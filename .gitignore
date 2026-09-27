@@ -1,0 +1,13 @@
+.DS_Store
+node_modules
+/dist
+/.local
+/build
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+*.log
+*.timestamp-*
+*.tsbuildinfo
