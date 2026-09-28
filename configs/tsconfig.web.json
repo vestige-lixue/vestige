@@ -1,0 +1,23 @@
+{
+    "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+    "include": [
+        "svelte.config.js",
+        "../renderer/**/*.ts",
+        "../renderer/**/*.js",
+        "../renderer/**/*.svelte",
+        "../preload/*.d.ts",
+        "../shared/**/*"
+    ],
+    "compilerOptions": {
+        "rootDir": "..",
+        "emitDeclarationOnly": true,
+        "outDir": "../dist/types/web",
+        "composite": true,
+        "tsBuildInfoFile": "../dist/tsconfig.web.tsbuildinfo",
+        "strict": true,
+        "allowJs": true,
+        "checkJs": true,
+        "verbatimModuleSyntax": true,
+        "types": ["svelte", "vite/client"]
+    }
+}

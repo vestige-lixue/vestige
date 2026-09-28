@@ -1,0 +1,33 @@
+button {
+    display: inline-block;
+    text-align: center;
+    cursor: pointer;
+    box-sizing: content-box;
+    background: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+
+    &[disabled]:not([disabled="false"]) {
+        cursor: default;
+    }
+}
+
+b {
+    font-weight: 600;
+}
+
+i {
+    font-style: italic;
+}
+
+u {
+    text-decoration: underline;
+    text-underline-offset: .2em;
+    text-decoration-skip-ink: none;
+}
+
+s {
+    text-decoration: line-through;
+    text-decoration-skip-ink: none;
+}

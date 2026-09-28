@@ -1,0 +1,37 @@
+appId: vestige.lixue
+productName: Vestige
+directories:
+  buildResources: resources
+  output: dist/release
+files:
+  - dist/**/*
+  - resources/icons/**/*
+  - '!dist/release/**/*'
+  - '!dist/types/**/*'
+  - '!dist/*.tsbuildinfo'
+  - '!dist/.eslintcache'
+win:
+  executableName: vestige
+  icon: resources/icons/icon.ico
+  target:
+    - nsis
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  icon: resources/icons/icon.icns
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  target:
+    - dmg
+dmg:
+  artifactName: ${name}-${version}-${arch}.${ext}
+linux:
+  icon: resources/icons/icon.png
+  target:
+    - AppImage
+  category: Utility
+appImage:
+  artifactName: ${name}-${version}-${arch}.${ext}

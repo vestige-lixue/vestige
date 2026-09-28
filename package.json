@@ -1,0 +1,55 @@
+{
+    "name": "vestige",
+    "version": "0.1.0",
+    "description": "A workspace for media transcription and records.",
+    "type": "module",
+    "scripts": {
+        "lint": "eslint --config configs/eslint.config.js --cache --cache-location dist/.eslintcache .",
+        "lint:fix": "eslint --config configs/eslint.config.js --fix .",
+        "lint:test": "node configs/config.test.js",
+        "typecheck:node": "tsc --noEmit -p configs/tsconfig.node.json",
+        "svelte-check": "svelte-check --tsconfig ./configs/tsconfig.web.json --config ./configs/svelte.config.js",
+        "typecheck": "pnpm typecheck:node && pnpm svelte-check",
+        "check": "pnpm typecheck",
+        "check:watch": "pnpm svelte-check --watch",
+        "start": "electron-vite preview --skipBuild --config configs/electron.vite.config.ts",
+        "dev": "electron-vite dev --config configs/electron.vite.config.ts",
+        "preview": "pnpm start",
+        "build": "pnpm typecheck && electron-vite build --config configs/electron.vite.config.ts",
+        "build:unpack": "pnpm build && electron-builder --dir",
+        "build:win": "pnpm build && electron-builder --win",
+        "build:mac": "pnpm build && electron-builder --mac",
+        "build:linux": "pnpm build && electron-builder --linux",
+        "icons": "node scripts/generate-icons.mjs"
+    },
+    "license": "MIT",
+    "devDependencies": {
+        "@electron-toolkit/eslint-config-ts": "^3.1.0",
+        "@electron-toolkit/tsconfig": "2.0.0",
+        "@eslint/css": "^2.0.0",
+        "@eslint/json": "^2.1.0",
+        "@resvg/resvg-js": "2.6.2",
+        "@stylistic/eslint-plugin": "^5.10.0",
+        "@sveltejs/vite-plugin-svelte": "^6.2.4",
+        "@types/node": "22.20.2",
+        "electron": "44.4.5",
+        "electron-builder": "26.15.3",
+        "electron-vite": "5.0.0",
+        "eslint": "^10.10.0",
+        "eslint-plugin-svelte": "^3.23.0",
+        "eslint-plugin-yml": "^3.8.1",
+        "svelte": "^5.56.3",
+        "svelte-check": "^4.6.0",
+        "typescript": "~6.0.3",
+        "vite": "^7.3.6"
+    },
+    "main": "./dist/main/index.js",
+    "author": "Vestige",
+    "packageManager": "pnpm@12.5.1",
+    "engines": {
+        "node": "^22.12.0 || >=24.0.0"
+    },
+    "build": {
+        "extends": "./configs/electron-builder.yml"
+    }
+}
