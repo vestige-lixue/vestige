@@ -59,6 +59,6 @@
 
 
 <script lang="ts">
-    import logo from "../assets/logo-black.svg?raw";
+    import logo from "../assets/logo.svg?raw";
     import RecordList from "./RecordList.svelte";
 </script>
