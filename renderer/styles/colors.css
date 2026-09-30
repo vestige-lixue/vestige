@@ -1,12 +1,21 @@
 :root {
-    --color-background: #ffffff;
+    --c-background: #ffffff;
     --c-surface: #f5f6f8;
-    --color-text: #252a30;
-    --color-muted: #747b85;
-    --color-border: #e1e4e8;
+    --c-text: #252a30;
+    --c-muted: #747b85;
+    --c-border: #e1e4e8;
+    --c-shadow-1: rgba(37, 42, 48, 0.06);
+    --c-shadow-2: rgba(37, 42, 48, 0.08);
+    --c-shadow-3: rgba(37, 42, 48, 0.12);
 }
 
 :root {
-    color: var(--color-text);
-    background: var(--color-background);
+    --bg: var(--c-background);
+    --hover-lightness: 0.9;
+    color: var(--c-text);
+    background: var(--bg);
+}
+
+.hoverable:hover:not(:disabled):not([data-disabled]) {
+    background-color: hsl(from var(--bg) h s calc(l * var(--hover-lightness)));
 }

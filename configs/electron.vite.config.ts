@@ -1,9 +1,11 @@
 import { resolve } from "node:path";
 import { defineConfig } from "electron-vite";
+import UnpluginTypia from "@typia/unplugin/vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig({
     main: {
+        plugins: [UnpluginTypia({ tsconfig: "configs/tsconfig.node.json" })],
         build: {
             outDir: "dist/main",
             rollupOptions: {

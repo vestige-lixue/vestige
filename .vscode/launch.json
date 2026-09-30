@@ -26,6 +26,7 @@
         },
         {
             "name": "Debug Renderer Process",
+            "address": "127.0.0.1",
             "port": 14201,
             "request": "attach",
             "type": "chrome",

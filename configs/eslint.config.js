@@ -19,6 +19,10 @@ export default defineConfig(
         rules: {
             "no-unused-vars": "off",
             "@typescript-eslint/no-unused-vars": "off",
+            "no-restricted-syntax": ["warn", {
+                selector: "ImportDeclaration[importKind='type']",
+                message: "Put type inside the braces: import { type Foo } from \"./Foo\"."
+            }],
             "@stylistic/quotes": ["warn", "double", { avoidEscape: false, allowTemplateLiterals: "always" }],
             "@stylistic/semi": ["warn", "always"],
             "@stylistic/comma-dangle": ["warn", "never"],

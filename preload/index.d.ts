@@ -1,4 +1,4 @@
-import type { AppAPI } from "../shared/types/app";
+import { type AppAPI } from "../shared/app";
 
 declare global {
     interface Window {

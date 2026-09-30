@@ -2,9 +2,14 @@ import { app, shell, BrowserWindow, nativeTheme } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import icon from "../resources/icons/icon.png?asset";
+import iconBlack from "../resources/icons/icon-black.png?asset";
+import iconWhite from "../resources/icons/icon-white.png?asset";
 import windowsIconBlack from "../resources/icons/icon-black.ico?asset";
 import windowsIconWhite from "../resources/icons/icon-white.ico?asset";
+import { registerTranscriptionIPCs } from "./transcription/ipc";
+import { registerProjectIPCs } from "./project/ipc";
+import { registerWindowLifecycle } from "./lifecycle";
+import { appChannels } from "../shared/ipc";
 
 app.setName("Vestige");
 
@@ -30,9 +35,9 @@ function openExternal(url: string): void {
 }
 
 function getWindowIcon(): string {
-    if (process.platform !== "win32") return icon;
-    // The Windows taskbar follows the system theme, independently of the app theme.
-    return nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ? windowsIconWhite : windowsIconBlack;
+    const dark = process.platform === "linux" ? nativeTheme.shouldUseDarkColors : nativeTheme.shouldUseDarkColorsForSystemIntegratedUI;
+    if (process.platform === "win32") return dark ? windowsIconWhite : windowsIconBlack;
+    return dark ? iconWhite : iconBlack;
 }
 
 function createWindow(): void {
@@ -62,7 +67,15 @@ function createWindow(): void {
         }
     });
 
-    if (process.platform === "win32") {
+    registerProjectIPCs(mainWindow);
+    registerWindowLifecycle(mainWindow);
+    registerTranscriptionIPCs(mainWindow.webContents, {
+        runtimeDirectory: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources"), "bin"),
+        modelDirectory: join(app.getPath("userData"), "models"),
+        temporaryDirectory: join(app.getPath("temp"), "vestige-transcription")
+    });
+
+    if (process.platform !== "darwin") {
         const updateWindowIcon = (): void => mainWindow.setIcon(getWindowIcon());
         nativeTheme.on("updated", updateWindowIcon);
         mainWindow.once("closed", () => nativeTheme.off("updated", updateWindowIcon));
@@ -80,7 +93,7 @@ function createWindow(): void {
         }
     });
 
-    mainWindow.webContents.ipc.on("window:open-devtools", event => {
+    mainWindow.webContents.ipc.on(appChannels.openDevTools, event => {
         if (event.senderFrame !== mainWindow.webContents.mainFrame) return;
         mainWindow.webContents.openDevTools({ mode: "detach" });
     });
@@ -119,15 +132,20 @@ function createWindow(): void {
 
     // HMR support, do not remove
     if (!app.isPackaged && process.env["ELECTRON_RENDERER_URL"]) {
-        void mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+        mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
     }
     else {
-        void mainWindow.loadFile(fileURLToPath(new URL("../renderer/index.html", import.meta.url)));
+        mainWindow.loadFile(fileURLToPath(new URL("../renderer/index.html", import.meta.url)));
     }
 }
 
 app.whenReady().then(() => {
     app.setAppUserModelId("vestige.lixue");
+    if (process.platform === "darwin") {
+        const updateDockIcon = (): void => app.dock?.setIcon(getWindowIcon());
+        updateDockIcon();
+        nativeTheme.on("updated", updateDockIcon);
+    }
     createWindow();
 });
 

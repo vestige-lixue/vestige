@@ -12,7 +12,7 @@
 <style>
     section {
         padding: 0 20px 16px;
-        border-bottom: 1px solid var(--color-border);
+        border-bottom: 1px solid var(--c-border);
     }
     .preview {
         display: grid;

@@ -10,9 +10,14 @@ files:
   - '!dist/types/**/*'
   - '!dist/*.tsbuildinfo'
   - '!dist/.eslintcache'
+extraResources:
+  - from: resources/bin
+    to: bin
+    filter:
+      - '**/*'
 win:
   executableName: vestige
-  icon: resources/icons/icon.ico
+  icon: resources/icons/icon-black.ico
   target:
     - nsis
 nsis:

@@ -2,7 +2,11 @@
     "name": "vestige",
     "version": "0.1.0",
     "description": "A workspace for media transcription and records.",
+    "author": "LJM12914",
     "type": "module",
+    "license": "MIT",
+    "main": "./dist/main/index.js",
+    "packageManager": "pnpm@12.5.1",
     "scripts": {
         "lint": "eslint --config configs/eslint.config.js --cache --cache-location dist/.eslintcache .",
         "lint:fix": "eslint --config configs/eslint.config.js --fix .",
@@ -20,9 +24,19 @@
         "build:win": "pnpm build && electron-builder --win",
         "build:mac": "pnpm build && electron-builder --mac",
         "build:linux": "pnpm build && electron-builder --linux",
-        "icons": "node scripts/generate-icons.mjs"
+        "icons": "node .local/generate-theme-icons.mjs"
     },
-    "license": "MIT",
+    "engines": {
+        "node": "^22.12.0 || >=24.0.0"
+    },
+    "build": {
+        "extends": "./configs/electron-builder.yml"
+    },
+    "dependencies": {
+        "@noble/hashes": "2.4.0",
+        "bits-ui": "^2.19.3",
+        "typia": "12.1.1"
+    },
     "devDependencies": {
         "@electron-toolkit/eslint-config-ts": "^3.1.0",
         "@electron-toolkit/tsconfig": "2.0.0",
@@ -32,6 +46,7 @@
         "@stylistic/eslint-plugin": "^5.10.0",
         "@sveltejs/vite-plugin-svelte": "^6.2.4",
         "@types/node": "22.20.2",
+        "@typia/unplugin": "12.1.1",
         "electron": "44.4.5",
         "electron-builder": "26.15.3",
         "electron-vite": "5.0.0",
@@ -42,14 +57,5 @@
         "svelte-check": "^4.6.0",
         "typescript": "~6.0.3",
         "vite": "^7.3.6"
-    },
-    "main": "./dist/main/index.js",
-    "author": "Vestige",
-    "packageManager": "pnpm@12.5.1",
-    "engines": {
-        "node": "^22.12.0 || >=24.0.0"
-    },
-    "build": {
-        "extends": "./configs/electron-builder.yml"
     }
 }
