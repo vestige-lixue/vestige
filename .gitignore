@@ -11,4 +11,5 @@ node_modules
 *.log
 *.timestamp-*
 *.tsbuildinfo
-/resources/bin
+/resources/bin/*
+!/resources/bin/README.md
