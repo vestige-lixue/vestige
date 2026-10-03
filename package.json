@@ -23,8 +23,7 @@
         "build:unpack": "pnpm build && electron-builder --dir",
         "build:win": "pnpm build && electron-builder --win",
         "build:mac": "pnpm build && electron-builder --mac",
-        "build:linux": "pnpm build && electron-builder --linux",
-        "icons": "node .local/generate-theme-icons.mjs"
+        "build:linux": "pnpm build && electron-builder --linux"
     },
     "engines": {
         "node": "^22.12.0 || >=24.0.0"

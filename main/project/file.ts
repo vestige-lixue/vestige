@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { open, readFile, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { type Project } from "../../shared/project/Project";
+import { type AbsolutePath } from "../../shared/util/path";
 import { type GetProjectResult, type SaveProjectResult } from "../../shared/project/file";
 import { validateProject } from "./validate";
-import { errorMessage, filePath } from "../file";
+import { errorMessage, filePath } from "../util/file";
 
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
 
-export async function getProject(path: string): Promise<GetProjectResult> {
+export async function getProject(path: unknown): Promise<GetProjectResult> {
     try {
         const text = await readFile(filePath(path), "utf8");
         const project: unknown = JSON.parse(text.replace(/^\uFEFF/, ""));
@@ -20,7 +21,7 @@ export async function getProject(path: string): Promise<GetProjectResult> {
     }
 }
 
-async function writeProject(path: string, text: string): Promise<SaveProjectResult> {
+async function writeProject(path: AbsolutePath, text: string): Promise<SaveProjectResult> {
     const temporary = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
     try {
         const existing = await stat(path).catch((error: NodeJS.ErrnoException) => {
@@ -47,15 +48,16 @@ async function writeProject(path: string, text: string): Promise<SaveProjectResu
     }
 }
 
-export async function saveProject(path: string, project: Project): Promise<SaveProjectResult> {
+export async function saveProject(path: unknown, project: Project): Promise<SaveProjectResult> {
     try {
-        path = filePath(path);
+        const normalized = filePath(path);
         validateProject(project);
         // Capture before waiting, so a queued write cannot observe later mutations.
         const text = JSON.stringify(project, null, 4);
-        const key = process.platform === "win32" ? path.toLowerCase() : path;
+        // Case folding only serializes potentially aliasing writes; keep the actual path unchanged.
+        const key = process.platform === "win32" ? normalized.toLowerCase() : normalized;
         const previous = pendingWritesQueue.get(key);
-        const write = (previous ?? Promise.resolve()).then(() => writeProject(path, text));
+        const write = (previous ?? Promise.resolve()).then(() => writeProject(normalized, text));
         pendingWritesQueue.set(key, write);
         try {
             return await write;

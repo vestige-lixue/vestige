@@ -5,7 +5,7 @@ directories:
   output: dist/release
 files:
   - dist/**/*
-  - resources/icons/**/*
+  - resources/logos/**/*
   - '!dist/release/**/*'
   - '!dist/types/**/*'
   - '!dist/*.tsbuildinfo'
@@ -17,7 +17,7 @@ extraResources:
       - '**/*'
 win:
   executableName: vestige
-  icon: resources/icons/logo-black.ico
+  icon: resources/logos/logo-square-black.ico
   target:
     - nsis
 nsis:
@@ -26,7 +26,7 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
-  icon: resources/icons/logo.icns
+  icon: resources/logos/logo-square.icns
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
   target:
@@ -34,7 +34,7 @@ mac:
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
 linux:
-  icon: resources/icons/logo.png
+  icon: resources/logos/logo-square-black.png
   target:
     - AppImage
   category: Utility

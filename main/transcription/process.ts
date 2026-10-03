@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
+import { type AbsolutePath } from "../../shared/util/path";
+import { filePath } from "../util/file";
 
-export async function findExecutable(runtimeRoot: string, runtime: string, name: string): Promise<string> {
+export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string, name: string): Promise<AbsolutePath> {
     const filename = name + (process.platform === "win32" ? ".exe" : "");
     const candidates = [join(runtimeRoot, runtime, filename)];
     // Resolve PATH before changing cwd; a task directory is never an executable search path.
@@ -13,8 +15,9 @@ export async function findExecutable(runtimeRoot: string, runtime: string, name:
     }
     for (const candidate of candidates) {
         try {
-            await access(candidate, constants.X_OK);
-            return resolve(candidate);
+            const executable = filePath(candidate);
+            await access(executable, constants.X_OK);
+            return executable;
         }
         catch { /* Try the next installed location. */ }
     }
@@ -25,9 +28,9 @@ export async function findExecutable(runtimeRoot: string, runtime: string, name:
 export type ProcessOutput = { stdout: string; stderr: string };
 
 export function runProcess(
-    executable: string,
+    executable: AbsolutePath,
     args: string[],
-    cwd: string,
+    cwd: AbsolutePath,
     signal?: AbortSignal
 ): Promise<ProcessOutput> {
     signal?.throwIfAborted();

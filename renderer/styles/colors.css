@@ -1,21 +1,36 @@
 :root {
+    --c-accent: #1e90ff;
+    --c-selection: #b9d1eb;
     --c-background: #ffffff;
     --c-surface: #f5f6f8;
     --c-text: #252a30;
+    --c-text-80p: #686e75;
     --c-muted: #747b85;
     --c-border: #e1e4e8;
+    --c-overlay: #0005;
+    --c-border-accent: var(--c-accent);
     --c-shadow-1: rgba(37, 42, 48, 0.06);
     --c-shadow-2: rgba(37, 42, 48, 0.08);
     --c-shadow-3: rgba(37, 42, 48, 0.12);
+    --c-kbd-border: #e1e5eb;
+    --c-danger: #e55353;
 }
 
 :root {
     --bg: var(--c-background);
-    --hover-lightness: 0.9;
+    --hover-lightness: 0.96;
+    --active-lightness: 0.9;
     color: var(--c-text);
     background: var(--bg);
 }
 
-.hoverable:hover:not(:disabled):not([data-disabled]) {
+.hoverable:hover:not(:disabled):not([data-disabled]),
+[data-menubar-item][data-highlighted]:not([data-disabled]),
+[data-menubar-trigger][data-state="open"]:not([data-disabled]) {
     background-color: hsl(from var(--bg) h s calc(l * var(--hover-lightness)));
+    transition: background-color .08s ease;
+}
+
+.activable:active:not(:disabled):not([data-disabled]) {
+    background-color: hsl(from var(--bg) h s calc(l * var(--active-lightness)));
 }

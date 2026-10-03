@@ -3,6 +3,14 @@ import { type Project } from "../../shared/project/Project";
 import { type Segment } from "../../shared/transcription/Run";
 import { type TextPosition } from "../../shared/util/range";
 import { projectVersion } from "../../shared/project/constants";
+import { storedFilePath } from "../util/file";
+
+// JSON stores plain strings; establish the path brand after structural validation.
+type SerializedProject = Omit<Project, "vestiges"> & {
+    vestiges: Array<Omit<Project["vestiges"][number], "media"> & {
+        media: Omit<Project["vestiges"][number]["media"], "path"> & { path: string };
+    }>;
+};
 
 function number(value: number, path: string, max = Infinity, integer = false): number {
     if (!Number.isFinite(value) || value < 0 || value > max || (integer && !Number.isSafeInteger(value))) {
@@ -19,13 +27,13 @@ function position(item: TextPosition, path: string, transcript: Segment[]): void
 
 export function validateProject(value: unknown): asserts value is Project {
     // Typia generates the structural checks directly from the shared TS type.
-    const project = typia.assert<Project>(value);
+    const project = typia.assert<SerializedProject>(value);
     if (project.version !== projectVersion) throw new Error(`Unsupported project version: ${project.version}.`);
     number(project.lastOpened, "project.lastOpened", Number.MAX_SAFE_INTEGER, true);
     project.vestiges.forEach((vestige, index) => {
         const path = `project.vestiges[${index}]`;
         const { media, runs } = vestige;
-        if (!media.path) throw new Error(`${path}.media.path must not be empty.`);
+        media.path = storedFilePath(media.path);
         number(media.size, `${path}.media.size`, Number.MAX_SAFE_INTEGER, true);
         const duration = number(media.duration, `${path}.media.duration`);
         runs.forEach((run, index) => {

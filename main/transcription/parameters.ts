@@ -1,16 +1,21 @@
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { join, relative } from "node:path";
+import { type AbsolutePath } from "../../shared/util/path";
+import { containsPath, filePath, resolveFilePath } from "../util/file";
 import { type TranscriptionRequest } from "../../shared/transcription/executer";
 
-export type ParsedRequest = TranscriptionRequest & { options: Record<string, unknown> };
+export type ParsedRequest = Omit<TranscriptionRequest, "modelDirectory"> & {
+    modelDirectory: AbsolutePath;
+    options: Record<string, unknown>;
+};
 
-export function parseRequest(value: unknown): ParsedRequest {
+export function parseRequest(value: unknown, modelRoot: AbsolutePath): ParsedRequest {
     if (!value || typeof value !== "object") throw new Error("A transcription request is required.");
     const request = value as Record<string, unknown>;
     if (request.executer !== "sherpa-onnx" && request.executer !== "whisper.cpp") {
         throw new Error("Unknown executer: " + String(request.executer));
     }
     for (const key of ["modelDirectory", "mediaPath"]) {
-        if (typeof request[key] !== "string" || !request[key].trim()) {
+        if (typeof request[key] !== "string" || !request[key].trim() || request[key].includes("\0")) {
             throw new Error(key + " must be a non-empty path.");
         }
     }
@@ -21,8 +26,8 @@ export function parseRequest(value: unknown): ParsedRequest {
     }
     return {
         executer: request.executer,
-        modelDirectory: request.modelDirectory as string,
-        mediaPath: request.mediaPath as string,
+        modelDirectory: resolveFilePath(modelRoot, request.modelDirectory as string),
+        mediaPath: filePath(request.mediaPath),
         params: request.params,
         options: params as Record<string, unknown>
     };
@@ -40,9 +45,8 @@ export function optionName(key: string): string {
     return name;
 }
 
-export function modelPath(value: string, modelDirectory: string): string {
-    const absolute = resolve(modelDirectory, value);
-    const child = relative(modelDirectory, absolute);
-    if (child === ".." || child.startsWith("..\\") || child.startsWith("../") || isAbsolute(child)) return absolute;
-    return join("models", child);
+export function modelPath(value: string, modelDirectory: AbsolutePath): string {
+    const absolute = resolveFilePath(modelDirectory, value);
+    if (!containsPath(modelDirectory, absolute)) return absolute;
+    return join("models", relative(modelDirectory, absolute));
 }

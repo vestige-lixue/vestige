@@ -1,3 +1,4 @@
+import { type AbsolutePath } from "../../../shared/util/path";
 import { argumentValue, modelPath, optionName } from "../parameters";
 
 // Only native file options are resolved; arbitrary options and text stay opaque.
@@ -14,7 +15,7 @@ const fileOptions = new Set([
 ]);
 const fileLists = new Set(["paraformer", "hr-rule-fsts", "rule-fsts", "rule-fars"]);
 
-export function nativeArguments(params: Record<string, unknown>, modelDirectory: string): string[] {
+export function nativeArguments(params: Record<string, unknown>, modelDirectory: AbsolutePath): string[] {
     return Object.entries(params).map(([key, value]) => {
         const name = optionName(key);
         const list = fileLists.has(name) || name.endsWith(".qnn-context-binary");

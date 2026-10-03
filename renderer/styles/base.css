@@ -13,7 +13,11 @@
     line-height: normal;
     user-select: none;
     -webkit-user-drag: none;
-    transition: background-color 0.2s ease;
+    transition: background-color .2s ease;
+}
+
+::selection {
+    background-color: var(--c-selection);
 }
 
 body {
@@ -26,8 +30,9 @@ body {
 }
 
 #app {
+    position: relative;
     display: grid;
-    grid-template-columns: clamp(150px, 22vw, 200px) minmax(0, 1fr);
+    grid-template-columns: auto auto minmax(0, 1fr);
     height: 100vh;
     width: 100vw;
     overflow: clip;

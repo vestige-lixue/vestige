@@ -1,15 +1,24 @@
-<aside>
+<aside
+    style:width={typeof width === "number" ? `${width}px` : width}
+    style:min-width={`${minWidth}px`}
+    style:max-width={maxWidth}
+>
     <div class="logo">
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html logo}
     </div>
+    <ProjectStatus />
     <RecordList />
-    <nav>
-        <button class="hoverable">词库</button>
-        <button class="hoverable">转写任务</button>
-        <button class="hoverable">设置</button>
-    </nav>
+    <SideNav />
 </aside>
+<Resizer
+    direction="vertical"
+    origin={width}
+    min={minWidth}
+    max={maxWidth}
+    changeCB={value => width = value}
+    thickness={3}
+/>
 
 
 <style>
@@ -20,7 +29,6 @@
         align-items: center;
         min-height: 0;
         background: var(--bg);
-        border-right: 1px solid var(--c-border);
     }
     .logo {
         -webkit-app-region: drag;
@@ -40,24 +48,17 @@
         max-width: 100%;
         pointer-events: none;
     }
-    nav {
-        display: flex;
-        flex-flow: column nowrap;
-        align-items: center;
-        width: 100%;
-        margin-top: auto;
-    }
-    nav button {
-        display: grid;
-        place-items: center;
-        width: 100%;
-        padding: 8px 0;
-        font-size: 16px;
-    }
 </style>
 
 
 <script lang="ts">
-    import logo from "../assets/logo.svg?raw";
-    import RecordList from "./RecordList.svelte";
+    import logo from "../../../resources/logos/logo-black.svg?raw";
+    import RecordList from "./MediaList.svelte";
+    import SideNav from "./SideNav.svelte";
+    import ProjectStatus from "./ProjectStatus.svelte";
+    import Resizer from "../util/Resizer.svelte";
+
+    const minWidth = 150;
+    const maxWidth = "min(40vw, 750px)";
+    let width = $state<number | string>("min(22vw, 200px)");
 </script>

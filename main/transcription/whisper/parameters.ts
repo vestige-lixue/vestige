@@ -1,8 +1,9 @@
+import { type AbsolutePath } from "../../../shared/util/path";
 import { argumentValue, modelPath, optionName } from "../parameters";
 
 const fileOptions = new Set(["m", "model", "vm", "vad-model", "fp", "font-path"]);
 
-export function nativeArguments(params: Record<string, unknown>, modelDirectory: string): string[] {
+export function nativeArguments(params: Record<string, unknown>, modelDirectory: AbsolutePath): string[] {
     const args: string[] = [];
     for (const [key, original] of Object.entries(params)) {
         const name = optionName(key);

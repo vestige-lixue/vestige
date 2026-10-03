@@ -2,16 +2,21 @@ import { app, shell, BrowserWindow, nativeTheme } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import iconBlack from "../resources/icons/icon-black.png?asset";
-import iconWhite from "../resources/icons/icon-white.png?asset";
-import windowsIconBlack from "../resources/icons/icon-black.ico?asset";
-import windowsIconWhite from "../resources/icons/icon-white.ico?asset";
+import iconBlack from "../resources/logos/logo-square-black.png?asset";
+import iconWhite from "../resources/logos/logo-square-white.png?asset";
+import windowsIconBlack from "../resources/logos/logo-square-black.ico?asset";
+import windowsIconWhite from "../resources/logos/logo-square-white.ico?asset";
 import { registerTranscriptionIPCs } from "./transcription/ipc";
 import { registerProjectIPCs } from "./project/ipc";
 import { registerWindowLifecycle } from "./lifecycle";
 import { appChannels } from "../shared/ipc";
+import { type EditAction } from "../shared/app";
+import { filePath } from "./util/file";
+import { registerFileIPCs } from "./file/ipc";
+import { registerMediaScheme } from "./file/source";
 
 app.setName("Vestige");
+registerMediaScheme();
 
 function developmentDataPath(projectPath: string, profile = "default"): string {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(profile)) {
@@ -49,7 +54,6 @@ function createWindow(): void {
         minHeight: 480,
         show: false,
         backgroundColor: "#ffffff",
-        autoHideMenuBar: true,
         titleBarStyle: "hidden",
         ...(process.platform === "darwin"
             ? { titleBarOverlay: true, trafficLightPosition: { x: 16, y: 20 } }
@@ -67,15 +71,22 @@ function createWindow(): void {
         }
     });
 
+    registerFileIPCs(mainWindow.webContents);
+    mainWindow.webContents.ipc.on(appChannels.edit, (event, action: unknown) => {
+        if (event.senderFrame !== mainWindow.webContents.mainFrame || typeof action !== "string"
+            || !["undo", "redo", "cut", "copy", "paste"].includes(action)) return;
+        mainWindow.webContents[action as EditAction]();
+    });
     registerProjectIPCs(mainWindow);
     registerWindowLifecycle(mainWindow);
     registerTranscriptionIPCs(mainWindow.webContents, {
-        runtimeDirectory: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources"), "bin"),
-        modelDirectory: join(app.getPath("userData"), "models"),
-        temporaryDirectory: join(app.getPath("temp"), "vestige-transcription")
+        runtimeDirectory: filePath(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources"), "bin")),
+        modelDirectory: filePath(join(app.getPath("userData"), "models")),
+        temporaryDirectory: filePath(join(app.getPath("temp"), "vestige-transcription"))
     });
 
     if (process.platform !== "darwin") {
+        mainWindow.removeMenu();
         const updateWindowIcon = (): void => mainWindow.setIcon(getWindowIcon());
         nativeTheme.on("updated", updateWindowIcon);
         mainWindow.once("closed", () => nativeTheme.off("updated", updateWindowIcon));
@@ -98,11 +109,16 @@ function createWindow(): void {
         mainWindow.webContents.openDevTools({ mode: "detach" });
     });
 
+    mainWindow.webContents.ipc.on(appChannels.quit, event => {
+        if (event.senderFrame !== mainWindow.webContents.mainFrame) return;
+        app.quit();
+    });
+
     mainWindow.webContents.on("before-input-event", (event, input) => {
         const command = input.control || input.meta;
-        // Disable native reload/close shortcuts while keeping page key events.
+        // Disable native reload/close/quit shortcuts while keeping page key events.
         mainWindow.webContents.setIgnoreMenuShortcuts(
-            command && (input.code === "KeyR" || input.code === "KeyW")
+            command && (input.code === "KeyR" || input.code === "KeyW" || input.key.toLowerCase() === "q")
         );
 
         if (input.code === "F11") {
