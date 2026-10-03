@@ -4,7 +4,7 @@
     "description": "A workspace for media transcription and records.",
     "author": "LJM12914",
     "type": "module",
-    "license": "MIT",
+    "license": "AGPL-3.0-or-later",
     "main": "./dist/main/index.js",
     "packageManager": "pnpm@12.5.1",
     "scripts": {

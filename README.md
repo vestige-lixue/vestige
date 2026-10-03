@@ -63,4 +63,4 @@ Packages are written to `dist/release/`.
 
 ## License
 
-MIT
+AGPL-3.0-or-later

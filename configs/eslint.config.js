@@ -17,7 +17,7 @@ export default defineConfig(
         ],
         plugins: { "@stylistic": stylistic },
         rules: {
-            "no-unused-vars": "off",
+            "no-unused-vars": "on",
             "@typescript-eslint/no-unused-vars": "off",
             "no-restricted-syntax": ["warn", {
                 selector: "ImportDeclaration[importKind='type']",
