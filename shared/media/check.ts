@@ -5,13 +5,18 @@ export type MediaReference = Pick<Media, "size" | "hash">;
 export type MediaIssueStatus = "missing" | "changed" | "unreadable";
 
 export type MediaCheckResult = ({
-    status: "available";
-    path: Media["path"];
-    size: number;
-    hash: string;
+    status: "ready";
+    media: Omit<Media, "id">;
 } | {
-    status: MediaIssueStatus;
+    status: MediaIssueStatus | "cancelled";
     error: string;
 });
 
-export type MediaSourceHandle = { id: string; url: string };
+export type MediaURLResult = ({
+    status: "ready";
+    id: string;
+    url: string;
+} | {
+    status: "missing" | "unreadable";
+    error: string;
+});

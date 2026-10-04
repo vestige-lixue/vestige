@@ -3,6 +3,7 @@ import { type AbsolutePath } from "./util/path";
 export type MediaKind = "audio" | "video";
 
 export type Media = {
+    id: string;
     // Including the filename.
     path: AbsolutePath;
     hash: string;

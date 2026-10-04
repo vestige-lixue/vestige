@@ -1,12 +1,13 @@
 import { type Run, type Segment } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, probability, range, segments, createRun } from "../result";
+import { TranscriptionError } from "../failure";
 
 function whisperTranscript(output: NativeObject, duration: number): Segment[] {
-    if (!Array.isArray(output.transcription)) throw new Error("whisper.cpp returned no transcription array.");
+    if (!Array.isArray(output.transcription)) throw new TranscriptionError("whisper.cpp returned no transcription array.");
     return output.transcription.flatMap(value => {
         const segment = object(value);
-        if (typeof segment.text !== "string") throw new Error("whisper.cpp returned a segment without text.");
+        if (typeof segment.text !== "string") throw new TranscriptionError("whisper.cpp returned a segment without text.");
         const offsets = object(segment.offsets);
         const fallback = range(offsets.from, offsets.to, duration, 0.001) ?? { start: 0, end: duration };
         const pieces = array(segment.tokens).map(object).filter(token => {
@@ -21,7 +22,7 @@ function whisperTranscript(output: NativeObject, duration: number): Segment[] {
     });
 }
 
-export function toRun(request: ParsedRequest, value: unknown, duration: number, runTime: number): Run {
+export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number): Run {
     const output = object(value);
-    return createRun(request, object(output.result).language, whisperTranscript(output, duration), runTime);
+    return createRun(id, request, object(output.result).language, whisperTranscript(output, duration), runTime);
 }

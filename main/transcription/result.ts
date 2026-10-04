@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import { type Range } from "../../shared/util/range";
 import { type Run, type Segment } from "../../shared/transcription/Run";
 import { type ParsedRequest } from "./parameters";
+import { TranscriptionError } from "./failure";
 
 export type NativeObject = Record<string, unknown>;
 export type Piece = { text: string; range?: Range; prob: number };
@@ -57,14 +57,15 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     try {
         return JSON.parse(raw);
     }
-    catch {
-        throw new Error(diagnostic || raw || "Executer produced no JSON result.");
+    catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        throw new TranscriptionError(diagnostic || raw || "Executer produced no JSON result.", { cause: error });
     }
 }
 
-export function createRun(request: ParsedRequest, language: unknown, transcript: Segment[], runTime: number): Run {
+export function createRun(id: string, request: ParsedRequest, language: unknown, transcript: Segment[], runTime: number): Run {
     return {
-        id: randomUUID(),
+        id,
         modelName: basename(request.modelDirectory),
         params: request.params,
         language: typeof language === "string" && language.trim() ? language : "und",

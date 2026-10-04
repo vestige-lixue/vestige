@@ -3,7 +3,7 @@
     escBehavior="ignore"
     clickMaskBehavior="ignore"
     onOpenChangeComplete={open => {
-        if (!open) mediaImports.dismissImportFailure(failure);
+        if (!open) onClosed();
     }}
 >
     <Dialog.Title class="modal-title">媒体导入失败</Dialog.Title>
@@ -19,8 +19,11 @@
 <script lang="ts">
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
-    import { mediaImports, type MediaImportFailure } from "../../states/media.svelte";
+    import * as mediaImport from "../../states/mediaImport.svelte";
 
-    let { failure }: { failure: MediaImportFailure } = $props();
-    let open = $state(true);
+    let { open = $bindable(), failure, onClosed }: {
+        open: boolean;
+        failure: mediaImport.MediaImportFailure;
+        onClosed: () => void;
+    } = $props();
 </script>

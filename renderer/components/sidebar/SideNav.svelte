@@ -1,5 +1,5 @@
 <nav>
-    <Tooltip text="词库" onclick={() => openPanel("vocabulary")}>
+    <Tooltip text="词库" onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
         {#snippet child({ props })}
             <button {...props} class="hoverable activable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -7,7 +7,7 @@
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text="转写任务" onclick={() => openPanel("tasks")}>
+    <Tooltip text="转写任务" onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
         {#snippet child({ props })}
             <button {...props} class="hoverable activable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -15,7 +15,7 @@
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text="设置" onclick={() => openPanel("settings")}>
+    <Tooltip text="设置" onclick={() => runCommand({ kind: "openPanel", panel: "settings" })}>
         {#snippet child({ props })}
             <button {...props} class="hoverable activable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -55,7 +55,7 @@
 
 <script lang="ts">
     import Tooltip from "../util/Tooltip.svelte";
-    import { openPanel } from "../../states/commands";
+    import { runCommand } from "../../states/commands";
     import bookIcon from "../../../resources/icons/carbon--book.svg?raw";
     import taskBlankIcon from "../../../resources/icons/carbon--task-blank.svg?raw";
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";

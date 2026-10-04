@@ -3,7 +3,9 @@ import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { filePath } from "../util/file";
+import { filePath, isSystemError } from "./file";
+
+export class NativeProcessError extends Error {}
 
 export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string, name: string): Promise<AbsolutePath> {
     const filename = name + (process.platform === "win32" ? ".exe" : "");
@@ -19,9 +21,11 @@ export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string,
             await access(executable, constants.X_OK);
             return executable;
         }
-        catch { /* Try the next installed location. */ }
+        catch (error) {
+            if (!isSystemError(error)) throw error;
+        }
     }
-    throw new Error(filename + " was not found. Install it with its native libraries in "
+    throw new NativeProcessError(filename + " was not found. Install it with its native libraries in "
         + join(runtimeRoot, runtime) + ", or add it to PATH.");
 }
 
@@ -57,7 +61,7 @@ export function runProcess(
         child.stdout.on("data", (data: string) => {
             stdout += data;
             if (stdout.length > 64 * 1024 * 1024) {
-                failure = new Error("Executer output exceeded 64 MiB.");
+                failure = new NativeProcessError("Executer output exceeded 64 MiB.");
                 abort();
             }
         });
@@ -65,14 +69,14 @@ export function runProcess(
             stderr += data;
         });
         child.on("error", error => {
-            failure = error;
+            failure = new NativeProcessError(error.message, { cause: error });
         });
         // Wait for close, including on cancellation, before deleting task files.
         child.on("close", (code, terminationSignal) => {
             signal?.removeEventListener("abort", abort);
-            if (signal?.aborted) reject(new Error("Transcription cancelled."));
+            if (signal?.aborted) reject(signal.reason);
             else if (failure) reject(failure);
-            else if (code !== 0) reject(new Error(stderr || stdout || "Executer exited with " + (terminationSignal ?? code)));
+            else if (code !== 0) reject(new NativeProcessError(stderr || stdout || "Executer exited with " + (terminationSignal ?? code)));
             else accept({ stdout, stderr });
         });
     });

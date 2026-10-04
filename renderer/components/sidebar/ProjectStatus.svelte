@@ -1,15 +1,15 @@
 <div class="project-status">
     <div class="project-name">
         <NiceLabel
-            value={getProjectFileName()}
+            value={project.getFileName()}
             editable={false}
             onchange={() => {}}
             scrollMode="ontime"
             scrollParam={1.5}
             scrollPause={0.5}
         />
-        {#if projectState.project}
-            <Tooltip text="关闭项目" side="bottom" onclick={closeProject}>
+        {#if project.projectState.project}
+            <Tooltip text="关闭项目" side="bottom" onclick={() => runCommand({ kind: "closeProject" })}>
                 {#snippet child({ props })}
                     <button {...props} class="hoverable activable">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -56,7 +56,8 @@
 
 <script lang="ts">
     import closeIcon from "../../../resources/icons/carbon--close.svg?raw";
-    import { closeProject, getProjectFileName, projectState } from "../../states/project.svelte";
+    import * as project from "../../states/project.svelte";
+    import { runCommand } from "../../states/commands";
     import NiceLabel from "../util/NiceLabel.svelte";
     import Tooltip from "../util/Tooltip.svelte";
 </script>

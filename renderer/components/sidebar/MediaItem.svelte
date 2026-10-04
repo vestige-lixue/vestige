@@ -1,82 +1,84 @@
-<div class="media hoverable" class:selected={mediaImports.selected === item} class:ignored={item.ignored}
-    role="button" tabindex={item.vestige ? 0 : -1} aria-pressed={mediaImports.selected === item}
-    onclick={() => {
-        if (!projectState.locked) mediaImports.select(item);
-    }}
-    onkeydown={event => {
-        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-            event.preventDefault();
-            if (!projectState.locked) mediaImports.select(item);
-        }
-    }}
->
-    <Tooltip text="双击编辑名称" disabled={projectState.locked} tabindex={-1}>
-        {#snippet child({ props })}
-            <div {...props}>
-                <NiceLabel
-                    value={item.vestige?.media.name ?? item.name}
-                    editable={!projectState.locked}
-                    onchange={name => renameMedia(item, name)}
-                    scrollMode="ontime"
-                    scrollParam={1.5}
-                    scrollPause={0.5}
-                />
+{#if item}
+    <div class="media hoverable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored}
+        role="button" tabindex={item.stage === "ready" ? 0 : -1} aria-pressed={mediaSelection.get() === mediaId}
+        onclick={() => {
+            if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
+        }}
+        onkeydown={event => {
+            if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
+            }
+        }}
+    >
+        <Tooltip text="双击编辑名称" disabled={project.projectState.locked} tabindex={-1}>
+            {#snippet child({ props })}
+                <div {...props}>
+                    <NiceLabel
+                        value={mediaImport.getName(mediaId)}
+                        editable={!project.projectState.locked}
+                        onchange={name => runCommand({ kind: "renameMedia", mediaId, name })}
+                        scrollMode="ontime"
+                        scrollParam={1.5}
+                        scrollPause={0.5}
+                    />
+                </div>
+            {/snippet}
+        </Tooltip>
+        <div class="media-actions">
+            <div class="media-info" title={issue?.error}>
+                {#if vestige}
+                    <span>{vestige.media.kind === "audio" ? "音频": "视频"}，{getSemanticDuration(vestige.media.duration)}</span>
+                {/if}
+                {#if mediaImport.isIssue(item)}
+                    <button class="media-issue import-error" disabled={project.projectState.locked} onclick={() => runCommand({ kind: "reviewMediaImportError", mediaId })}>
+                        {issueLabels[item.stage]}{item.ignored ? "（已忽略）" : ""}
+                    </button>
+                {:else if item.stage !== "ready"}
+                    <span class="import-progress">
+                        <Spinner size="12px" />
+                        {item.stage === "queued" && vestige ? "等待检查" : importStages[item.stage]}
+                    </span>
+                {/if}
             </div>
-        {/snippet}
-    </Tooltip>
-    <div class="media-actions">
-        <div class="media-info" title={item.error ?? undefined}>
-            {#if item.vestige}
-                <span>{item.vestige.media.kind === "audio" ? "音频": "视频"}，{getSemanticDuration(item.vestige.media.duration)}</span>
-            {/if}
-            {#if isMediaIssue(item.stage)}
-                <button class="media-issue import-error" disabled={projectState.locked} onclick={() => reviewMedia(item)}>
-                    {mediaIssueLabels[item.stage]}{item.ignored ? "（已忽略）" : ""}
-                </button>
-            {:else if item.stage !== "ready"}
-                <span class="import-progress">
-                    <Spinner size="12px" />
-                    {item.stage === "queued" && item.vestige ? "等待检查" : importStages[item.stage]}
-                </span>
-            {/if}
+            <Tooltip
+                text={transcription.getLabel(mediaId)}
+                disabled={commandDisabled(transcriptionCommand)}
+                onclick={() => runCommand(transcriptionCommand)}
+            >
+                {#snippet child({ props })}
+                    <button {...props} class="hoverable activable transcription-action">
+                        {#if task && task.status !== "failed"}
+                            <Spinner />
+                        {:else}
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                            {@html task?.status === "failed" ? taskRemoveIcon : vestige?.runs.length ? taskCompleteIcon : taskAddIcon}
+                        {/if}
+                    </button>
+                {/snippet}
+            </Tooltip>
+            <Tooltip
+                text={confirmingRemove ? "再次点击确认" : vestige ? "从项目中移除" : "取消导入"}
+                bind:open={removeTooltipOpen}
+                disableCloseOnTriggerClick
+                disabled={project.projectState.locked}
+                onclick={handleRemove}
+            >
+                {#snippet child({ props })}
+                    <button {...props} class="hoverable activable danger" bind:this={removeButton}>
+                        {#if confirmingRemove}
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                            {@html checkIcon}
+                        {:else}
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                            {@html removeIcon}
+                        {/if}
+                    </button>
+                {/snippet}
+            </Tooltip>
         </div>
-        <Tooltip
-            text={transcriptions.label(item)}
-            disabled={transcriptionDisabled(item)}
-            onclick={() => runMediaTranscription(item)}
-        >
-            {#snippet child({ props })}
-                <button {...props} class="hoverable activable transcription-action">
-                    {#if task && task.status !== "failed"}
-                        <Spinner />
-                    {:else}
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                        {@html task?.status === "failed" ? taskRemoveIcon : item.vestige?.runs.length ? taskCompleteIcon : taskAddIcon}
-                    {/if}
-                </button>
-            {/snippet}
-        </Tooltip>
-        <Tooltip
-            text={confirmingRemove ? "再次点击确认" : item.vestige ? "从项目中移除" : "取消导入"}
-            bind:open={removeTooltipOpen}
-            disableCloseOnTriggerClick
-            disabled={projectState.locked}
-            onclick={handleRemove}
-        >
-            {#snippet child({ props })}
-                <button {...props} class="hoverable activable danger" bind:this={removeButton}>
-                    {#if confirmingRemove}
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                        {@html checkIcon}
-                    {:else}
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                        {@html removeIcon}
-                    {/if}
-                </button>
-            {/snippet}
-        </Tooltip>
     </div>
-</div>
+{/if}
 
 
 <style>
@@ -155,10 +157,11 @@
 
 
 <script lang="ts">
-    import { mediaImports, isMediaIssue, mediaIssueLabels, type MediaItemState } from "../../states/media.svelte";
-    import { projectState, renameMedia, removeMedia, reviewMedia } from "../../states/project.svelte";
-    import { transcriptions } from "../../states/transcription.svelte";
-    import { transcriptionDisabled, runMediaTranscription } from "../../states/commands";
+    import * as mediaImport from "../../states/mediaImport.svelte";
+    import * as project from "../../states/project.svelte";
+    import * as transcription from "../../states/transcription.svelte";
+    import { commandDisabled, runCommand, type Command } from "../../states/commands";
+    import * as mediaSelection from "../../states/mediaSelection.svelte";
     import Spinner from "../util/Spinner.svelte";
     import NiceLabel from "../util/NiceLabel.svelte";
     import taskAddIcon from "../../../resources/icons/carbon--task-add.svg?raw";
@@ -168,8 +171,15 @@
     import checkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
     import Tooltip from "../util/Tooltip.svelte";
 
-    const { item }: { item: MediaItemState } = $props();
-    const task = $derived(transcriptions.taskFor(item));
+    const { mediaId }: { mediaId: string } = $props();
+    const item = $derived(mediaImport.get(mediaId));
+    const issue = $derived(item && mediaImport.isIssue(item) ? item : null);
+    const vestige = $derived(project.getVestige(mediaId));
+    const task = $derived(transcription.getTask(mediaId));
+    const transcriptionCommand = $derived<Command>({
+        kind: task?.status === "failed" ? "reviewTranscriptionError" : task ? "stopTranscription" : "openTranscriptionConfig",
+        mediaId
+    });
     let confirmingRemove = $state(false);
     let removeTooltipOpen = $state(false);
     let removeButton = $state<HTMLButtonElement>();
@@ -177,15 +187,19 @@
     const importStages = {
         queued: "等待导入",
         path: "正在读取文件路径",
-        metadata: "正在读取媒体信息",
-        hash: "正在计算哈希",
-        locating: "正在选择媒体文件",
+        reading: "正在读取媒体信息和哈希",
+        relocating: "正在重新定位媒体文件",
         ready: "导入完成"
+    };
+    const issueLabels = {
+        missing: "找不到媒体文件",
+        changed: "媒体文件已变化",
+        unreadable: "无法读取媒体文件"
     };
 
     $effect(() => {
-        const locked = projectState.locked;
-        if (item.stage === "ready" || locked) {
+        const locked = project.projectState.locked;
+        if (item?.stage === "ready" || locked) {
             confirmingRemove = false;
             removeTooltipOpen = false;
         }
@@ -206,8 +220,8 @@
 
     function handleRemove(event: MouseEvent): void {
         event.stopPropagation();
-        if (projectState.locked) return;
-        if (confirmingRemove) removeMedia(item);
+        if (project.projectState.locked) return;
+        if (confirmingRemove) runCommand({ kind: "removeMedia", mediaId });
         else {
             confirmingRemove = true;
             removeTooltipOpen = true;

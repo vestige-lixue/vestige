@@ -13,7 +13,7 @@ import { appChannels } from "../shared/ipc";
 import { type EditAction } from "../shared/app";
 import { filePath } from "./util/file";
 import { registerFileIPCs } from "./file/ipc";
-import { registerMediaScheme } from "./file/source";
+import { registerMediaScheme, registerMediaProtocol } from "./file/source";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -71,7 +71,8 @@ function createWindow(): void {
         }
     });
 
-    registerFileIPCs(mainWindow.webContents);
+    const runtimeDirectory = filePath(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources"), "bin"));
+    registerFileIPCs(mainWindow, runtimeDirectory);
     mainWindow.webContents.ipc.on(appChannels.edit, (event, action: unknown) => {
         if (event.senderFrame !== mainWindow.webContents.mainFrame || typeof action !== "string"
             || !["undo", "redo", "cut", "copy", "paste"].includes(action)) return;
@@ -80,7 +81,7 @@ function createWindow(): void {
     registerProjectIPCs(mainWindow);
     registerWindowLifecycle(mainWindow);
     registerTranscriptionIPCs(mainWindow.webContents, {
-        runtimeDirectory: filePath(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources"), "bin")),
+        runtimeDirectory,
         modelDirectory: filePath(join(app.getPath("userData"), "models")),
         temporaryDirectory: filePath(join(app.getPath("temp"), "vestige-transcription"))
     });
@@ -156,6 +157,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+    registerMediaProtocol();
     app.setAppUserModelId("vestige.lixue");
     if (process.platform === "darwin") {
         const updateDockIcon = (): void => app.dock?.setIcon(getWindowIcon());

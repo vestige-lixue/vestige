@@ -10,23 +10,23 @@
         <Menubar.Trigger class="menu-trigger hoverable activable">项目</Menubar.Trigger>
         <Menubar.Portal>
             <Menubar.Content bind:ref={fileContent} onOpenAutoFocus={handleFileOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}>
-                <Menubar.Item class="activable" disabled={fileActionDisabled("new")} onSelect={() => runFileAction("new")}>
+                <Menubar.Item class="activable" disabled={fileActionDisabled({ kind: "newProject" })} onSelect={() => runFileAction({ kind: "newProject" })}>
                     <div>新建</div>
                     <kbd>{modKeyText}+N</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={fileActionDisabled("open")} onSelect={() => runFileAction("open")}>
+                <Menubar.Item class="activable" disabled={fileActionDisabled({ kind: "openProject" })} onSelect={() => runFileAction({ kind: "openProject" })}>
                     <div>打开</div>
                     <kbd>{modKeyText}+O</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={fileActionDisabled("save")} onSelect={() => runFileAction("save")}>
+                <Menubar.Item class="activable" disabled={fileActionDisabled({ kind: "saveProject" })} onSelect={() => runFileAction({ kind: "saveProject" })}>
                     <div>保存</div>
                     <kbd>{modKeyText}+S</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={fileActionDisabled("saveAs")} onSelect={() => runFileAction("saveAs")}>
+                <Menubar.Item class="activable" disabled={fileActionDisabled({ kind: "saveProjectAs" })} onSelect={() => runFileAction({ kind: "saveProjectAs" })}>
                     <div>另存为</div>
                     <kbd>{modKeyText}+⇧+S</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={fileActionDisabled("close")} onSelect={() => runFileAction("close")}>
+                <Menubar.Item class="activable" disabled={fileActionDisabled({ kind: "closeProject" })} onSelect={() => runFileAction({ kind: "closeProject" })}>
                     <div>关闭</div>
                     <kbd>{modKeyText}+W</kbd>
                 </Menubar.Item>
@@ -37,20 +37,20 @@
         <Menubar.Trigger class="menu-trigger hoverable activable">媒体</Menubar.Trigger>
         <Menubar.Portal>
             <Menubar.Content align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}>
-                <Menubar.Item class="activable" disabled={commandDisabled("import")} onSelect={() => runMenuCommand("import")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "importMedia" })} onSelect={() => runMenuCommand({ kind: "importMedia" })}>
                     <div>导入媒体</div>
                     <kbd>{modKeyText}+I</kbd>
                 </Menubar.Item>
                 <Menubar.Separator />
-                <Menubar.Item class="activable" disabled={commandDisabled("transcribe")} onSelect={() => runMenuCommand("transcribe")}>
-                    <div>{transcriptions.label(mediaImports.selected)}</div>
+                <Menubar.Item class="activable" disabled={commandDisabled(transcriptionCommand)} onSelect={() => runMenuCommand(transcriptionCommand)}>
+                    <div>{transcription.getLabel(mediaSelection.get())}</div>
                 </Menubar.Item>
                 <Menubar.Separator />
-                <Menubar.Item class="activable" disabled={commandDisabled("previousMedia")} onSelect={() => runMenuCommand("previousMedia")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "selectAdjacentMedia", direction: -1 })} onSelect={() => runMenuCommand({ kind: "selectAdjacentMedia", direction: -1 })}>
                     <div>上一媒体</div>
                     <kbd>{modKeyText}+⇧+←</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={commandDisabled("nextMedia")} onSelect={() => runMenuCommand("nextMedia")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "selectAdjacentMedia", direction: 1 })} onSelect={() => runMenuCommand({ kind: "selectAdjacentMedia", direction: 1 })}>
                     <div>下一媒体</div>
                     <kbd>{modKeyText}+⇧+→</kbd>
                 </Menubar.Item>
@@ -83,15 +83,15 @@
                     <kbd>{modKeyText}+V</kbd>
                 </Menubar.Item>
                 <Menubar.Separator />
-                <Menubar.Item class="activable" disabled={commandDisabled("vocabulary")} onSelect={() => runMenuCommand("vocabulary")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "openPanel", panel: "vocabulary" })} onSelect={() => runMenuCommand({ kind: "openPanel", panel: "vocabulary" })}>
                     <div>词库</div>
                     <kbd>{modKeyText}+L</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={commandDisabled("tasks")} onSelect={() => runMenuCommand("tasks")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "openPanel", panel: "tasks" })} onSelect={() => runMenuCommand({ kind: "openPanel", panel: "tasks" })}>
                     <div>转写任务</div>
                     <kbd>{modKeyText}+T</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={commandDisabled("settings")} onSelect={() => runMenuCommand("settings")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "openPanel", panel: "settings" })} onSelect={() => runMenuCommand({ kind: "openPanel", panel: "settings" })}>
                     <div>设置</div>
                     <kbd>{modKeyText}+,</kbd>
                 </Menubar.Item>
@@ -102,16 +102,16 @@
         <Menubar.Trigger class="menu-trigger hoverable activable">播放</Menubar.Trigger>
         <Menubar.Portal>
             <Menubar.Content align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}>
-                <Menubar.Item class="activable" disabled={commandDisabled("play")} onSelect={() => runMenuCommand("play")}>
-                    <div>{playerState.playing ? "暂停" : "播放"}</div>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "playSelectedMedia" })} onSelect={() => runMenuCommand({ kind: "playSelectedMedia" })}>
+                    <div>{player.isPlaying() ? "暂停" : "播放"}</div>
                     <kbd>Space</kbd>
                 </Menubar.Item>
                 <Menubar.Separator />
-                <Menubar.Item class="activable" disabled={commandDisabled("previousWord")} onSelect={() => runMenuCommand("previousWord")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "seekAdjacentWord", direction: -1 })} onSelect={() => runMenuCommand({ kind: "seekAdjacentWord", direction: -1 })}>
                     <div>上一词</div>
                     <kbd>{modKeyText}+←</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={commandDisabled("nextWord")} onSelect={() => runMenuCommand("nextWord")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "seekAdjacentWord", direction: 1 })} onSelect={() => runMenuCommand({ kind: "seekAdjacentWord", direction: 1 })}>
                     <div>下一词</div>
                     <kbd>{modKeyText}+→</kbd>
                 </Menubar.Item>
@@ -122,16 +122,16 @@
         <Menubar.Trigger class="menu-trigger hoverable activable">其他</Menubar.Trigger>
         <Menubar.Portal>
             <Menubar.Content align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}>
-                <Menubar.Item class="activable" disabled={commandDisabled("about")} onSelect={() => runMenuCommand("about")}>
+                <Menubar.Item class="activable" disabled={commandDisabled({ kind: "openPanel", panel: "settings" })} onSelect={() => runMenuCommand({ kind: "openPanel", panel: "settings" })}>
                     <div>关于</div>
                 </Menubar.Item>
                 <Menubar.Item class="activable" onSelect={() => {
-                    window.api.openDevTools();
+                    runCommand({ kind: "openDevTools" });
                 }}>
                     <div>打开开发者工具</div>
                     <kbd>F12</kbd>
                 </Menubar.Item>
-                <Menubar.Item class="activable" disabled={fileActionDisabled("quit")} onSelect={() => runFileAction("quit")}>
+                <Menubar.Item class="activable" disabled={fileActionDisabled({ kind: "quitApp" })} onSelect={() => runFileAction({ kind: "quitApp" })}>
                     <div>退出应用</div>
                     <kbd>{modKeyText}+Q</kbd>
                 </Menubar.Item>
@@ -204,22 +204,28 @@
     import { Menubar } from "bits-ui";
     import { commandDisabled, runCommand, interfaceBlocked, type Command } from "../../states/commands";
     import { type EditAction } from "../../../shared/app";
-    import { mediaImports } from "../../states/media.svelte";
-    import { transcriptions } from "../../states/transcription.svelte";
-    import { playerState } from "../../states/player.svelte";
+    import * as transcription from "../../states/transcription.svelte";
+    import * as player from "../../states/player.svelte";
+    import * as mediaSelection from "../../states/mediaSelection.svelte";
 
+    const selectedMediaId = $derived(mediaSelection.get());
+    const selectedTask = $derived(selectedMediaId ? transcription.getTask(selectedMediaId) : null);
+    const transcriptionCommand = $derived<Command>({
+        kind: selectedTask?.status === "failed" ? "reviewTranscriptionError" : selectedTask ? "stopTranscription" : "openTranscriptionConfig",
+        mediaId: selectedMediaId
+    });
     const isMac = window.api.platform === "darwin";
     const modKeyText = isMac ? "⌘" : "Ctrl";
     const shortcuts: Record<string, Command> = {
-        n: "new",
-        o: "open",
-        s: "save",
-        w: "close",
-        q: "quit",
-        i: "import",
-        l: "vocabulary",
-        t: "tasks",
-        ",": "settings"
+        n: { kind: "newProject" },
+        o: { kind: "openProject" },
+        s: { kind: "saveProject" },
+        w: { kind: "closeProject" },
+        q: { kind: "quitApp" },
+        i: { kind: "importMedia" },
+        l: { kind: "openPanel", panel: "vocabulary" },
+        t: { kind: "openPanel", panel: "tasks" },
+        ",": { kind: "openPanel", panel: "settings" }
     };
 
     let activeMenu = $state("");
@@ -286,13 +292,12 @@
         const editing = event.target instanceof HTMLElement && (event.target.closest("input, textarea") || event.target.isContentEditable);
         let action: Command | undefined;
         if (command) {
-            action = event.shiftKey ? (key === "s" ? "saveAs" : undefined) : shortcuts[key];
+            action = event.shiftKey ? (key === "s" ? { kind: "saveProjectAs" } : undefined) : shortcuts[key];
             if (!editing && (key === "arrowleft" || key === "arrowright")) {
-                action = event.shiftKey ? (key === "arrowleft" ? "previousMedia" : "nextMedia")
-                    : (key === "arrowleft" ? "previousWord" : "nextWord");
+                action = { kind: event.shiftKey ? "selectAdjacentMedia" : "seekAdjacentWord", direction: key === "arrowleft" ? -1 : 1 };
             }
         }
-        else if (!editing && !event.ctrlKey && !event.metaKey && !event.shiftKey && key === " " && !activeMenu) action = "play";
+        else if (!editing && !event.ctrlKey && !event.metaKey && !event.shiftKey && key === " " && !activeMenu) action = { kind: "playSelectedMedia" };
         if (!action) return;
         event.preventDefault();
         event.stopPropagation();

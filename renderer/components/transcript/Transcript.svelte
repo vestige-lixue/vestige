@@ -1,9 +1,9 @@
 <section class="transcript">
     <article class="transcript-document">
         {#if run}
-            <p>{#each run.transcript as segment, index (index)}<span class:current={playerState.currentTime >= segment.range.start && playerState.currentTime < segment.range.end}>{segment.token.text}</span>{/each}</p>
+            <p>{#each run.transcript as segment, index (index)}<span class:current={player.getCurrentTime() >= segment.range.start && player.getCurrentTime() < segment.range.end}>{segment.token.text}</span>{/each}</p>
         {:else}
-            <p class="placeholder">{mediaImports.selected ? "此媒体暂无转写结果。" : "转写正文将在这里显示。"}</p>
+            <p class="placeholder">{mediaSelection.get() ? "此媒体暂无转写结果。" : "转写正文将在这里显示。"}</p>
         {/if}
     </article>
 </section>
@@ -35,9 +35,10 @@
 
 
 <script lang="ts">
-    import { mediaImports } from "../../states/media.svelte";
-    import { playerState } from "../../states/player.svelte";
+    import * as player from "../../states/player.svelte";
+    import * as mediaSelection from "../../states/mediaSelection.svelte";
+    import * as project from "../../states/project.svelte";
 
-    const vestige = $derived(mediaImports.selected?.vestige);
+    const vestige = $derived(project.getVestige(mediaSelection.get()));
     const run = $derived(vestige?.runs[vestige.primaryRunIdx]);
 </script>

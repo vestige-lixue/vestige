@@ -1,6 +1,6 @@
 <div class="controls">
-    <button type="button" {disabled} onclick={togglePlaying}>
-        {playerState.playing ? "暂停" : "播放"}
+    <button type="button" {disabled} onclick={() => runCommand({ kind: "playSelectedMedia" })}>
+        {player.isPlaying() ? "暂停" : "播放"}
     </button>
     <Slider.Root
         class="progress"
@@ -16,7 +16,7 @@
         </span>
         <Slider.Thumb index={0} class="progress-thumb" />
     </Slider.Root>
-    <span class="time">{formatTime(playerState.currentTime)} / {formatTime(duration)}</span>
+    <span class="time">{formatTime(player.getCurrentTime())} / {formatTime(duration)}</span>
 </div>
 
 
@@ -81,20 +81,23 @@
 
 <script lang="ts">
     import { Slider } from "bits-ui";
-    import { mediaImports } from "../../states/media.svelte";
-    import { playerState, setCurrentTime, togglePlaying } from "../../states/player.svelte";
+    import * as player from "../../states/player.svelte";
+    import * as mediaSelection from "../../states/mediaSelection.svelte";
+    import * as project from "../../states/project.svelte";
+
+    import { runCommand } from "../../states/commands";
 
     // Keep the slider's step rounding from writing back to the precise playback time.
     const progressSteps = 1000;
-    const duration = $derived(mediaImports.selected?.vestige?.media.duration ?? 0);
-    const disabled = $derived(!playerState.media || !Number.isFinite(duration) || duration <= 0);
-    const progress = $derived(disabled || !Number.isFinite(playerState.currentTime)
+    const duration = $derived(project.getMedia(mediaSelection.get())?.duration ?? 0);
+    const disabled = $derived(!player.getURL() || !Number.isFinite(duration) || duration <= 0);
+    const progress = $derived(disabled || !Number.isFinite(player.getCurrentTime())
         ? 0
-        : Math.round(Math.min(1, Math.max(0, playerState.currentTime / duration)) * progressSteps));
+        : Math.round(Math.min(1, Math.max(0, player.getCurrentTime() / duration)) * progressSteps));
 
     function seek(progress: number): void {
         if (disabled) return;
-        setCurrentTime(progress / progressSteps * duration);
+        runCommand({ kind: "seekSelectedMedia", time: progress / progressSteps * duration });
     }
 
     function formatTime(time: number): string {

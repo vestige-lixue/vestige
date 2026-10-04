@@ -32,7 +32,6 @@
         "extends": "./configs/electron-builder.yml"
     },
     "dependencies": {
-        "@noble/hashes": "2.4.0",
         "bits-ui": "^2.19.3",
         "typia": "12.1.1"
     },

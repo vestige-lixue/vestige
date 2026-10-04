@@ -1,18 +1,18 @@
 <Modal bind:open escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
-    if (!open) onClosed(nextDialog);
+    if (!open) onClosed(nextAction);
 }}>
     <Dialog.Title class="modal-title">转写任务</Dialog.Title>
     <div class="tasks">
-        {#each transcriptions.tasks as task (task.id)}
+        {#each tasks as task (task.id)}
             <div class="task">
-                <span>{task.item.vestige?.media.name ?? task.item.name}</span>
+                <span>{project.getMedia(task.mediaId)?.name ?? ""}</span>
                 <span>{task.status === "failed" ? "失败" : task.status === "stopping" ? "正在停止" : "正在转写"}</span>
                 <button class="hoverable activable" disabled={task.status === "stopping"} onclick={() => {
                     if (task.status === "failed") {
-                        nextDialog = { kind: "failure", item: task.item, open: true };
+                        nextAction = () => onFailure(task.mediaId);
                         open = false;
                     }
-                    else transcriptions.stop(task.item);
+                    else onStop(task.mediaId);
                 }}>{task.status === "failed" ? "失败详情" : "停止转写"}</button>
             </div>
         {:else}
@@ -54,12 +54,15 @@
 <script lang="ts">
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
-    import { type ApplicationDialog } from "../../states/interface.svelte";
-    import { transcriptions } from "../../states/transcription.svelte";
+    import * as project from "../../states/project.svelte";
+    import * as transcription from "../../states/transcription.svelte";
 
-    let { open = $bindable(false), onClosed }: {
-        open?: boolean;
-        onClosed: (next?: ApplicationDialog) => void;
+    let { open = $bindable(), tasks, onStop, onFailure, onClosed }: {
+        open: boolean;
+        tasks: transcription.TranscriptionTask[];
+        onStop: (mediaId: string) => void;
+        onFailure: (mediaId: string) => void;
+        onClosed: (next?: () => void) => void;
     } = $props();
-    let nextDialog: ApplicationDialog | undefined;
+    let nextAction: (() => void) | undefined;
 </script>

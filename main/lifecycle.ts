@@ -2,7 +2,7 @@ import { app, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { appChannels } from "../shared/ipc";
 
-const checks = new Map<BrowserWindow, () => Promise<boolean>>();
+let checkBeforeQuit: (() => Promise<boolean>) | null = null;
 let allowQuit = false;
 let pendingQuit: Promise<void> | null = null;
 
@@ -10,8 +10,8 @@ app.on("before-quit", event => {
     if (allowQuit) return;
     event.preventDefault();
     if (pendingQuit) return;
-    pendingQuit = Promise.all([...checks.values()].map(check => check())).then(blocked => {
-        if (blocked.some(Boolean)) return;
+    pendingQuit = (checkBeforeQuit?.() ?? Promise.resolve(false)).then(blocked => {
+        if (blocked) return;
         allowQuit = true;
         app.quit();
     }).catch(console.error).finally(() => {
@@ -46,7 +46,7 @@ export function registerWindowLifecycle(window: BrowserWindow): void {
         }
         return result;
     };
-    checks.set(window, beforeQuit);
+    checkBeforeQuit = beforeQuit;
 
     contents.ipc.on(appChannels.beforeQuitResult, (event, id: unknown, block: unknown) => {
         if (event.senderFrame !== contents.mainFrame || id !== pending?.id) return;
@@ -77,6 +77,6 @@ export function registerWindowLifecycle(window: BrowserWindow): void {
     });
     window.once("closed", () => {
         pending?.finish(true);
-        checks.delete(window);
+        checkBeforeQuit = null;
     });
 }

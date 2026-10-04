@@ -1,9 +1,10 @@
 import { type Run, type Segment } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, number, probability, range, segments, createRun } from "../result";
+import { TranscriptionError } from "../failure";
 
 function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
-    if (typeof output.text !== "string") throw new Error("sherpa-onnx returned no transcript text.");
+    if (typeof output.text !== "string") throw new TranscriptionError("sherpa-onnx returned no transcript text.");
     const tokens = array(output.tokens);
     const timestamps = array(output.timestamps);
     const durations = array(output.durations);
@@ -40,7 +41,7 @@ function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
     return tokenSegments;
 }
 
-export function toRun(request: ParsedRequest, value: unknown, duration: number, runTime: number): Run {
+export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number): Run {
     const output = object(value);
-    return createRun(request, output.lang, sherpaTranscript(output, duration), runTime);
+    return createRun(id, request, output.lang, sherpaTranscript(output, duration), runTime);
 }

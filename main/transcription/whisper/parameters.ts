@@ -1,5 +1,6 @@
 import { type AbsolutePath } from "../../../shared/util/path";
 import { argumentValue, modelPath, optionName } from "../parameters";
+import { TranscriptionError } from "../failure";
 
 const fileOptions = new Set(["m", "model", "vm", "vad-model", "fp", "font-path"]);
 
@@ -9,7 +10,7 @@ export function nativeArguments(params: Record<string, unknown>, modelDirectory:
         const name = optionName(key);
         // Input and JSON destination belong to this API invocation.
         if (["f", "file", "of", "output-file"].includes(name)) {
-            throw new Error("Option " + key + " is managed by Vestige; use mediaPath for the input.");
+            throw new TranscriptionError("Option " + key + " is managed by Vestige; use mediaPath for the input.");
         }
         if (original === false) continue;
         const value = fileOptions.has(name) && typeof original === "string" && original

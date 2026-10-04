@@ -1,13 +1,15 @@
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, filePath } from "../util/file";
+import { containsPath, filePath, InvalidPathError, isSystemError } from "../util/file";
 import { type Run } from "../../shared/transcription/Run";
+import { type TranscriptionResult } from "../../shared/transcription/executer";
 import { waveDuration } from "./audio";
 import { type ParsedRequest, parseRequest } from "./parameters";
-import { findExecutable, runProcess } from "./process";
+import { findExecutable, NativeProcessError, runProcess } from "../util/process";
 import { execute as executeSherpa } from "./sherpa/execute";
 import { execute as executeWhisper } from "./whisper/execute";
+import { TranscriptionError } from "./failure";
 
 export type ExecutionPaths = {
     runtimeDirectory: AbsolutePath;
@@ -16,6 +18,7 @@ export type ExecutionPaths = {
 };
 
 export type ExecutionContext = {
+    id: string;
     request: ParsedRequest;
     runtimeDirectory: AbsolutePath;
     directory: AbsolutePath;
@@ -24,7 +27,21 @@ export type ExecutionContext = {
     signal?: AbortSignal;
 };
 
-export async function transcribe(value: unknown, paths: ExecutionPaths, signal?: AbortSignal): Promise<Run> {
+export async function transcribe(id: string, value: unknown, paths: ExecutionPaths, signal?: AbortSignal): Promise<TranscriptionResult> {
+    try {
+        return { success: true, run: await executeTask(id, value, paths, signal) };
+    }
+    catch (error) {
+        console.error("Transcription failed:", error);
+        if (signal?.aborted && error === signal.reason) return { success: false, error: "Transcription cancelled." };
+        if (error instanceof TranscriptionError || error instanceof NativeProcessError || error instanceof InvalidPathError || isSystemError(error)) {
+            return { success: false, error: error.message };
+        }
+        throw error;
+    }
+}
+
+async function executeTask(id: string, value: unknown, paths: ExecutionPaths, signal?: AbortSignal): Promise<Run> {
     const request = parseRequest(value, paths.modelDirectory);
     const ffmpeg = await findExecutable(paths.runtimeDirectory, "ffmpeg", "ffmpeg");
     signal?.throwIfAborted();
@@ -42,7 +59,7 @@ export async function transcribe(value: unknown, paths: ExecutionPaths, signal?:
         ], directory, signal);
         const duration = await waveDuration(audio);
         const execute = request.executer === "sherpa-onnx" ? executeSherpa : executeWhisper;
-        return await execute({ request, runtimeDirectory: paths.runtimeDirectory, directory, audio, duration, signal });
+        return await execute({ id, request, runtimeDirectory: paths.runtimeDirectory, directory, audio, duration, signal });
     }
     finally {
         // Only remove the directory created for this invocation, inside our root.

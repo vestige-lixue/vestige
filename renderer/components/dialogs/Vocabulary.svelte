@@ -14,5 +14,5 @@
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
 
-    let { open = $bindable(false), onClosed }: { open?: boolean; onClosed: () => void } = $props();
+    let { open = $bindable(), onClosed }: { open: boolean; onClosed: () => void } = $props();
 </script>

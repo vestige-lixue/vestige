@@ -1,10 +1,9 @@
 <svelte:head>
-    <title>{projectState.project ? `${getProjectFileName()} - ` : ""}Vestige</title>
+    <title>{project.projectState.project ? `${project.getFileName()} - ` : ""}Vestige</title>
 </svelte:head>
 
 <Tooltip.Provider delayDuration={300}>
-    <FileDropOverlay locked={projectState.locked} />
-    <ProjectDialogs />
+    <FileDropOverlay locked={project.projectState.locked} />
     <ApplicationDialogs />
     <Sidebar />
     <div>
@@ -37,10 +36,9 @@
     import Player from "../player/Player.svelte";
     import Sidebar from "../sidebar/Sidebar.svelte";
     import FileDropOverlay from "./FileDropOverlay.svelte";
-    import ProjectDialogs from "./ProjectDialogs.svelte";
     import ApplicationDialogs from "./ApplicationDialogs.svelte";
     import Transcript from "../transcript/Transcript.svelte";
-    import { getProjectFileName, projectState, startProjectLifecycle } from "../../states/project.svelte";
+    import * as project from "../../states/project.svelte";
 
-    onMount(startProjectLifecycle);
+    onMount(project.startLifecycle);
 </script>

@@ -1,7 +1,7 @@
 <Tooltip.Root bind:open {disableCloseOnTriggerClick}>
     <Tooltip.Trigger {...triggerProps} />
     <Tooltip.Portal>
-        <Tooltip.Content class="tooltip-content" style={`z-index: ${modalLayers.top};`} {side} sideOffset={6} collisionPadding={8}>
+        <Tooltip.Content class="tooltip-content" style={`z-index: ${modal.getTopLayer()};`} {side} sideOffset={6} collisionPadding={8}>
             {text}
         </Tooltip.Content>
     </Tooltip.Portal>
@@ -56,7 +56,13 @@
 
 <script lang="ts">
     import { Tooltip } from "bits-ui";
-    import { modalLayers } from "../../states/modal.svelte";
+    import * as modal from "../../states/modal.svelte";
+    type Props = Tooltip.TriggerProps & {
+        text: string;
+        side?: Tooltip.ContentProps["side"];
+        open?: boolean;
+        disableCloseOnTriggerClick?: boolean;
+    };
 
     let {
         text,
@@ -64,10 +70,5 @@
         open = $bindable(false),
         disableCloseOnTriggerClick,
         ...triggerProps
-    }: Tooltip.TriggerProps & {
-        text: string;
-        side?: Tooltip.ContentProps["side"];
-        open?: boolean;
-        disableCloseOnTriggerClick?: boolean;
-    } = $props();
+    }: Props = $props();
 </script>

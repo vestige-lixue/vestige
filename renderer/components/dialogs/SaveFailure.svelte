@@ -4,11 +4,14 @@
     escBehavior="ignore"
     clickMaskBehavior="ignore"
     onOpenChangeComplete={isOpen => {
-        if (!isOpen) answerSave(choice);
+        if (!isOpen) {
+            answer(choice);
+            onClosed();
+        }
     }}
 >
     <Dialog.Title class="modal-title">保存失败</Dialog.Title>
-    <Dialog.Description class="modal-description">{`无法保存到“${saveConfirmation.fileName}”。\n${saveConfirmation.error}\n是否另存为其他文件？`}</Dialog.Description>
+    <Dialog.Description class="modal-description">{`无法保存到“${fileName}”。\n${error}\n是否另存为其他文件？`}</Dialog.Description>
     {#snippet actions()}
         <button class="hoverable activable" onclick={() => choose("retry")}>重试</button>
         <button class="hoverable activable" onclick={() => choose("memory")}>在内存中编辑</button>
@@ -20,12 +23,18 @@
 <script lang="ts">
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
-    import { answerSave, saveConfirmation, type SaveChoice } from "../../states/confirmation.svelte";
+    import * as dialogs from "../../states/dialogs.svelte";
 
-    let open = $state(true);
-    let choice: SaveChoice = "retry";
+    let { open = $bindable(), fileName, error, answer, onClosed }: {
+        open: boolean;
+        fileName: string;
+        error: string;
+        answer: (choice: dialogs.SaveChoice) => void;
+        onClosed: () => void;
+    } = $props();
+    let choice: dialogs.SaveChoice = "retry";
 
-    function choose(value: SaveChoice): void {
+    function choose(value: dialogs.SaveChoice): void {
         if (!open) return;
         choice = value;
         open = false;

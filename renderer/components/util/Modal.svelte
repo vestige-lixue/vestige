@@ -15,7 +15,7 @@
                 content?.focus();
             }}
         >
-            {@render children?.()}
+            {@render children()}
             {#if actions}
                 <div class="actions">
                     {@render actions()}
@@ -125,24 +125,24 @@
 
 <script lang="ts">
     import { onDestroy, untrack, type Snippet } from "svelte";
-    import { modalLayers } from "../../states/modal.svelte";
+    import * as modal from "../../states/modal.svelte";
     import { Dialog } from "bits-ui";
 
     type Props = {
-        open?: boolean;
+        open: boolean;
         escBehavior: "close" | "ignore";
         clickMaskBehavior: "close" | "ignore";
         width?: string;
         height?: string;
         class?: string;
-        children?: Snippet;
+        children: Snippet;
         actions?: Snippet;
         // Clear content data or unmount the caller only after this reports false.
-        onOpenChangeComplete?: (open: boolean) => void;
+        onOpenChangeComplete: (open: boolean) => void;
     };
 
     let {
-        open = $bindable(false),
+        open = $bindable(),
         escBehavior,
         clickMaskBehavior,
         width = "440px",
@@ -155,17 +155,17 @@
 
     let content = $state<HTMLDivElement | null>(null);
     const layer = Symbol();
-    const layerIndex = $derived(modalLayers.index(layer));
+    const layerIndex = $derived(modal.getLayerIndex(layer));
 
     $effect.pre(() => {
-        if (open) untrack(() => modalLayers.open(layer));
+        if (open) untrack(() => modal.openLayer(layer));
     });
-    onDestroy(() => modalLayers.close(layer));
+    onDestroy(() => modal.closeLayer(layer));
 
     function handleOpenChangeComplete(isOpen: boolean): void {
         if (!isOpen && !open) {
-            modalLayers.close(layer);
+            modal.closeLayer(layer);
         }
-        onOpenChangeComplete?.(isOpen);
+        onOpenChangeComplete(isOpen);
     }
 </script>

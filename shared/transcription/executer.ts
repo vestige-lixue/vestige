@@ -14,10 +14,10 @@ export type TranscriptionRequest = {
 };
 
 export type TranscriptionResult = ({
-    ok: true;
+    success: true;
     run: Run;
 } | {
-    ok: false;
+    success: false;
     error: string;
 });
 

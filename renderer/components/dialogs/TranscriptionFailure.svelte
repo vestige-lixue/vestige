@@ -1,11 +1,11 @@
 <Modal bind:open escBehavior="close" clickMaskBehavior="ignore" onOpenChangeComplete={open => {
-    if (!open) onClosed(nextDialog);
+    if (!open) onClosed(nextAction);
 }}>
     <Dialog.Title class="modal-title">转写失败</Dialog.Title>
-    <Dialog.Description class="modal-description">{`${item.vestige?.media.name ?? item.name}\n${transcriptions.taskFor(item)?.error ?? ""}`}</Dialog.Description>
+    <Dialog.Description class="modal-description">{`${project.getMedia(mediaId)?.name ?? ""}\n${error}`}</Dialog.Description>
     {#snippet actions()}
-        <button class="hoverable activable" disabled={item.stage !== "ready" || item.ignored} onclick={() => {
-            nextDialog = { kind: "transcription", item, open: true };
+        <button class="hoverable activable" disabled={!mediaImport.isReady(mediaId)} onclick={() => {
+            nextAction = onConfigure;
             open = false;
         }}>转写配置</button>
         <button class="primary hoverable activable" onclick={() => {
@@ -18,14 +18,15 @@
 <script lang="ts">
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
-    import { type MediaItemState } from "../../states/media.svelte";
-    import { type ApplicationDialog } from "../../states/interface.svelte";
-    import { transcriptions } from "../../states/transcription.svelte";
+    import * as project from "../../states/project.svelte";
+    import * as mediaImport from "../../states/mediaImport.svelte";
 
-    let { open = $bindable(false), item, onClosed }: {
-        open?: boolean;
-        item: MediaItemState;
-        onClosed: (next?: ApplicationDialog) => void;
+    let { open = $bindable(), mediaId, error, onConfigure, onClosed }: {
+        open: boolean;
+        mediaId: string;
+        error: string;
+        onConfigure: () => void;
+        onClosed: (next?: () => void) => void;
     } = $props();
-    let nextDialog: ApplicationDialog | undefined;
+    let nextAction: (() => void) | undefined;
 </script>

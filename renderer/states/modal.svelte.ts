@@ -1,23 +1,20 @@
-class ModalLayers {
-    #layers = $state<symbol[]>([]);
+import { SvelteSet } from "svelte/reactivity";
 
-    open(layer: symbol): void {
-        this.close(layer);
-        this.#layers.push(layer);
-    }
+const layers = new SvelteSet<symbol>();
 
-    close(layer: symbol): void {
-        const index = this.#layers.indexOf(layer);
-        if (index >= 0) this.#layers.splice(index, 1);
-    }
-
-    index(layer: symbol): number {
-        return 12915 + Math.max(0, this.#layers.indexOf(layer)) * 2;
-    }
-
-    get top(): number {
-        return 12915 + this.#layers.length * 2;
-    }
+export function openLayer(layer: symbol): void {
+    closeLayer(layer);
+    layers.add(layer);
 }
 
-export const modalLayers = new ModalLayers();
+export function closeLayer(layer: symbol): void {
+    layers.delete(layer);
+}
+
+export function getLayerIndex(layer: symbol): number {
+    return 12915 + Math.max(0, [...layers].indexOf(layer)) * 2;
+}
+
+export function getTopLayer(): number {
+    return 12915 + layers.size * 2;
+}

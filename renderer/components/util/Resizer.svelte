@@ -11,7 +11,7 @@
     onlostpointercapture={() => dragging = false}
 ></div>
 <div
-    class="measurement"
+    class="resizer-measurement-div"
     bind:this={measurement}
     style:width={direction === "vertical" ? toLength(origin) : "0px"}
     style:height={direction === "horizontal" ? toLength(origin) : "0px"}
@@ -33,7 +33,7 @@
     .handle:hover, .handle.dragging {
         background-color: var(--c-accent);
     }
-    .measurement {
+    .resizer-measurement-div {
         position: absolute;
         top: 0;
         left: 0;

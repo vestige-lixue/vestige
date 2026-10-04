@@ -5,15 +5,12 @@ import { type ExecutionPaths, transcribe } from "./execute";
 export function registerTranscriptionIPCs(contents: WebContents, paths: ExecutionPaths): void {
     const running = new Map<string, AbortController>();
     contents.ipc.handle(executerChannel, async (event, id: unknown, request: unknown): Promise<TranscriptionResult> => {
-        if (event.senderFrame !== contents.mainFrame) return { ok: false, error: "Transcription is only available to the main frame." };
-        if (typeof id !== "string" || !id || id.length > 128 || running.has(id)) return { ok: false, error: "A unique transcription task ID is required." };
+        if (event.senderFrame !== contents.mainFrame) return { success: false, error: "Transcription is only available to the main frame." };
+        if (typeof id !== "string" || !id || id.length > 128 || running.has(id)) return { success: false, error: "A unique transcription task ID is required." };
         const controller = new AbortController();
         running.set(id, controller);
         try {
-            return { ok: true, run: await transcribe(request, paths, controller.signal) };
-        }
-        catch (error) {
-            return { ok: false, error: error instanceof Error ? error.message : String(error) };
+            return await transcribe(id, request, paths, controller.signal);
         }
         finally {
             running.delete(id);

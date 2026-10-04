@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import { type AppAPI } from "../shared/app";
 import { appChannels, fileChannels, projectChannels } from "../shared/ipc";
-import { executerChannel, cancelExecuterChannel, type TranscriptionResult } from "../shared/transcription/executer";
+import { executerChannel, cancelExecuterChannel } from "../shared/transcription/executer";
 
 const api: AppAPI = {
     platform: process.platform,
@@ -30,17 +30,13 @@ const api: AppAPI = {
         },
         readMedia: (id, path, reference) => ipcRenderer.invoke(fileChannels.readMedia, id, path, reference),
         cancelMediaRead: id => ipcRenderer.send(fileChannels.cancelMediaRead, id),
-        openMediaSource: path => ipcRenderer.invoke(fileChannels.openMediaSource, path),
-        closeMediaSource: id => ipcRenderer.send(fileChannels.closeMediaSource, id),
+        getMediaURL: path => ipcRenderer.invoke(fileChannels.getMediaURL, path),
+        releaseMediaURL: id => ipcRenderer.invoke(fileChannels.releaseMediaURL, id),
         selectMediaPath: path => ipcRenderer.invoke(fileChannels.selectMediaPath, path),
         selectMediaPaths: () => ipcRenderer.invoke(fileChannels.selectMediaPaths)
     },
     transcription: {
-        async transcribe(id, request) {
-            const reply: TranscriptionResult = await ipcRenderer.invoke(executerChannel, id, request);
-            if (!reply.ok) throw new Error(reply.error);
-            return reply.run;
-        },
+        transcribe: (id, request) => ipcRenderer.invoke(executerChannel, id, request),
         cancel: id => ipcRenderer.send(cancelExecuterChannel, id)
     },
     project: {

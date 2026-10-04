@@ -15,7 +15,7 @@
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html downloadIcon}
         <strong>{locked ? "正在处理项目" : "松开鼠标，导入媒体或打开项目"}</strong>
-        <p>{locked ? "请稍候再拖入文件" : "音频、视频或 .vestige 项目文件"}</p>
+        <p>{locked ? "请稍候再拖入文件" : "音频、视频、文件夹或单个 .vestige 项目文件"}</p>
     </div>
 </div>
 
@@ -76,22 +76,79 @@
 
 
 <script lang="ts">
+    import { onDestroy } from "svelte";
     import downloadIcon from "../../../resources/icons/carbon--download.svg?raw";
-    import { importMedia, openProject } from "../../states/project.svelte";
     import { interfaceBlocked } from "../../states/commands";
+    import * as project from "../../states/project.svelte";
+    import * as mediaImport from "../../states/mediaImport.svelte";
 
     let { locked }: { locked: boolean } = $props();
     let dropArea: HTMLDivElement;
     let dragDepth = 0;
     let dragging = $state(false);
 
-    function importFiles(files: File[]): void {
-        if (!files.length) return;
-        if (files.length === 1 && /\.vestige$/i.test(files[0].name)) {
-            void openProject(() => window.api.file.getPathForFile(files[0]));
+    type DroppedItem = { file: File | null; entry: FileSystemEntry | null };
+    let collection: AbortController | null = null;
+
+    onDestroy(() => {
+        if (!collection) return;
+        collection.abort();
+        mediaImport.endCollection(collection);
+    });
+
+    async function collectEntry(entry: FileSystemEntry, files: File[], failures: mediaImport.MediaImportFailure[], signal: AbortSignal): Promise<void> {
+        if (signal.aborted) return;
+        try {
+            if (entry.isFile) {
+                const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
+                if (!signal.aborted) files.push(file);
+            }
+            else if (entry.isDirectory) {
+                const reader = (entry as FileSystemDirectoryEntry).createReader();
+                while (!signal.aborted) {
+                    // Chromium returns directory entries in batches; read until the empty batch.
+                    const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
+                    if (!entries.length) break;
+                    for (const child of entries) await collectEntry(child, files, failures, signal);
+                }
+            }
+        }
+        catch (error) {
+            if (!signal.aborted) failures.push({
+                name: entry.fullPath || entry.name, path: null,
+                error: "无法读取拖入的" + (entry.isDirectory ? "文件夹：" : "文件：") + (error instanceof Error ? error.message : String(error))
+            });
+        }
+    }
+
+    async function importDroppedItems(items: DroppedItem[]): Promise<void> {
+        if (!items.length) return;
+        const first = items[0];
+        // Classify the original drop before flattening directories or discarding failures.
+        if (items.length === 1 && !first.entry?.isDirectory && first.file && /\.vestige$/i.test(first.file.name)) {
+            void project.openFile(first.file);
             return;
         }
-        importMedia(files);
+        const current = mediaImport.beginCollection();
+        if (!current) return;
+        collection = current;
+        try {
+            const files: File[] = [];
+            const failures: mediaImport.MediaImportFailure[] = [];
+            for (const item of items) {
+                if (current.signal.aborted) return;
+                if (item.entry?.isDirectory || (!item.file && item.entry)) await collectEntry(item.entry, files, failures, current.signal);
+                else if (item.file) files.push(item.file);
+                else failures.push({ name: "拖入文件", path: null, error: "无法读取拖入的文件。" });
+            }
+            if (current.signal.aborted) return;
+            project.importMedia(files);
+            for (const failure of failures) mediaImport.reportImportFailure(failure);
+        }
+        finally {
+            mediaImport.endCollection(current);
+            if (collection === current) collection = null;
+        }
     }
 
     function isInDropArea(event: DragEvent): boolean {
@@ -135,7 +192,10 @@
         if (!event.dataTransfer?.types.includes("Files")) return;
         event.preventDefault();
         if (locked || interfaceBlocked() || !isInDropArea(event)) return;
-        const files = Array.from(event.dataTransfer.files);
-        if (files.length) importFiles(files);
+        // Capture entries during drop, while the browser's drag data store is readable.
+        const items: DroppedItem[] = Array.from(event.dataTransfer.items).filter(item => item.kind === "file")
+            .map(item => ({ file: item.getAsFile(), entry: item.webkitGetAsEntry() }));
+        if (!items.length) for (const file of Array.from(event.dataTransfer.files)) items.push({ file, entry: null });
+        void importDroppedItems(items);
     }
 </script>

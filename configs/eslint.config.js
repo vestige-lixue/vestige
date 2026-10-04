@@ -6,6 +6,7 @@ import css from "@eslint/css";
 import json from "@eslint/json";
 import yml from "eslint-plugin-yml";
 import local from "./css.js";
+import imports from "./imports.js";
 
 export default defineConfig(
     { ignores: ["**/node_modules", "**/dist", "**/build", "**/.local", "pnpm-lock.yaml"] },
@@ -15,19 +16,30 @@ export default defineConfig(
             tseslint.configs.recommended,
             eslintPluginSvelte.configs["flat/recommended"]
         ],
-        plugins: { "@stylistic": stylistic },
+        plugins: { "@stylistic": stylistic, imports },
         rules: {
-            "no-unused-vars": "on",
+            "imports/svelte-namespace": "error",
+            "no-unused-vars": "warn",
             "@typescript-eslint/no-unused-vars": "off",
             "no-restricted-syntax": ["warn", {
                 selector: "ImportDeclaration[importKind='type']",
                 message: "Put type inside the braces: import { type Foo } from \"./Foo\"."
+            }, {
+                selector: "Property[kind=/^(get|set)$/], MethodDefinition[kind=/^(get|set)$/], AccessorProperty",
+                message: "Use ordinary functions instead of get/set accessors; export state operations as individual functions."
             }],
             "@stylistic/quotes": ["warn", "double", { avoidEscape: false, allowTemplateLiterals: "always" }],
             "@stylistic/semi": ["warn", "always"],
             "@stylistic/comma-dangle": ["warn", "never"],
             "@stylistic/arrow-spacing": ["warn", { before: true, after: true }],
             "@stylistic/brace-style": ["warn", "stroustrup"]
+        }
+    },
+    {
+        files: ["**/*.{ts,mts,cts,tsx,svelte}"],
+        rules: {
+            "no-unused-vars": "off",
+            "@typescript-eslint/no-unused-vars": "warn"
         }
     },
     {

@@ -1,9 +1,7 @@
 <section class="media-list">
-    {#if projectState.project}
-        {#each mediaImports.items as item (item)}
-            <MediaItem {item} />
-        {/each}
-    {/if}
+    {#each mediaImport.getIds() as mediaId (mediaId)}
+        <MediaItem {mediaId} />
+    {/each}
 </section>
 
 
@@ -22,7 +20,6 @@
 
 
 <script lang="ts">
-    import { mediaImports } from "../../states/media.svelte";
-    import { projectState } from "../../states/project.svelte";
+    import * as mediaImport from "../../states/mediaImport.svelte";
     import MediaItem from "./MediaItem.svelte";
 </script>

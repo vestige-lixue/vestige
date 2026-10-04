@@ -2,8 +2,8 @@ export const fileChannels = {
     normalize: "file:normalize",
     readMedia: "file:read-media",
     cancelMediaRead: "file:cancel-media-read",
-    openMediaSource: "file:open-media-source",
-    closeMediaSource: "file:close-media-source",
+    getMediaURL: "file:get-media-url",
+    releaseMediaURL: "file:release-media-url",
     selectMediaPath: "file:select-media-path",
     selectMediaPaths: "file:select-media-paths"
 } as const;

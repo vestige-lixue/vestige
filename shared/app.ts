@@ -1,9 +1,8 @@
-import { type TranscriptionRequest } from "./transcription/executer";
+import { type TranscriptionRequest, type TranscriptionResult } from "./transcription/executer";
 import { type GetProjectResult, type SaveProjectResult } from "./project/file";
 import { type Project } from "./project/Project";
-import { type Run } from "./transcription/Run";
 import { type AbsolutePath } from "./util/path";
-import { type MediaCheckResult, type MediaReference, type MediaSourceHandle } from "./media/check";
+import { type MediaCheckResult, type MediaReference, type MediaURLResult } from "./media/check";
 
 export type EditAction = "undo" | "redo" | "cut" | "copy" | "paste";
 
@@ -18,13 +17,13 @@ export type AppAPI = {
         getPathForFile(file: File): Promise<AbsolutePath>;
         readMedia(id: string, path: AbsolutePath, reference: MediaReference | null): Promise<MediaCheckResult>;
         cancelMediaRead(id: string): void;
-        openMediaSource(path: AbsolutePath): Promise<MediaSourceHandle>;
-        closeMediaSource(id: string): void;
+        getMediaURL(path: AbsolutePath): Promise<MediaURLResult>;
+        releaseMediaURL(id: string): Promise<void>;
         selectMediaPath(path: AbsolutePath | null): Promise<AbsolutePath | null>;
         selectMediaPaths(): Promise<AbsolutePath[]>;
     };
     transcription: {
-        transcribe(id: string, request: TranscriptionRequest): Promise<Run>;
+        transcribe(id: string, request: TranscriptionRequest): Promise<TranscriptionResult>;
         cancel(id: string): void;
     };
     project: {
