@@ -10,10 +10,16 @@
     line-height: normal;
     scrollbar-gutter: auto;
     scrollbar-width: thin;
+    scrollbar-color: var(--c-scrollbar) transparent;
     line-height: normal;
     user-select: none;
     -webkit-user-drag: none;
     transition: background-color .2s ease;
+}
+
+.focusable:focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
 }
 
 ::selection {
@@ -21,7 +27,7 @@
 }
 
 body {
-    font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
     height: 100vh;
     width: 100vw;
     margin: 0;

@@ -3,6 +3,10 @@
         <Vocabulary bind:open={current.open} onClosed={() => closed(current)} />
     {:else if current.kind === "settings"}
         <Settings bind:open={current.open} onClosed={() => closed(current)} />
+    {:else if current.kind === "licenses"}
+        <OpenSourceLicenses bind:open={current.open} onClosed={() => closed(current)} />
+    {:else if current.kind === "about"}
+        <About bind:open={current.open} onClosed={() => closed(current)} />
     {:else if current.kind === "tasks"}
         <TranscriptionTasks bind:open={current.open} tasks={current.getTasks()} onStop={current.onStop} onFailure={current.onFailure} onClosed={next => closed(current, next)} />
     {:else if current.kind === "transcription"}
@@ -30,6 +34,8 @@
     import Vocabulary from "../dialogs/Vocabulary.svelte";
     import TranscriptionTasks from "../dialogs/TranscriptionTasks.svelte";
     import Settings from "../dialogs/Settings.svelte";
+    import OpenSourceLicenses from "../dialogs/OpenSourceLicenses.svelte";
+    import About from "../dialogs/About.svelte";
     import TranscriptionConfig from "../dialogs/TranscriptionConfig.svelte";
     import TranscriptionFailure from "../dialogs/TranscriptionFailure.svelte";
     import SaveConfirmation from "../dialogs/SaveConfirmation.svelte";

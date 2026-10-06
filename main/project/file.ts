@@ -1,3 +1,4 @@
+import { toFailure } from "../../shared/failure";
 import { randomUUID } from "node:crypto";
 import { open, readFile, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -10,8 +11,8 @@ import { filePath, InvalidPathError, isSystemError } from "../util/file";
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
 
 export async function getProject(path: unknown): Promise<GetProjectResult> {
-    const normalized = filePath(path);
     try {
+        const normalized = filePath(path);
         const text = await readFile(normalized, "utf8");
         let project: unknown;
         try {
@@ -19,14 +20,14 @@ export async function getProject(path: unknown): Promise<GetProjectResult> {
         }
         catch (error) {
             if (!(error instanceof SyntaxError)) throw error;
-            throw new ProjectValidationError(error.message, { cause: error });
+            throw new ProjectValidationError({ kind: "project-invalid-json", diagnostic: error.message }, { cause: error });
         }
         validateProject(project);
         return { success: true, project };
     }
     catch (error) {
         console.error("Could not open project:", error);
-        if (error instanceof ProjectValidationError || isSystemError(error)) return { success: false, error: error.message };
+        if (error instanceof ProjectValidationError || error instanceof InvalidPathError || isSystemError(error)) return { success: false, error: toFailure(error) };
         throw error;
     }
 }
@@ -38,7 +39,7 @@ async function writeProject(path: AbsolutePath, text: string): Promise<SaveProje
             if (!isSystemError(error) || error.code !== "ENOENT") throw error;
             return null;
         });
-        if (existing && !existing.isFile()) throw new InvalidPathError("The project path must refer to a file.");
+        if (existing && !existing.isFile()) throw new InvalidPathError({ kind: "project-path-not-file" });
         const handle = await open(temporary, "wx", existing?.mode);
         try {
             await handle.writeFile(text, "utf8");
@@ -58,8 +59,8 @@ async function writeProject(path: AbsolutePath, text: string): Promise<SaveProje
 }
 
 export async function saveProject(path: unknown, project: Project): Promise<SaveProjectResult> {
-    const normalized = filePath(path);
     try {
+        const normalized = filePath(path);
         validateProject(project);
         // Capture before waiting, so a queued write cannot observe later mutations.
         const text = JSON.stringify(project, null, 4);
@@ -79,7 +80,7 @@ export async function saveProject(path: unknown, project: Project): Promise<Save
     catch (error) {
         console.error("Could not save project:", error);
         if (error instanceof ProjectValidationError || error instanceof InvalidPathError || isSystemError(error)) {
-            return { success: false, error: error.message };
+            return { success: false, error: toFailure(error) };
         }
         throw error;
     }

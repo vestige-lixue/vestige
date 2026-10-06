@@ -1,6 +1,8 @@
 <Dialog.Root bind:open onOpenChangeComplete={handleOpenChangeComplete}>
     <Dialog.Portal>
-        <Dialog.Overlay class="modal-overlay" style={`z-index: ${layerIndex};`}>
+        <Dialog.Overlay class="modal-overlay" style={`z-index: ${layerIndex};`} onclick={() => {
+            if (clickMaskBehavior === "close") open = false;
+        }}>
             <div class="titlebar-backdrop"></div>
             <div class="content-backdrop"></div>
         </Dialog.Overlay>
@@ -9,10 +11,17 @@
             class={["modal-content", className]}
             style={`--modal-width: ${width}; --modal-height: ${height}; z-index: ${layerIndex + 1};`}
             escapeKeydownBehavior={escBehavior}
-            interactOutsideBehavior={clickMaskBehavior}
+            interactOutsideBehavior="ignore"
             onOpenAutoFocus={event => {
                 event.preventDefault();
+                returnFocus = document.activeElement;
                 content?.focus();
+            }}
+            onCloseAutoFocus={event => {
+                event.preventDefault();
+                const target = returnFocus;
+                returnFocus = null;
+                modal.restoreFocus(target);
             }}
         >
             {@render children()}
@@ -74,31 +83,34 @@
     :global(.modal-content) {
         --bg: var(--c-background);
         position: fixed;
-        top: calc(40% + env(titlebar-area-height) / 2);
+        top: calc(42% + env(titlebar-area-height) / 2);
         left: 50%;
         transform: translate(-50%, max(-50%, calc(-40vh + env(titlebar-area-height) / 2 + 24px)));
         width: var(--modal-width);
         max-width: calc(100vw - 48px);
         height: var(--modal-height);
         max-height: calc(100vh - env(titlebar-area-height) - 48px);
-        overflow: auto;
+        overflow-x: clip;
+        overflow-y: auto;
         padding: 24px;
         border: 1px solid var(--c-border);
         border-radius: 12px;
         color: var(--c-text);
         background: var(--bg);
         box-shadow: 0 8px 32px var(--c-shadow-3);
+        display: flex;
+        flex-flow: column nowrap;
+        gap: 24px;
     }
     :global(.modal-content .modal-title) {
-        margin: 0 0 12px;
-        font-size: 18px;
+        font-size: 26px;
         font-weight: bold;
     }
     :global(.modal-content .modal-description) {
         margin: 0;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
-        color: var(--c-muted);
+        color: var(--c-text);
         line-height: 1.6;
         user-select: text;
     }
@@ -108,17 +120,20 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        margin-top: 24px;
+        margin-top: auto;
     }
     .actions :global(button) {
         padding: 8px 14px;
-        border: 1px solid var(--c-border);
+        border: 1px solid var(--c-border-120p);
         border-radius: 6px;
         background: var(--bg);
     }
     .actions :global(.primary) {
         --bg: var(--c-accent);
         color: var(--c-background);
+    }
+    .actions :global(button:only-child) {
+        margin-left: auto;
     }
 </style>
 
@@ -154,6 +169,7 @@
     }: Props = $props();
 
     let content = $state<HTMLDivElement | null>(null);
+    let returnFocus: Element | null = null;
     const layer = Symbol();
     const layerIndex = $derived(modal.getLayerIndex(layer));
 

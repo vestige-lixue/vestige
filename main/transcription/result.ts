@@ -59,7 +59,7 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     }
     catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
-        throw new TranscriptionError(diagnostic || raw || "Executer produced no JSON result.", { cause: error });
+        throw new TranscriptionError({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
     }
 }
 

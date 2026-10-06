@@ -1,7 +1,7 @@
 <Modal
     bind:open
     class="save-confirmation"
-    escBehavior="close"
+    escBehavior="ignore"
     clickMaskBehavior="ignore"
     onOpenChangeComplete={isOpen => {
         if (!isOpen) {
@@ -10,31 +10,32 @@
         }
     }}
 >
-    <Dialog.Title class="modal-title">保存项目后再继续？</Dialog.Title>
-    <Dialog.Description class="modal-description">“{fileName}”有未保存的更改。</Dialog.Description>
+    <Dialog.Title class="modal-title">{i18n.t("dialogs.saveConfirm")}</Dialog.Title>
+    <Dialog.Description class="modal-description">{i18n.t("dialogs.unsavedChanges", { name: fileName ?? i18n.t("common.unsaved") })}</Dialog.Description>
     {#snippet actions()}
-        <button class="hoverable activable" onclick={() => choose("cancel")}>取消</button>
-        <button class="discard hoverable activable" onclick={() => choose("discard")}>不保存</button>
-        <button class="save primary hoverable activable" onclick={() => choose("save")}>保存</button>
+        <button class="activable focusable" onclick={() => choose("cancel")}>{i18n.t("common.cancel")}</button>
+        <button class="discard-btn hoverable activable focusable" onclick={() => choose("discard")}>{i18n.t("common.discard")}</button>
+        <button class="primary hoverable activable focusable" onclick={() => choose("save")}>{i18n.t("common.save")}</button>
     {/snippet}
 </Modal>
 
 
 <style>
-    .discard {
+    .discard-btn {
         margin-right: auto;
     }
 </style>
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import * as dialogs from "../../states/dialogs.svelte";
 
     let { open = $bindable(), fileName, answer, onClosed }: {
         open: boolean;
-        fileName: string;
+        fileName: string | null;
         answer: (choice: dialogs.SaveChoice) => void;
         onClosed: () => void;
     } = $props();

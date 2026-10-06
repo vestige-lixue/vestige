@@ -1,3 +1,4 @@
+import { type Failure, FailureError, toFailure } from "../../shared/failure";
 import { SvelteMap } from "svelte/reactivity";
 import { type MediaIssueStatus } from "../../shared/media/check";
 import { type InputSource } from "../../shared/util/file";
@@ -10,12 +11,12 @@ export type ImportState = { id: string } & ({
     stage: "queued" | "path" | "reading" | "relocating" | "ready";
 } | {
     stage: MediaIssueStatus;
-    error: string;
+    error: Failure;
     path: AbsolutePath;
     ignored: boolean;
 });
 type ImportIssue = Extract<ImportState, { stage: MediaIssueStatus }>;
-export type MediaImportFailure = { name: string; path: AbsolutePath | null; error: string };
+export type MediaImportFailure = { name: string | null; path: AbsolutePath | null; error: Failure };
 
 type TaskSource = ({
     kind: "import";
@@ -79,7 +80,7 @@ export function getConcurrency(): number {
 }
 
 export function setConcurrency(value: number): void {
-    if (!Number.isSafeInteger(value) || value < 1) throw new RangeError("Media import concurrency must be a positive integer.");
+    if (!Number.isSafeInteger(value) || value < 1) throw new FailureError({ kind: "media-invalid-concurrency" });
     state.concurrency = value;
     pump();
 }
@@ -194,7 +195,7 @@ export function review(id: string): void {
     showIssue(id);
 }
 
-export function reportPlaybackFailure(id: string, status: MediaIssueStatus, error: string): void {
+export function reportPlaybackFailure(id: string, status: MediaIssueStatus, error: Failure): void {
     const media = project.getMedia(id);
     if (media && isReady(id)) reportFailure(id, status, error, media.path);
 }
@@ -221,7 +222,7 @@ export function reportImportFailure(input: MediaImportFailure): void {
     failureDialogs.set(failure, dialog);
 }
 
-function reportFailure(id: string, status: MediaIssueStatus, error: string, path: AbsolutePath | null): void {
+function reportFailure(id: string, status: MediaIssueStatus, error: Failure, path: AbsolutePath | null): void {
     const media = project.getMedia(id);
     if (media) {
         update({ id, stage: status, error, path: path ?? media.path, ignored: false });
@@ -268,10 +269,15 @@ async function run(id: string, task: ImportTask): Promise<void> {
         }
         else source = task.source.kind === "check" ? task.source.path : task.source.source;
         update({ id, stage: "path" });
-        path = typeof source === "string" ? source : await window.api.file.getPathForFile(source);
+        if (typeof source === "string") path = source;
+        else {
+            const result = await window.api.file.getPathForFile(source);
+            if (!result.success) throw new FailureError(result.error);
+            path = result.path;
+        }
         if (tasks.get(id) !== task) return;
         if (task.source.kind === "import" && /\.vestige$/i.test(path)) {
-            reportFailure(id, "unreadable", "媒体格式不符合。", path);
+            reportFailure(id, "unreadable", { kind: "media-format" }, path);
             return;
         }
         update({ id, stage: "reading" });
@@ -297,7 +303,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
     }
     catch (error) {
         if (tasks.get(id) !== task || task.controller.signal.aborted) return;
-        reportFailure(id, "unreadable", error instanceof Error ? error.message : String(error), path);
+        reportFailure(id, "unreadable", toFailure(error), path);
         console.error(error);
     }
     finally {

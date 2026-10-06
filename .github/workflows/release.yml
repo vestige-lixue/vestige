@@ -1,0 +1,203 @@
+name: Build release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Platform and architecture to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - windows-x64
+          - windows-arm64
+          - macos-x64
+          - macos-arm64
+          - linux-x64
+          - linux-arm64
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      matrix: ${{ steps.prepare.outputs.matrix }}
+    steps:
+      - name: Check out the application
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate the version and select build targets
+        id: prepare
+        env:
+          TARGET: ${{ inputs.target || 'all' }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from "node:fs";
+
+          const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+          if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
+              throw new Error("package.json must contain a valid release version.");
+          }
+          if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== `v${version}`) {
+              throw new Error(`The tag must match package.json: v${version}`);
+          }
+
+          const targets = [
+              { target: "windows-x64", os: "windows-2025", platform: "win32", builder: "win", arch: "x64" },
+              { target: "windows-arm64", os: "windows-11-arm", platform: "win32", builder: "win", arch: "arm64" },
+              { target: "macos-x64", os: "macos-15-intel", platform: "darwin", builder: "mac", arch: "x64" },
+              { target: "macos-arm64", os: "macos-26", platform: "darwin", builder: "mac", arch: "arm64" },
+              { target: "linux-x64", os: "ubuntu-24.04", platform: "linux", builder: "linux", arch: "x64" },
+              { target: "linux-arm64", os: "ubuntu-24.04-arm", platform: "linux", builder: "linux", arch: "arm64" }
+          ];
+          const include = targets.filter(({ target }) => process.env.TARGET === "all" || process.env.TARGET === target);
+          if (include.length === 0) throw new Error(`Unknown build target: ${process.env.TARGET}`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nmatrix=${JSON.stringify({ include })}\n`);
+          NODE
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      TARGET_PLATFORM: ${{ matrix.platform }}
+      TARGET_ARCH: ${{ matrix.arch }}
+      BUILDER_PLATFORM: ${{ matrix.builder }}
+    steps:
+      - name: Check out the application
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+          architecture: ${{ matrix.arch }}
+          package-manager-cache: false
+
+      - name: Set up pnpm from package.json
+        uses: pnpm/action-setup@v6.1.0
+        with:
+          run_install: false
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libarchive-tools libfuse2t64
+
+      - name: Download native programs for this target
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VESTIGE_NATIVE_REPOSITORY: ${{ vars.VESTIGE_NATIVE_REPOSITORY || 'vestige-lixue/macos-whisper-cli' }}
+        run: node resources/bin/download.mjs --platform "$TARGET_PLATFORM" --arch "$TARGET_ARCH"
+
+      - name: Typecheck and build the application
+        run: pnpm build
+
+      - name: Package the application
+        run: |
+          args=("--$BUILDER_PLATFORM" "--$TARGET_ARCH" --publish never)
+          if [[ "$TARGET_PLATFORM" == win32 ]]; then
+            args+=('-c.nsis.artifactName=${name}-${version}-${arch}-setup.${ext}')
+          elif [[ "$TARGET_PLATFORM" == darwin ]]; then
+            # Ad-hoc signing supports Apple Silicon without a Developer ID certificate.
+            args+=(-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false)
+          fi
+          pnpm exec electron-builder "${args[@]}"
+
+      - name: Upload application packages
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: vestige-${{ matrix.target }}
+          path: |
+            dist/release/*.exe
+            dist/release/*.dmg
+            dist/release/*.AppImage
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    name: Create release draft
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download all application packages
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: vestige-*
+          path: release
+          merge-multiple: true
+
+      - name: Verify packages and create or update the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        working-directory: release
+        run: |
+          files=(
+            "vestige-$VERSION-x64-setup.exe"
+            "vestige-$VERSION-arm64-setup.exe"
+            "vestige-$VERSION-x64.dmg"
+            "vestige-$VERSION-arm64.dmg"
+            "vestige-$VERSION-x64.AppImage"
+            "vestige-$VERSION-arm64.AppImage"
+          )
+          for file in "${files[@]}"; do
+            if [[ ! -s "$file" ]]; then
+              echo "::error::Missing or empty release package: $file"
+              exit 1
+            fi
+          done
+          sha256sum "${files[@]}" > SHA256SUMS
+
+          if draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"; then
+            if [[ "$draft" != true ]]; then
+              echo "::error::Release $RELEASE_TAG is already published; its assets will not be replaced."
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" "${files[@]}" SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            args=(--draft --verify-tag --generate-notes --title "Vestige $VERSION")
+            if [[ "${VERSION%%+*}" == *-* ]]; then
+              args+=(--prerelease)
+            fi
+            gh release create "$RELEASE_TAG" "${files[@]}" SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" "${args[@]}"
+          fi

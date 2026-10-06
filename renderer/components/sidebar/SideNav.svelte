@@ -1,23 +1,23 @@
 <nav>
-    <Tooltip text="词库" onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
+    <Tooltip text={i18n.t("dialogs.vocabulary")} shortcut={`${modKeyText}+L`} onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
         {#snippet child({ props })}
-            <button {...props} class="hoverable activable">
+            <button {...props} class="hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html bookIcon}
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text="转写任务" onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
+    <Tooltip text={i18n.t("transcription.tasks")} shortcut={`${modKeyText}+T`} onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
         {#snippet child({ props })}
-            <button {...props} class="hoverable activable">
+            <button {...props} class="hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html taskBlankIcon}
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text="设置" onclick={() => runCommand({ kind: "openPanel", panel: "settings" })}>
+    <Tooltip text={i18n.t("settings.title")} shortcut={`${modKeyText}+,`} onclick={() => runCommand({ kind: "openPanel", panel: "settings" })}>
         {#snippet child({ props })}
-            <button {...props} class="hoverable activable">
+            <button {...props} class="hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html settingsIcon}
             </button>
@@ -34,7 +34,7 @@
         align-items: center;
         flex-shrink: 0;
         width: 100%;
-        margin-bottom: 8px;
+        margin: 10px 0 8px;
     }
     nav button {
         display: grid;
@@ -54,9 +54,12 @@
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
     import Tooltip from "../util/Tooltip.svelte";
     import { runCommand } from "../../states/commands";
     import bookIcon from "../../../resources/icons/carbon--book.svg?raw";
     import taskBlankIcon from "../../../resources/icons/carbon--task-blank.svg?raw";
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
+
+    const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
 </script>

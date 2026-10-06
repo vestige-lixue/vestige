@@ -1,4 +1,5 @@
-import { app, shell, BrowserWindow, nativeTheme } from "electron";
+import { setLocale } from "./ui/i18n";
+import { app, shell, BrowserWindow, nativeTheme, screen } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,9 @@ import { type EditAction } from "../shared/app";
 import { filePath } from "./util/file";
 import { registerFileIPCs } from "./file/ipc";
 import { registerMediaScheme, registerMediaProtocol } from "./file/source";
+import { ConfigStore } from "./config/store";
+import { registerConfigIPCs } from "./config/ipc";
+import { minWindowHeight, minWindowWidth } from "../shared/config/defaults";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -34,6 +38,9 @@ const sessionPath = join(dataPath, "chromium");
 mkdirSync(sessionPath, { recursive: true });
 app.setPath("userData", dataPath);
 app.setPath("sessionData", sessionPath);
+const config = new ConfigStore(dataPath);
+setLocale(config.get().config.language);
+config.subscribe(snapshot => setLocale(snapshot.config.language));
 
 function openExternal(url: string): void {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(console.error);
@@ -46,12 +53,14 @@ function getWindowIcon(): string {
 }
 
 function createWindow(): void {
+    const windowState = config.get().config.window;
+    const workArea = screen.getPrimaryDisplay().workAreaSize;
     const mainWindow = new BrowserWindow({
         title: "Vestige",
-        width: 800,
-        height: 600,
-        minWidth: 640,
-        minHeight: 480,
+        width: Math.max(minWindowWidth, Math.min(windowState.width, workArea.width)),
+        height: Math.max(minWindowHeight, Math.min(windowState.height, workArea.height)),
+        minWidth: minWindowWidth,
+        minHeight: minWindowHeight,
         show: false,
         backgroundColor: "#ffffff",
         titleBarStyle: "hidden",
@@ -79,6 +88,7 @@ function createWindow(): void {
         mainWindow.webContents[action as EditAction]();
     });
     registerProjectIPCs(mainWindow);
+    const rememberWindow = registerConfigIPCs(mainWindow, config);
     registerWindowLifecycle(mainWindow);
     registerTranscriptionIPCs(mainWindow.webContents, {
         runtimeDirectory,
@@ -93,7 +103,11 @@ function createWindow(): void {
         mainWindow.once("closed", () => nativeTheme.off("updated", updateWindowIcon));
     }
 
-    mainWindow.once("ready-to-show", () => mainWindow.show());
+    mainWindow.once("ready-to-show", () => {
+        if (windowState.maximized) mainWindow.maximize();
+        rememberWindow();
+        mainWindow.show();
+    });
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         openExternal(url);
         return { action: "deny" };

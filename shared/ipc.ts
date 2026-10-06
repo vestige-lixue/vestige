@@ -1,3 +1,12 @@
+export const configChannels = {
+    get: "config:get",
+    update: "config:update",
+    setSidebarWidth: "config:set-sidebar-width",
+    updatePlayback: "config:update-playback",
+    save: "config:save",
+    changed: "config:changed"
+} as const;
+
 export const fileChannels = {
     normalize: "file:normalize",
     readMedia: "file:read-media",

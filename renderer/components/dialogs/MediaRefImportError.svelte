@@ -9,14 +9,16 @@
     <Dialog.Title class="modal-title">{labels[issue.status]}</Dialog.Title>
     <Dialog.Description class="modal-description">{description}</Dialog.Description>
     {#snippet actions()}
-        <button class="hoverable activable" onclick={() => close(onRetry)}>重试</button>
-        <button class="primary hoverable activable" onclick={() => close(onRelink)}>重新定位</button>
-        <button class="hoverable activable" onclick={() => close(onIgnore)}>忽略</button>
+        <button class="hoverable activable focusable" onclick={() => close(onRetry)}>{i18n.t("common.retry")}</button>
+        <button class="primary hoverable activable focusable" onclick={() => close(onRelink)}>{i18n.t("common.relocate")}</button>
+        <button class="hoverable activable focusable" onclick={() => close(onIgnore)}>{i18n.t("common.ignore")}</button>
     {/snippet}
 </Modal>
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
+    import { describeFailure } from "../feedback";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import { type MediaIssueStatus } from "../../../shared/media/check";
@@ -33,11 +35,11 @@
     } = $props();
     let action: (() => void) | undefined;
 
-    const labels: Record<MediaIssueStatus, string> = {
-        missing: "找不到媒体文件",
-        changed: "媒体文件已变化",
-        unreadable: "无法读取媒体文件"
-    };
+    const labels = $derived<Record<MediaIssueStatus, string>>({
+        missing: i18n.t("dialogs.mediaMissing"),
+        changed: i18n.t("dialogs.mediaChanged"),
+        unreadable: i18n.t("dialogs.mediaUnreadable")
+    });
 
     function close(next: () => void): void {
         if (!open) return;
@@ -47,10 +49,10 @@
     const description = $derived.by(() => {
         const { mediaId, path } = issue;
         const media = project.getMedia(mediaId);
-        const original = !media || path === media.path ? "" : `\n项目原路径：${media.path}`;
+        const original = !media || path === media.path ? "" : i18n.t("dialogs.originalPath", { path: media.path });
         const guidance = issue.status === "changed"
-            ? "请选择与原媒体内容相同的文件。要使用新内容，请另行导入。"
-            : "可在外部恢复文件后重试，或重定位到文件的新位置。";
-        return `${media?.name ?? ""}\n${path}${original}\n\n${issue.error}\n${guidance}\n忽略后保留此媒体及已有转写，也可在侧栏删除此媒体。`;
+            ? i18n.t("dialogs.sameMedia")
+            : i18n.t("dialogs.restoreMedia");
+        return i18n.t("dialogs.mediaRefDescription", { path, original, error: describeFailure(issue.error), guidance });
     });
 </script>

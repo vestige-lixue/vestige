@@ -1,3 +1,4 @@
+import { toFailure } from "../../shared/failure";
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
@@ -33,9 +34,9 @@ export async function transcribe(id: string, value: unknown, paths: ExecutionPat
     }
     catch (error) {
         console.error("Transcription failed:", error);
-        if (signal?.aborted && error === signal.reason) return { success: false, error: "Transcription cancelled." };
+        if (signal?.aborted && error === signal.reason) return { success: false, error: { kind: "transcription-cancelled" } };
         if (error instanceof TranscriptionError || error instanceof NativeProcessError || error instanceof InvalidPathError || isSystemError(error)) {
-            return { success: false, error: error.message };
+            return { success: false, error: toFailure(error) };
         }
         throw error;
     }

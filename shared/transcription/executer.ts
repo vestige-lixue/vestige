@@ -1,3 +1,4 @@
+import { type Failure } from "../failure";
 import { type Run } from "./Run";
 import { type AbsolutePath } from "../util/path";
 
@@ -18,7 +19,7 @@ export type TranscriptionResult = ({
     run: Run;
 } | {
     success: false;
-    error: string;
+    error: Failure;
 });
 
 export const executerChannel = "transcription:transcribe";

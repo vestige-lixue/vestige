@@ -1,14 +1,14 @@
-import { dialog, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
+import { FailureError } from "../../shared/failure";
+import { selectOpenProjectPath, selectSaveProjectPath } from "../ui/fileDialogs";
+import { type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { getProject, saveProject } from "./file";
 import { type Project } from "../../shared/project/Project";
 import { projectChannels } from "../../shared/ipc";
-import { filePath } from "../util/file";
 
 export function registerProjectIPCs(window: BrowserWindow): void {
     const contents = window.webContents;
-    const filters = [{ name: "Vestige Project", extensions: ["vestige"] }];
     const checkSender = (event: IpcMainInvokeEvent): void => {
-        if (event.senderFrame !== contents.mainFrame) throw new Error("Project access is only available to the main frame.");
+        if (event.senderFrame !== contents.mainFrame) throw new FailureError({ kind: "ipc-not-main-frame" });
     };
     contents.ipc.handle(projectChannels.get, (event, path: unknown) => {
         checkSender(event);
@@ -18,20 +18,12 @@ export function registerProjectIPCs(window: BrowserWindow): void {
         checkSender(event);
         return saveProject(path, project);
     });
-    contents.ipc.handle(projectChannels.openDialog, async event => {
+    contents.ipc.handle(projectChannels.openDialog, event => {
         checkSender(event);
-        const result = await dialog.showOpenDialog(window, { filters, properties: ["openFile"] });
-        return result.canceled || !result.filePaths[0] ? null : filePath(result.filePaths[0]);
+        return selectOpenProjectPath(window);
     });
-    contents.ipc.handle(projectChannels.saveDialog, async (event, path: unknown) => {
+    contents.ipc.handle(projectChannels.saveDialog, (event, path: unknown, saveAs: unknown) => {
         checkSender(event);
-        const result = await dialog.showSaveDialog(window, {
-            filters,
-            defaultPath: path == null ? "Untitled.vestige" : filePath(path),
-            properties: ["showOverwriteConfirmation"]
-        });
-        // Use the exact confirmed path; appending an extension afterwards could
-        // overwrite a different file that the native dialog never confirmed.
-        return result.canceled || !result.filePath ? null : filePath(result.filePath);
+        return selectSaveProjectPath(window, path, saveAs === true);
     });
 }

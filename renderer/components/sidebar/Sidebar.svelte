@@ -7,7 +7,6 @@
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html logo}
     </div>
-    <ProjectStatus />
     <RecordList />
     <SideNav />
 </aside>
@@ -16,7 +15,7 @@
     origin={width}
     min={minWidth}
     max={maxWidth}
-    changeCB={value => width = value}
+    changeCB={value => void config.setSidebarWidth(value)}
     thickness={3}
 />
 
@@ -44,9 +43,10 @@
     .logo :global(svg) {
         display: block;
         width: auto;
-        height: 85%;
+        height: 100%;
         max-width: 100%;
         pointer-events: none;
+        transform: translateY(6px);
     }
 </style>
 
@@ -55,10 +55,11 @@
     import logo from "../../../resources/logos/logo-black.svg?raw";
     import RecordList from "./MediaList.svelte";
     import SideNav from "./SideNav.svelte";
-    import ProjectStatus from "./ProjectStatus.svelte";
     import Resizer from "../util/Resizer.svelte";
+    import * as config from "../../states/config.svelte";
+    import { minSidebarWidth, maxSidebarWidth } from "../../../shared/config/defaults";
 
-    const minWidth = 150;
-    const maxWidth = "min(40vw, 750px)";
-    let width = $state<number | string>("min(22vw, 200px)");
+    const minWidth = minSidebarWidth;
+    const maxWidth = `min(40vw, ${maxSidebarWidth}px)`;
+    const width = $derived(config.getSidebarWidth() ?? "min(22vw, 200px)");
 </script>

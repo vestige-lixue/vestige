@@ -35,7 +35,7 @@ s {
 kbd {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     padding: .1em .4em;
-    border: .0625em solid var(--c-kbd-border);
+    border: .0625em solid var(--c-border-120p);
     color: var(--c-text-80p);
     border-radius: .25em;
     font-size: .85em;
@@ -44,4 +44,19 @@ kbd {
 
 .danger {
     color: var(--c-danger);
+}
+
+a {
+    color: var(--c-link);
+    text-decoration: none;
+    transition: color .2s ease;
+}
+
+a:hover {
+    color: hsl(from var(--c-link) h s calc(l * 1.2));
+    transition: background-color .08s ease;
+}
+
+a:active {
+    color: hsl(from var(--c-link) h s calc(l * 0.8));
 }

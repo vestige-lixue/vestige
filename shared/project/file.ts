@@ -1,3 +1,4 @@
+import { type Failure } from "../failure";
 import { type Project } from "./Project";
 
 export type GetProjectResult = ({
@@ -5,12 +6,12 @@ export type GetProjectResult = ({
     project: Project;
 } | {
     success: false;
-    error: string;
+    error: Failure;
 });
 
 export type SaveProjectResult = ({
     success: true;
 } | {
     success: false;
-    error: string;
+    error: Failure;
 });

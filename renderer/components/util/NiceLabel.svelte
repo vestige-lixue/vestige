@@ -11,17 +11,17 @@
     ></div>
 {:else}
     <div
+        {...labelAttributes}
         class={["label", className]}
+        class:focusable={tabIndex !== undefined}
         class:scrolling={scrollDistance > 0 && scrollDuration > 0}
         bind:this={element}
         contenteditable="false"
+        tabindex={tabIndex}
         style:--scroll-distance={`${scrollDistance}px`}
         style:--scroll-duration={`${scrollAnimationDuration}s`}
         style:--scroll-stop={`${scrollStop}s`}
         style:--scroll-stop-progress={`${scrollStopProgress}%`}
-        ondblclick={editable ? startEditing : undefined}
-        onmouseenter={startScrolling}
-        onmouseleave={() => scrollDistance = 0}
     >
         <span bind:this={text}>{value}</span>
     </div>
@@ -41,6 +41,9 @@
     .label {
         user-select: none;
     }
+    .label:focus-visible {
+        border-radius: 4px;
+    }
     .label span {
         display: block;
         overflow: hidden;
@@ -56,7 +59,7 @@
         cursor: text;
         user-select: text;
         border-radius: 4px;
-        outline: 1px solid var(--c-border-accent);
+        outline: 2px solid var(--c-accent);
         outline-offset: 3px;
     }
     @keyframes scroll-label {
@@ -77,10 +80,11 @@
 
 
 <script lang="ts">
+    import { mergeProps } from "bits-ui";
     import { tick } from "svelte";
+    import { type HTMLAttributes } from "svelte/elements";
 
-    type Props = {
-        class?: string;
+    type Props = Omit<HTMLAttributes<HTMLDivElement>, "onchange"> & {
         value: string;
         editable: boolean;
         onchange: (value: string) => void;
@@ -91,13 +95,22 @@
         scrollPause?: number;
     };
 
-    let { class: className = "", value, onchange, editable, scrollMode = "none", scrollParam = 1, scrollPause = 1 }: Props = $props();
+    let { class: className = "", value, onchange, editable, scrollMode = "none", scrollParam = 1, scrollPause = 1, ...labelProps }: Props = $props();
 
     let element = $state<HTMLDivElement>();
     let text = $state<HTMLSpanElement>();
     let draft = $state("");
     let editing = $state(false);
     let scrollDistance = $state(0);
+    const tabIndex = $derived(labelProps.tabindex ?? (editable ? 0 : undefined));
+    const labelAttributes = $derived(mergeProps(labelProps, {
+        ondblclick: editable ? startEditing : undefined,
+        onkeydown: handleKeydown,
+        onmouseenter: startScrolling,
+        onmouseleave: stopScrolling,
+        onfocus: startScrolling,
+        onblur: stopScrolling
+    }));
     const scrollDuration = $derived.by(() => {
         if (scrollMode === "none" || !Number.isFinite(scrollParam) || scrollParam <= 0) return 0;
         return scrollMode === "ontime" ? scrollParam : scrollDistance / scrollParam;
@@ -184,9 +197,11 @@
         return target instanceof Element && target.closest("[data-menubar-trigger], [data-menubar-content]") !== null;
     }
 
-    async function startEditing(event: MouseEvent): Promise<void> {
+    async function startEditing(event: MouseEvent | KeyboardEvent): Promise<void> {
         if (!editable) return;
         event.preventDefault();
+        event.stopPropagation();
+        element?.blur();
         draft = value;
         scrollDistance = 0;
         editing = true;
@@ -199,6 +214,10 @@
     function startScrolling(): void {
         if (!element || !text) return;
         scrollDistance = Math.max(0, text.scrollWidth - element.clientWidth);
+    }
+
+    function stopScrolling(): void {
+        if (!element?.matches(":hover, :focus")) scrollDistance = 0;
     }
 
     function scrollSelectionFocusIntoView(): void {
@@ -216,7 +235,7 @@
         else if (focus.right > right) element.scrollLeft += focus.right - right;
     }
 
-    function finishEditing(cancel = false): void {
+    async function finishEditing(cancel = false): Promise<void> {
         if (!element) return;
         const selection = element.ownerDocument.getSelection();
         if (selection && element.contains(selection.anchorNode) && element.contains(selection.focusNode)) {
@@ -228,12 +247,19 @@
         if (!cancel && editable && nextValue && nextValue !== value) onchange(nextValue);
         draft = value;
         element?.blur();
+        await tick();
+        if (!editing && editable) element?.focus();
     }
 
     function handleKeydown(event: KeyboardEvent): void {
-        if (event.isComposing || (event.key !== "Enter" && event.key !== "Escape")) return;
+        if (event.isComposing || event.repeat) return;
+        if (!editing) {
+            if (editable && event.key === "Enter") void startEditing(event);
+            return;
+        }
+        if (event.key !== "Enter" && event.key !== "Escape") return;
         event.preventDefault();
         event.stopPropagation();
-        finishEditing(event.key === "Escape");
+        void finishEditing(event.key === "Escape");
     }
 </script>

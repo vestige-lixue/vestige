@@ -1,3 +1,4 @@
+import { type Failure } from "../../shared/failure";
 import { type MediaIssueStatus } from "../../shared/media/check";
 import { type AbsolutePath } from "../../shared/util/path";
 import * as mediaImport from "./mediaImport.svelte";
@@ -27,7 +28,7 @@ type ProjectSaveOperation = {
 
 type ProjectWaitSaveOperation = {
     kind: "wait-save";
-    fileName: string;
+    fileName: string | null;
 };
 
 export type ProjectOperation = (
@@ -42,22 +43,22 @@ export type ProjectError = ({
     kind: "pending-imports" | "active-transcriptions";
 } | {
     kind: "operation-failed";
-    diagnostic: string;
+    failure: Failure;
 } | {
     kind: "read-failed";
     path: AbsolutePath;
-    diagnostic: string;
+    failure: Failure;
 });
 
 export type MediaRefImportIssue = {
     status: MediaIssueStatus;
     mediaId: string;
     path: AbsolutePath;
-    error: string;
+    error: Failure;
 };
 
 type PanelDialog = {
-    kind: "vocabulary" | "settings";
+    kind: "vocabulary" | "settings" | "licenses" | "about";
 };
 
 type TranscriptionTasksDialog = {
@@ -75,20 +76,20 @@ type TranscriptionConfigDialog = {
 type TranscriptionFailureDialog = {
     kind: "failure";
     mediaId: string;
-    error: string;
+    error: Failure;
     onConfigure: () => void;
 };
 
 type SaveConfirmationDialog = {
     kind: "save-confirmation";
-    fileName: string;
+    fileName: string | null;
     answer: (choice: SaveChoice) => void;
 };
 
 type SaveFailureDialog = {
     kind: "save-failure";
-    fileName: string;
-    error: string;
+    fileName: string | null;
+    error: Failure;
     answer: (choice: SaveChoice) => void;
 };
 

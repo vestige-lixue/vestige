@@ -1,16 +1,17 @@
+import { FailureError, toFailure } from "../../shared/failure";
 import { net, protocol } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { type MediaURLResult } from "../../shared/media/check";
-import { errorMessage, filePath, isSystemError } from "../util/file";
+import { filePath, isSystemError } from "../util/file";
 
 const scheme = "vestige-media";
 type MediaSource = { path: string; controller: AbortController; pending: Set<Promise<unknown>> };
 const sources = new Map<string, MediaSource>();
 
 export function registerMediaScheme(): void {
-    protocol.registerSchemesAsPrivileged([{ scheme, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }]);
+    protocol.registerSchemesAsPrivileged([{ scheme, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } }]);
 }
 
 export function registerMediaProtocol(): void {
@@ -54,6 +55,9 @@ async function respond(source: MediaSource, request: Request, signal: AbortSigna
         }
         // Chromium's file response honors Range but omits the HTTP range and length headers.
         const responseHeaders = new Headers(response.headers);
+        // URLs are opaque, temporary handles; anonymous CORS lets Web Audio read
+        // the same stream from both the development origin and packaged file://.
+        responseHeaders.set("Access-Control-Allow-Origin", "*");
         responseHeaders.set("Accept-Ranges", "bytes");
         responseHeaders.set("Content-Length", String(end - start + 1));
         if (range) responseHeaders.set("Content-Range", `bytes ${start}-${end}/${info.size}`);
@@ -118,11 +122,11 @@ function rangeError(size: number): Response {
 }
 
 export async function getMediaURL(input: unknown): Promise<MediaURLResult> {
-    const path = filePath(input);
     try {
+        const path = filePath(input);
         const file = await open(path, "r");
         try {
-            if (!(await file.stat()).isFile()) return { status: "unreadable", error: "该路径不是普通文件。" };
+            if (!(await file.stat()).isFile()) return { status: "unreadable", error: { kind: "media-not-file" } };
         }
         finally {
             await file.close();
@@ -132,11 +136,12 @@ export async function getMediaURL(input: unknown): Promise<MediaURLResult> {
         return { status: "ready", id, url: `${scheme}://${id}/` };
     }
     catch (error) {
+        if (error instanceof FailureError) return { status: "unreadable", error: error.failure };
         if (!isSystemError(error)) throw error;
         const code = error.code;
         return code === "ENOENT" || code === "ENOTDIR"
-            ? { status: "missing", error: "找不到此路径下的媒体文件，文件可能已移动或重命名。" }
-            : { status: "unreadable", error: errorMessage(error) };
+            ? { status: "missing", error: { kind: "media-missing" } }
+            : { status: "unreadable", error: toFailure(error) };
     }
 }
 

@@ -1,3 +1,4 @@
+import { type Failure, FailureError, toFailure } from "../../shared/failure";
 import { type Project } from "../../shared/project/Project";
 import { type Media } from "../../shared/Media";
 import { type Vestige } from "../../shared/Vestige";
@@ -24,9 +25,12 @@ export const projectState = $state<ProjectState>({
     path: null, project: null, locked: false, operation: null, saving: false, error: null
 });
 
-export const saveConfirmation = $state<{ fileName: string | null; error: string | null }>({ fileName: null, error: null });
+export const saveConfirmation = $state<{ pending: boolean; fileName: string | null; error: Failure | null }>({
+    pending: false, fileName: null, error: null
+});
 
 let confirmation: Promise<dialogs.SaveChoice> | null = null;
+let busy: { id: string; operation: dialogs.ProjectOperation } | null = null;
 let savedText = "";
 let saveTask: Promise<boolean> | null = null;
 let activeTransition: Promise<boolean> | null = null;
@@ -34,12 +38,14 @@ let autosaveTimer: ReturnType<typeof setInterval> | null = null;
 let lifecycleStarted = false;
 let projectGeneration = 0;
 
-export function getFileName(): string {
-    return projectState.project ? projectState.path === null ? "<未保存>" : getPathFileName(projectState.path) : "";
+export function getFileName(): string | null {
+    return projectState.path === null ? null : getPathFileName(projectState.path);
 }
 
-function confirmSave(fileName: string, error: string | null = null): Promise<dialogs.SaveChoice> {
+function confirmSave(fileName: string | null, error: Failure | null = null): Promise<dialogs.SaveChoice> {
     if (confirmation) return confirmation;
+    setOperation(null);
+    saveConfirmation.pending = true;
     saveConfirmation.fileName = fileName;
     saveConfirmation.error = error;
     confirmation = new Promise(resolve => {
@@ -52,6 +58,7 @@ function confirmSave(fileName: string, error: string | null = null): Promise<dia
             },
             onClosed: () => {
                 confirmation = null;
+                saveConfirmation.pending = false;
                 saveConfirmation.fileName = null;
                 saveConfirmation.error = null;
                 resolve(answer);
@@ -75,7 +82,7 @@ function reportError(error: dialogs.ProjectError): void {
 
 function reportUnexpected(error: unknown): void {
     console.error(error);
-    reportError({ kind: "operation-failed", diagnostic: error instanceof Error ? error.message : String(error) });
+    reportError({ kind: "operation-failed", failure: toFailure(error) });
 }
 
 function rejectPendingImports(): boolean {
@@ -90,34 +97,43 @@ function rejectActiveTranscriptions(): boolean {
     return true;
 }
 
-function showBusy(operation: dialogs.ProjectOperation): string {
-    return dialogs.show({
+function setOperation(operation: dialogs.ProjectOperation | null): void {
+    projectState.operation = operation;
+    if (operation === null) {
+        if (busy) dialogs.close(busy.id);
+        busy = null;
+        return;
+    }
+    if (busy) {
+        busy.operation = operation;
+        return;
+    }
+    const current = $state({ id: "", operation });
+    current.id = dialogs.show({
         kind: "project-busy",
-        getOperation: () => projectState.operation ?? operation,
+        getOperation: () => current.operation,
         onClosed: () => {}
     });
+    busy = current;
 }
 
-function invokeWithLock(operation: dialogs.ProjectOperation, action: () => Promise<boolean>): Promise<boolean> {
+function invokeWithLock(action: () => Promise<boolean>): Promise<boolean> {
     if (projectState.locked || rejectPendingImports()) return Promise.resolve(false);
+    // Confirmation holds the lock, but progress starts only when work begins.
     projectState.locked = true;
-    projectState.operation = operation;
-    const busy = showBusy(operation);
     activeTransition = Promise.resolve().then(async () => {
         while (saveTask) {
-            projectState.operation = { kind: "wait-save", fileName: getFileName() };
+            setOperation({ kind: "wait-save", fileName: getFileName() });
             if (!await saveTask) return false;
         }
-        projectState.operation = operation;
         return action();
     }).catch(error => {
         reportUnexpected(error);
         return false;
     }).finally(() => {
         projectState.locked = false;
-        projectState.operation = null;
+        setOperation(null);
         activeTransition = null;
-        dialogs.close(busy);
     });
     return activeTransition;
 }
@@ -148,26 +164,24 @@ async function writeCurrent(saveAs: boolean): Promise<boolean> {
     const project = projectState.project;
     if (!project) return false;
     projectState.saving = true;
-    const previousOperation = projectState.operation;
     let recoveryLock = false;
-    let recoveryBusy: string | null = null;
     let path = projectState.path;
-    let lastError: string | null = null;
+    let lastError: Failure | null = null;
     try {
         for (; ;) {
             if (rejectPendingImports()) return false;
-            let message = lastError;
+            let failure = lastError;
             try {
-                if (projectState.locked) projectState.operation = { kind: "save", path, saveAs };
+                if (projectState.locked) setOperation({ kind: "save", path, saveAs });
                 let cancelled = false;
                 if (saveAs || path === null) {
-                    const selected = await window.api.project.selectSavePath(path);
+                    const selected = await window.api.project.selectSavePath(path, saveAs);
                     if (selected === null) cancelled = true;
                     else path = selected;
                 }
                 if (cancelled && lastError === null) return false;
                 if (!cancelled && path !== null) {
-                    if (projectState.locked) projectState.operation = { kind: "save", path, saveAs: false };
+                    if (projectState.locked) setOperation({ kind: "save", path, saveAs: false });
                     const snapshot = $state.snapshot(project);
                     const text = JSON.stringify(snapshot);
                     // Recreate deleted project files, even when the snapshot is unchanged.
@@ -180,20 +194,18 @@ async function writeCurrent(saveAs: boolean): Promise<boolean> {
                         }
                         return true;
                     }
-                    message = result.error;
+                    failure = result.error;
                 }
             }
             catch (error) {
                 console.error(error);
-                message = error instanceof Error ? error.message : String(error);
+                failure = toFailure(error);
             }
             pauseAutosave();
-            lastError = message!;
+            lastError = failure!;
             if (!projectState.locked) {
                 projectState.locked = true;
                 recoveryLock = true;
-                projectState.operation = { kind: "save", path, saveAs };
-                recoveryBusy = showBusy(projectState.operation);
             }
             const choice = await confirmSave(path ?? getFileName(), lastError);
             if (choice === "retry") {
@@ -213,15 +225,16 @@ async function writeCurrent(saveAs: boolean): Promise<boolean> {
     }
     finally {
         projectState.saving = false;
-        if (recoveryLock) projectState.locked = false;
-        if (recoveryBusy) dialogs.close(recoveryBusy);
-        projectState.operation = previousOperation;
+        if (recoveryLock) {
+            projectState.locked = false;
+            setOperation(null);
+        }
     }
 }
 
 async function saveCurrent(saveAs = false): Promise<boolean> {
     while (saveTask) {
-        if (projectState.locked) projectState.operation = { kind: "wait-save", fileName: getFileName() };
+        if (projectState.locked) setOperation({ kind: "wait-save", fileName: getFileName() });
         if (!await saveTask) return false;
     }
     saveTask = writeCurrent(saveAs).finally(() => {
@@ -233,7 +246,7 @@ async function saveCurrent(saveAs = false): Promise<boolean> {
 async function prepareToLeave(): Promise<boolean> {
     if (rejectPendingImports() || rejectActiveTranscriptions()) return false;
     while (saveTask) {
-        if (projectState.locked) projectState.operation = { kind: "wait-save", fileName: getFileName() };
+        if (projectState.locked) setOperation({ kind: "wait-save", fileName: getFileName() });
         if (!await saveTask) return false;
     }
     if (!projectState.project) return true;
@@ -261,8 +274,9 @@ async function replaceProject(project: Project | null, path: AbsolutePath | null
 }
 
 export function create(): Promise<boolean> {
-    return invokeWithLock({ kind: "new" }, async () => {
+    return invokeWithLock(async () => {
         if (!await prepareToLeave()) return false;
+        setOperation({ kind: "new" });
         await replaceProject(createProject(), null);
         savedText = "";
         pauseAutosave();
@@ -272,14 +286,18 @@ export function create(): Promise<boolean> {
 
 // Both entry points hold the project lock before resolving or reading the source.
 async function openSource(source: InputSource): Promise<boolean> {
-    const path = typeof source === "string" ? source : await window.api.file.getPathForFile(source);
-    projectState.operation = { kind: "read", path };
+    setOperation({ kind: "open", path: typeof source === "string" ? source : null });
+    const resolved = typeof source === "string" ? { success: true as const, path: source } : await window.api.file.getPathForFile(source);
+    if (!resolved.success) throw new FailureError(resolved.error);
+    const path = resolved.path;
+    setOperation({ kind: "read", path });
     const result = await window.api.project.getProject(path);
     if (!result.success) {
-        reportError({ kind: "read-failed", path, diagnostic: result.error });
+        reportError({ kind: "read-failed", path, failure: result.error });
         return false;
     }
     if (!await prepareToLeave()) return false;
+    setOperation({ kind: "open", path });
     savedText = JSON.stringify(result.project);
     result.project.lastOpened = Date.now();
     await replaceProject(result.project, path);
@@ -288,18 +306,19 @@ async function openSource(source: InputSource): Promise<boolean> {
 }
 
 export function open(): Promise<boolean> {
-    return invokeWithLock({ kind: "open", path: null }, async () => {
+    return invokeWithLock(async () => {
+        setOperation({ kind: "open", path: null });
         const source = await window.api.project.selectOpenPath();
         return source === null ? false : openSource(source);
     });
 }
 
 export function openFile(source: InputSource): Promise<boolean> {
-    return invokeWithLock({ kind: "open", path: typeof source === "string" ? source : null }, () => openSource(source));
+    return invokeWithLock(() => openSource(source));
 }
 
 export function save(saveAs = false): Promise<boolean> {
-    return invokeWithLock({ kind: "save", path: projectState.path, saveAs }, () => saveCurrent(saveAs));
+    return invokeWithLock(() => saveCurrent(saveAs));
 }
 
 export function getVestige(id: string | null): Vestige | null {
@@ -311,7 +330,7 @@ export function getMedia(id: string | null): Media | null {
 }
 
 export function appendMedia(mediaFile: Media, index: number): void {
-    if (!mediaImport.get(mediaFile.id) || getMedia(mediaFile.id)) throw new Error("A pending, unique media import is required.");
+    if (!mediaImport.get(mediaFile.id) || getMedia(mediaFile.id)) throw new FailureError({ kind: "media-invalid-import" });
     projectState.project ??= createProject();
     projectState.project.vestiges.splice(index, 0, { media: mediaFile, runs: [], primaryRunIdx: 0, modifications: [] });
 }
@@ -353,20 +372,20 @@ export function selectMedia(id: string | null): void {
 }
 
 export function resetPlayback(): void {
-    player.updatePlaybackTime(0, true);
+    player.updatePlaybackTime(0, "commit");
 }
 
-export function seekPlayback(time: number): void {
+export function seekPlayback(time: number, mode: player.SeekMode = "commit"): void {
     const media = getMedia(mediaSelection.get());
     if (!media || !player.getURL() || !Number.isFinite(time)) return;
     // Transcript highlights derive from the same time, including explicit seeks.
-    player.updatePlaybackTime(Math.max(0, Math.min(media.duration, time)), true);
+    player.updatePlaybackTime(Math.max(0, Math.min(media.duration, time)), mode);
 }
 
 export function observePlaybackTime(id: string, time: number): void {
     const media = getMedia(id);
     if (mediaSelection.get() !== id || !media || !player.getURL() || !Number.isFinite(time)) return;
-    player.updatePlaybackTime(Math.max(0, Math.min(media.duration, time)), false);
+    player.updatePlaybackTime(Math.max(0, Math.min(media.duration, time)), null);
 }
 
 export function renameMedia(id: string, name: string): void {
@@ -404,8 +423,9 @@ export function reviewMedia(id: string): void {
 }
 
 export function close(): Promise<boolean> {
-    return invokeWithLock({ kind: "close" }, async () => {
+    return invokeWithLock(async () => {
         if (!await prepareToLeave()) return false;
+        setOperation({ kind: "close" });
         await replaceProject(null, null);
         savedText = "";
         pauseAutosave();
@@ -413,7 +433,7 @@ export function close(): Promise<boolean> {
     });
 }
 
-export function startLifecycle(): () => void {
+export function startLifecycle(saveConfigBeforeQuit: () => Promise<boolean>): () => void {
     lifecycleStarted = true;
     mediaImport.reset(projectState.project?.vestiges.map(vestige => vestige.media.id) ?? []);
     let checking: Promise<boolean> | null = null;
@@ -422,7 +442,11 @@ export function startLifecycle(): () => void {
         checking ??= (async () => {
             while (activeTransition) if (!await activeTransition) return true;
             while (saveTask) if (!await saveTask) return true;
-            return !await invokeWithLock({ kind: "quit" }, prepareToLeave);
+            return !await invokeWithLock(async () => {
+                if (!await prepareToLeave()) return false;
+                setOperation({ kind: "quit" });
+                return saveConfigBeforeQuit();
+            });
         })().finally(() => {
             checking = null;
         });

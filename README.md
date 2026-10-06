@@ -57,6 +57,17 @@ pnpm build:linux # Linux
 
 Packages are written to `dist/release/`.
 
+### Building releases with GitHub Actions
+
+The [Build release workflow](.github/workflows/release.yml) builds Windows NSIS installers, macOS DMG files, and Linux AppImages for both x64 and arm64 on native runners. Each job installs the pnpm version from `package.json`, uses the frozen lockfile, downloads the target's native programs, and runs the existing typecheck and build commands before packaging.
+
+macOS builds download the latest complete dependency release from [macos-whisper-cli](https://github.com/vestige-lixue/macos-whisper-cli). That independent repository checks upstream stable releases daily and builds only when needed. Publish its first pair of archives before the first macOS application build; subsequent builds and forks reuse those packages. The optional Actions variable `VESTIGE_NATIVE_REPOSITORY` selects another compatible repository. See [native program preparation](resources/bin/README.md) for details.
+
+- **Manual build:** Commit the workflow to the default branch, then open **Actions → Build release → Run workflow**. Choose a branch and either `all` or one platform/architecture. Download the packages from the run's **Artifacts**; they are retained for 14 days. Manual runs only upload artifacts.
+- **Release draft:** Set `package.json` to the intended version, commit it, then push the matching tag, such as `v0.1.0`. After all six builds succeed, the workflow creates a GitHub Release draft containing the installers and `SHA256SUMS`. Tags must exactly match `v` followed by the package version. Versions with a prerelease suffix create prerelease drafts. Review the files and notes in **Releases**, then publish the draft.
+
+Re-running a tag build updates an existing draft; published release assets are never overwritten. Only the release job receives `contents: write`, using GitHub's built-in token. No additional secrets are required. Windows installers are unsigned; macOS apps use ad-hoc signing without Developer ID signing or notarization, so operating-system trust prompts still apply.
+
 ## Author
 
 [@ljm12914](https://github.com/ljm12914)

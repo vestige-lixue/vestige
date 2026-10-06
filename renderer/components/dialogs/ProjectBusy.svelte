@@ -23,6 +23,7 @@
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import Spinner from "../util/Spinner.svelte";
@@ -36,22 +37,22 @@
 
     const title = $derived.by(() => {
         switch (operation.kind) {
-            case "new": return "正在新建项目";
-            case "close": return "正在关闭项目";
-            case "quit": return "正在退出应用";
-            case "open": return "正在打开项目";
-            case "read": return "正在读取并校验项目";
-            case "save": return "正在保存项目";
-            case "wait-save": return "正在等待项目保存";
+            case "new": return i18n.t("project.busy.new");
+            case "close": return i18n.t("project.busy.close");
+            case "quit": return i18n.t("project.busy.quit");
+            case "open": return i18n.t("project.busy.open");
+            case "read": return i18n.t("project.busy.read");
+            case "save": return i18n.t("project.busy.save");
+            case "wait-save": return i18n.t("project.busy.wait-save");
         }
     });
     const detail = $derived.by(() => {
         switch (operation.kind) {
-            case "new": case "close": case "quit": return "正在处理当前项目的更改";
-            case "open": return operation.path ?? "正在选择项目文件";
+            case "new": case "close": case "quit": return "";
+            case "open": return operation.path ?? i18n.t("project.chooseFile");
             case "read": return operation.path;
-            case "save": return operation.saveAs || operation.path === null ? "请选择保存位置" : operation.path;
-            case "wait-save": return operation.fileName;
+            case "save": return operation.saveAs || operation.path === null ? i18n.t("project.chooseSaveLocation") : operation.path;
+            case "wait-save": return operation.fileName ?? i18n.t("common.unsaved");
         }
     });
 </script>

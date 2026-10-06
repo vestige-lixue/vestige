@@ -1,8 +1,14 @@
-<Tooltip.Root bind:open {disableCloseOnTriggerClick}>
-    <Tooltip.Trigger {...triggerProps} />
+<Tooltip.Root bind:open={() => open, value => {
+    if (value && modal.isRestoringFocus(ref)) return;
+    open = value;
+}} {disableCloseOnTriggerClick}>
+    <Tooltip.Trigger {...triggerProps} bind:ref />
     <Tooltip.Portal>
         <Tooltip.Content class="tooltip-content" style={`z-index: ${modal.getTopLayer()};`} {side} sideOffset={6} collisionPadding={8}>
-            {text}
+            <div>
+                {#if typeof text === "string"}{text}{:else}{@render text()}{/if}
+            </div>
+            {#if shortcut}<kbd>{shortcut}</kbd>{/if}
         </Tooltip.Content>
     </Tooltip.Portal>
 </Tooltip.Root>
@@ -10,6 +16,10 @@
 
 <style>
     :global(.tooltip-content) {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        gap: 8px;
         max-width: min(320px, calc(100vw - 16px));
         padding: 6px 8px;
         border: 1px solid var(--c-border);
@@ -17,13 +27,17 @@
         color: var(--c-text);
         background: var(--c-surface);
         box-shadow: 0 4px 12px var(--c-shadow-3);
-        font-size: 12px;
+        font-size: 13px;
         line-height: 1.5;
         overflow-wrap: anywhere;
         transform-origin: var(--bits-tooltip-content-transform-origin);
         opacity: 1;
         transform: translate(0, 0) scale(1);
         transition: opacity .16s ease-out, transform .16s ease-out;
+    }
+    :global(.tooltip-content kbd) {
+        flex-shrink: 0;
+        white-space: nowrap;
     }
     :global(.tooltip-content[data-side="top"]) {
         --tooltip-offset-y: 6px;
@@ -55,10 +69,12 @@
 
 
 <script lang="ts">
+    import { type Snippet } from "svelte";
     import { Tooltip } from "bits-ui";
     import * as modal from "../../states/modal.svelte";
     type Props = Tooltip.TriggerProps & {
-        text: string;
+        text: string | Snippet;
+        shortcut?: string;
         side?: Tooltip.ContentProps["side"];
         open?: boolean;
         disableCloseOnTriggerClick?: boolean;
@@ -66,8 +82,10 @@
 
     let {
         text,
+        shortcut,
         side = "top",
         open = $bindable(false),
+        ref = $bindable(null),
         disableCloseOnTriggerClick,
         ...triggerProps
     }: Props = $props();

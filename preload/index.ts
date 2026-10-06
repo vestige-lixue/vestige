@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import { type AppAPI } from "../shared/app";
-import { appChannels, fileChannels, projectChannels } from "../shared/ipc";
+import { appChannels, configChannels, fileChannels, projectChannels } from "../shared/ipc";
+import { type ConfigSnapshot } from "../shared/config/Config";
 import { executerChannel, cancelExecuterChannel } from "../shared/transcription/executer";
 
 const api: AppAPI = {
@@ -22,10 +23,22 @@ const api: AppAPI = {
             ipcRenderer.removeListener(appChannels.beforeQuit, listener);
         };
     },
+    config: {
+        get: () => ipcRenderer.invoke(configChannels.get),
+        update: patch => ipcRenderer.invoke(configChannels.update, patch),
+        setSidebarWidth: width => ipcRenderer.invoke(configChannels.setSidebarWidth, width),
+        updatePlayback: patch => ipcRenderer.invoke(configChannels.updatePlayback, patch),
+        save: () => ipcRenderer.invoke(configChannels.save),
+        onChanged(callback) {
+            const listener = (_event: IpcRendererEvent, snapshot: ConfigSnapshot): void => callback(snapshot);
+            ipcRenderer.on(configChannels.changed, listener);
+            return () => ipcRenderer.removeListener(configChannels.changed, listener);
+        }
+    },
     file: {
         async getPathForFile(file) {
             const path = webUtils.getPathForFile(file);
-            if (!path) throw new Error(`A local file path is required: ${file.name}`);
+            if (!path) return { success: false, error: { kind: "file-not-local", name: file.name } };
             return ipcRenderer.invoke(fileChannels.normalize, path);
         },
         readMedia: (id, path, reference) => ipcRenderer.invoke(fileChannels.readMedia, id, path, reference),
@@ -43,7 +56,7 @@ const api: AppAPI = {
         getProject: path => ipcRenderer.invoke(projectChannels.get, path),
         saveProject: (path, project) => ipcRenderer.invoke(projectChannels.save, path, project),
         selectOpenPath: () => ipcRenderer.invoke(projectChannels.openDialog),
-        selectSavePath: path => ipcRenderer.invoke(projectChannels.saveDialog, path)
+        selectSavePath: (path, saveAs) => ipcRenderer.invoke(projectChannels.saveDialog, path, saveAs)
     }
 };
 

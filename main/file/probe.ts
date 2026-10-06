@@ -1,3 +1,4 @@
+import { toFailure } from "../../shared/failure";
 import { dirname } from "node:path";
 import { type Media } from "../../shared/Media";
 import { type MediaCheckResult } from "../../shared/media/check";
@@ -37,23 +38,23 @@ export async function probeMedia(path: AbsolutePath, runtimeDirectory: AbsoluteP
         }
         catch (error) {
             if (!(error instanceof SyntaxError)) throw error;
-            return { status: "unreadable", error: "ffprobe 返回了无效的媒体信息。" };
+            return { status: "unreadable", error: { kind: "media-invalid-info" } };
         }
         const info = object(value);
         const streams = Array.isArray(info?.streams) ? info.streams.map(object).filter(stream => stream !== null) : [];
         const video = streams.some(stream => stream.codec_type === "video" && object(stream.disposition)?.attached_pic !== 1);
         if (!video && !streams.some(stream => stream.codec_type === "audio")) {
-            return { status: "unreadable", error: "文件中没有可用的音频或视频流。" };
+            return { status: "unreadable", error: { kind: "media-no-streams" } };
         }
         const streamDurations = streams.map(stream => duration(stream.duration)).filter(value => value !== null);
         const seconds = duration(object(info?.format)?.duration) ?? (streamDurations.length ? Math.max(...streamDurations) : null);
-        if (seconds === null) return { status: "unreadable", error: "无法确定媒体时长。" };
+        if (seconds === null) return { status: "unreadable", error: { kind: "media-no-duration" } };
         return { status: "ready", metadata: { kind: video ? "video" : "audio", duration: seconds } };
     }
     catch (error) {
-        if (signal.aborted) return { status: "cancelled", error: "媒体读取已取消。" };
-        if (timeout.aborted) return { status: "unreadable", error: "读取媒体信息超时，请重试。" };
-        if (error instanceof NativeProcessError) return { status: "unreadable", error: error.message };
+        if (signal.aborted) return { status: "cancelled", error: { kind: "media-cancelled" } };
+        if (timeout.aborted) return { status: "unreadable", error: { kind: "media-timeout" } };
+        if (error instanceof NativeProcessError) return { status: "unreadable", error: toFailure(error) };
         throw error;
     }
 }

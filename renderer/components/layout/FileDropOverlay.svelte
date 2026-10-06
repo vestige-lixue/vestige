@@ -14,8 +14,8 @@
     <div class="file-drop-message">
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html downloadIcon}
-        <strong>{locked ? "正在处理项目" : "松开鼠标，导入媒体或打开项目"}</strong>
-        <p>{locked ? "请稍候再拖入文件" : "音频、视频、文件夹或单个 .vestige 项目文件"}</p>
+        <strong>{locked ? i18n.t("drop.busy") : i18n.t("drop.release")}</strong>
+        <div>{locked ? i18n.t("drop.wait") : i18n.t("drop.formats")}</div>
     </div>
 </div>
 
@@ -24,7 +24,7 @@
     .file-drop-overlay {
         -webkit-app-region: no-drag;
         position: fixed;
-        inset: env(titlebar-area-height) 0 0;
+        inset: calc(env(titlebar-area-height) + 2px) 0 0;
         z-index: 12914;
         display: grid;
         place-items: center;
@@ -39,7 +39,7 @@
         content: "";
         position: absolute;
         inset: 0 12px 12px;
-        border: 2px dashed var(--c-muted);
+        border: 2px dashed var(--c-border-200p);
         border-radius: 12px;
     }
     .file-drop-overlay::after {
@@ -67,15 +67,16 @@
         font-size: 20px;
         font-weight: 600;
     }
-    p {
+    .file-drop-message > div {
         margin: 0;
-        color: var(--c-muted);
+        color: var(--c-text-80p);
         font-size: 14px;
     }
 </style>
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
     import { onDestroy } from "svelte";
     import downloadIcon from "../../../resources/icons/carbon--download.svg?raw";
     import { interfaceBlocked } from "../../states/commands";
@@ -116,7 +117,10 @@
         catch (error) {
             if (!signal.aborted) failures.push({
                 name: entry.fullPath || entry.name, path: null,
-                error: "无法读取拖入的" + (entry.isDirectory ? "文件夹：" : "文件：") + (error instanceof Error ? error.message : String(error))
+                error: {
+                    kind: "drop-unreadable", entry: entry.isDirectory ? "directory" : "file",
+                    diagnostic: error instanceof Error ? error.message : String(error)
+                }
             });
         }
     }
@@ -139,7 +143,7 @@
                 if (current.signal.aborted) return;
                 if (item.entry?.isDirectory || (!item.file && item.entry)) await collectEntry(item.entry, files, failures, current.signal);
                 else if (item.file) files.push(item.file);
-                else failures.push({ name: "拖入文件", path: null, error: "无法读取拖入的文件。" });
+                else failures.push({ name: null, path: null, error: { kind: "drop-unreadable", entry: "file", diagnostic: null } });
             }
             if (current.signal.aborted) return;
             project.importMedia(files);

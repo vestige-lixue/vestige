@@ -6,17 +6,19 @@
         if (!open) onClosed();
     }}
 >
-    <Dialog.Title class="modal-title">媒体导入失败</Dialog.Title>
-    <Dialog.Description class="modal-description">{`${failure.name}${failure.path ? `\n${failure.path}` : ""}\n\n${failure.error}\n请确认文件可读取且为支持的音视频格式。`}</Dialog.Description>
+    <Dialog.Title class="modal-title">{i18n.t("dialogs.mediaImportFailed")}</Dialog.Title>
+    <Dialog.Description class="modal-description">{i18n.t("dialogs.mediaImportDescription", { path: failure.path ?? failure.name ?? i18n.t("dialogs.droppedFile"), error: describeFailure(failure.error) })}</Dialog.Description>
     {#snippet actions()}
-        <button class="primary hoverable activable" onclick={() => {
+        <button class="primary hoverable activable focusable" onclick={() => {
             open = false;
-        }}>确定</button>
+        }}>{i18n.t("common.ok")}</button>
     {/snippet}
 </Modal>
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
+    import { describeFailure } from "../feedback";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";

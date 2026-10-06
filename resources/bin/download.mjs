@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const root = await realpath(dirname(fileURLToPath(import.meta.url)));
 const names = ["ffmpeg", "sherpa-onnx", "whisper.cpp"];
+const nativeRepository = process.env.VESTIGE_NATIVE_REPOSITORY || "vestige-lixue/macos-whisper-cli";
 
 function options(args) {
     const result = { platform: process.platform, arch: process.arch, only: null, dryRun: false, help: false };
@@ -36,7 +37,7 @@ async function request(url, timeout = 30_000) {
         if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
     }
     const response = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${url}`);
+    if (!response.ok) throw Object.assign(new Error(`${response.status} ${response.statusText}: ${url}`), { status: response.status });
     return response;
 }
 
@@ -44,21 +45,48 @@ async function release(repo, endpoint = "releases/latest") {
     return (await request(`https://api.github.com/repos/${repo}/${endpoint}`)).json();
 }
 
-function packageFor(name, repo, info, assetName, programs) {
+function releaseAsset(repo, info, assetName) {
     const asset = info.assets.find(asset => asset.name === assetName);
     if (!asset) throw new Error(`${repo} ${info.tag_name} does not publish ${assetName}. No binaries were replaced.`);
     if (!/^sha256:[a-f\d]{64}$/i.test(asset.digest ?? "")) throw new Error(`${assetName} has no upstream SHA-256 digest.`);
-    return { name, repo, tag: info.tag_name, page: info.html_url, asset, programs };
+    return asset;
+}
+
+function packageFor(name, repo, info, assetName, programs) {
+    return {
+        name, repo, tag: info.tag_name, page: info.html_url, programs,
+        downloads: [{ asset: releaseAsset(repo, info, assetName) }],
+        licenseURL: name === "ffmpeg" ? null : `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(info.tag_name)}/LICENSE`
+    };
+}
+
+function newestWithAsset(releases, assetName, prefix = "") {
+    return releases.filter(info => !info.draft && info.tag_name.startsWith(prefix))
+        .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))
+        .find(info => info.assets.some(asset => asset.name === assetName));
 }
 
 async function resolveDownloads(platform, arch, selected) {
-    if (!["win32", "linux"].includes(platform) || !["x64", "arm64"].includes(arch)) {
-        throw new Error(`No complete prebuilt CLI set is configured for ${platform}/${arch}. `
-            + "The official whisper.cpp macOS release contains an XCFramework, not whisper-cli; prepare native CLI files manually.");
+    if (!["win32", "linux", "darwin"].includes(platform) || !["x64", "arm64"].includes(arch)) {
+        throw new Error(`No complete prebuilt CLI set is configured for ${platform}/${arch}.`);
     }
     const suffix = platform === "win32" ? ".exe" : "";
     return Promise.all(selected.map(async name => {
         if (name === "ffmpeg") {
+            if (platform === "darwin") {
+                const repo = "eugeneware/ffmpeg-static";
+                const info = await release(repo);
+                const programs = ["ffmpeg", "ffprobe"];
+                const files = [
+                    ...programs.map(program => [program + "-darwin-" + arch, program]),
+                    [`darwin-${arch}.LICENSE`, "licenses/LICENSE.txt"],
+                    [`darwin-${arch}.README`, "licenses/README.txt"]
+                ];
+                return {
+                    name, repo, tag: info.tag_name, page: info.html_url, programs, licenseURL: null,
+                    downloads: files.map(([assetName, destination]) => ({ asset: releaseAsset(repo, info, assetName), destination }))
+                };
+            }
             const info = await release("BtbN/FFmpeg-Builds");
             const target = (platform === "win32" ? "win" : "linux") + (arch === "x64" ? "64" : "arm64");
             return packageFor(name, "BtbN/FFmpeg-Builds", info,
@@ -67,17 +95,31 @@ async function resolveDownloads(platform, arch, selected) {
         if (name === "sherpa-onnx") {
             const info = await release("k2-fsa/sherpa-onnx");
             const target = platform === "win32" ? `win-${arch}-shared-MT-Release-no-tts`
-                : arch === "x64" ? "linux-x64-shared-no-tts" : "linux-aarch64-shared-cpu";
+                : platform === "darwin" ? `osx-${arch}-shared`
+                    : arch === "x64" ? "linux-x64-shared-no-tts" : "linux-aarch64-shared-cpu";
             return packageFor(name, "k2-fsa/sherpa-onnx", info,
                 `sherpa-onnx-${info.tag_name}-${target}.tar.bz2`, ["sherpa-onnx-offline" + suffix]);
         }
         const releases = await release("ggml-org/whisper.cpp", "releases?per_page=20");
         const asset = platform === "win32" ? arch === "x64" ? "whisper-bin-x64.zip" : "whisper-bin-win-cpu-arm64.zip"
-            : `whisper-bin-ubuntu-${arch}.tar.gz`;
+            : `whisper-bin-${platform === "darwin" ? "macos" : "ubuntu"}-${arch}.tar.gz`;
         // Semantic releases may contain only source; the newest official build carries the CLI archives.
-        const info = releases.filter(info => !info.draft)
-            .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))
-            .find(info => info.assets.some(item => item.name === asset));
+        const info = newestWithAsset(releases, asset);
+        if (!info && platform === "darwin") {
+            const built = await release(nativeRepository).catch(error => {
+                if (error.status === 404) return null;
+                throw error;
+            });
+            const required = ["whisper-bin-macos-arm64.tar.gz", "whisper-bin-macos-x64.tar.gz", "SHA256SUMS", "build.json"];
+            if (!built || built.draft || built.prerelease || !built.tag_name.startsWith("native-whisper-")
+                || !required.every(name => built.assets.some(file => file.name === name && file.state === "uploaded"
+                    && file.size > 0 && /^sha256:[a-f\d]{64}$/i.test(file.digest ?? "")))) {
+                throw new Error(`No complete latest macOS Whisper CLI release is published by ${nativeRepository}. `
+                    + `Run Build macOS Whisper CLI in https://github.com/${nativeRepository}/actions to publish both architectures first. No binaries were replaced.`);
+            }
+            // The independent build repository includes Whisper's LICENSE in each archive.
+            return { ...packageFor(name, nativeRepository, built, asset, ["whisper-cli"]), licenseURL: null };
+        }
         if (!info) throw new Error(`No ${asset} in the latest 20 official whisper.cpp releases. No binaries were replaced.`);
         return packageFor(name, "ggml-org/whisper.cpp", info, asset, ["whisper-cli" + suffix]);
     }));
@@ -138,11 +180,21 @@ async function filesIn(directory, boundary = directory) {
 }
 
 async function prepare(item, work, platform, arch) {
-    const archive = join(work, item.asset.name);
-    console.log(`Downloading ${item.name}: ${item.asset.name}`);
-    await download(item.asset, archive);
     const unpacked = join(work, item.name + "-archive");
-    await extract(archive, unpacked);
+    const directFiles = item.downloads.every(file => file.destination);
+    if (directFiles) await mkdir(unpacked);
+    for (const { asset, destination } of item.downloads) {
+        const path = join(work, asset.name);
+        console.log(`Downloading ${item.name}: ${asset.name}`);
+        await download(asset, path);
+        if (destination) {
+            const output = join(unpacked, destination);
+            inside(unpacked, output);
+            await mkdir(dirname(output), { recursive: true });
+            await copyFile(path, output);
+        }
+        else await extract(path, unpacked);
+    }
     const target = join(work, "ready", item.name);
     await mkdir(target, { recursive: true });
     const copied = new Set();
@@ -158,27 +210,28 @@ async function prepare(item, work, platform, arch) {
             notices++;
         }
         if (!item.programs.includes(name) && !/\.(?:dll|dylib|so(?:\.[\d.]+)?|metallib)$/i.test(name)) continue;
-        if (copied.has(name)) throw new Error(`Duplicate runtime filename in ${item.asset.name}: ${name}`);
+        if (copied.has(name)) throw new Error(`Duplicate runtime filename in ${item.name}: ${name}`);
         copied.add(name);
         await copyFile(file, join(target, name));
         if (platform !== "win32") await chmod(join(target, name), 0o755);
     }
-    for (const name of item.programs) if (!copied.has(name)) throw new Error(`${item.asset.name} does not contain ${name}.`);
+    for (const name of item.programs) if (!copied.has(name)) throw new Error(`${item.name} does not contain ${name}.`);
     if (item.name === "ffmpeg" && platform === process.platform && arch === process.arch) {
         for (const name of item.programs) {
             await run(join(target, name), ["-version"], { windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 });
         }
     }
-    if (item.name !== "ffmpeg") {
-        const license = await request(`https://raw.githubusercontent.com/${item.repo}/${encodeURIComponent(item.tag)}/LICENSE`);
+    if (item.licenseURL) {
+        const license = await request(item.licenseURL);
         await mkdir(join(target, "licenses"), { recursive: true });
         await writeFile(join(target, "licenses", "LICENSE.txt"), await license.text());
         notices++;
     }
-    if (!notices) throw new Error(`No license or distribution notices found in ${item.asset.name}.`);
+    if (!notices) throw new Error(`No license or distribution notices found in ${item.name}.`);
     await writeFile(join(target, "download.json"), JSON.stringify({
-        platform, arch, release: item.tag, releaseURL: item.page, asset: item.asset.name,
-        url: item.asset.browser_download_url, sha256: item.asset.digest, downloadedAt: new Date().toISOString()
+        platform, arch, release: item.tag, releaseURL: item.page,
+        assets: item.downloads.map(({ asset, destination }) => ({ name: asset.name, url: asset.browser_download_url, sha256: asset.digest, destination })),
+        downloadedAt: new Date().toISOString()
     }, null, 4));
 }
 
@@ -218,14 +271,17 @@ async function replaceAll(work, selected) {
 async function main() {
     const settings = options(process.argv.slice(2));
     if (settings.help) {
-        console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|sherpa-onnx|whisper.cpp] [--platform win32|linux] [--arch x64|arm64]\n"
-            + "Downloads the latest available CPU CLI packages, shared libraries and licenses.\n"
+        console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|sherpa-onnx|whisper.cpp] [--platform win32|linux|darwin] [--arch x64|arm64]\n"
+            + "Downloads native CLI packages, shared libraries and licenses (Whisper includes Metal on macOS arm64).\n"
             + "Replaces the selected program directories only after all selected packages are ready; defaults to all three.");
         return;
     }
     const selected = settings.only === null ? names : [settings.only];
     const packages = await resolveDownloads(settings.platform, settings.arch, selected);
-    for (const item of packages) console.log(`${item.name}: ${item.tag}\n  ${item.asset.name}\n  ${item.asset.browser_download_url}`);
+    for (const item of packages) {
+        console.log(`${item.name}: ${item.tag}`);
+        for (const { asset } of item.downloads) console.log(`  ${asset.name}\n  ${asset.browser_download_url}`);
+    }
     if (settings.dryRun) return;
     const work = await mkdtemp(join(root, ".download-"));
     let installed = false;

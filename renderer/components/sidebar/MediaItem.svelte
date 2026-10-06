@@ -1,81 +1,91 @@
 {#if item}
-    <div class="media hoverable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored}
-        role="button" tabindex={item.stage === "ready" ? 0 : -1} aria-pressed={mediaSelection.get() === mediaId}
+    <div class="media hoverable focusable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored}
+        role="button" tabindex={tabStop === 0 ? 0 : -1}
+        onfocus={event => {
+            if (event.target === event.currentTarget) focusedTarget = 0;
+        }}
         onclick={() => {
             if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
         }}
-        onkeydown={event => {
-            if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-                event.preventDefault();
-                if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
-            }
-        }}
+        onkeydown={handleKeydown}
     >
-        <Tooltip text="双击编辑名称" disabled={project.projectState.locked} tabindex={-1}>
+        <Tooltip text={i18n.t("media.rename")} disabled={project.projectState.locked}
+            tabindex={tabStop === 1 ? 0 : -1} onfocus={() => focusedTarget = 1}
+        >
             {#snippet child({ props })}
-                <div {...props}>
-                    <NiceLabel
-                        value={mediaImport.getName(mediaId)}
-                        editable={!project.projectState.locked}
-                        onchange={name => runCommand({ kind: "renameMedia", mediaId, name })}
-                        scrollMode="ontime"
-                        scrollParam={1.5}
-                        scrollPause={0.5}
-                    />
-                </div>
+                <NiceLabel
+                    {...props}
+                    value={mediaImport.getName(mediaId)}
+                    editable={!project.projectState.locked}
+                    onchange={name => runCommand({ kind: "renameMedia", mediaId, name })}
+                    scrollMode="ontime"
+                    scrollParam={1.5}
+                    scrollPause={0.5}
+                />
             {/snippet}
         </Tooltip>
-        <div class="media-actions">
-            <div class="media-info" title={issue?.error}>
+        <div class="media-secondary-wrapper">
+            <div class="media-info" title={issue ? describeFailure(issue.error) : undefined}>
                 {#if vestige}
-                    <span>{vestige.media.kind === "audio" ? "音频": "视频"}，{getSemanticDuration(vestige.media.duration)}</span>
+                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.audio" : "media.video"), duration: getSemanticDuration(vestige.media.duration) })}
                 {/if}
                 {#if mediaImport.isIssue(item)}
-                    <button class="media-issue import-error" disabled={project.projectState.locked} onclick={() => runCommand({ kind: "reviewMediaImportError", mediaId })}>
-                        {issueLabels[item.stage]}{item.ignored ? "（已忽略）" : ""}
+                    <button class="media-issue import-error focusable" disabled={project.projectState.locked}
+                        tabindex={tabStop === 2 ? 0 : -1} onfocus={() => focusedTarget = 2}
+                        onclick={() => runCommand({ kind: "reviewMediaImportError", mediaId })}
+                    >
+                        {item.ignored ? i18n.t("media.ignored", { status: issueLabels[item.stage] }) : issueLabels[item.stage]}
                     </button>
                 {:else if item.stage !== "ready"}
                     <span class="import-progress">
                         <Spinner size="12px" />
-                        {item.stage === "queued" && vestige ? "等待检查" : importStages[item.stage]}
+                        {importStages[item.stage]}
                     </span>
                 {/if}
+                {#if task?.status === "queued"}<span>{i18n.t("media.queuedTranscription")}</span>{/if}
             </div>
-            <Tooltip
-                text={transcription.getLabel(mediaId)}
-                disabled={commandDisabled(transcriptionCommand)}
-                onclick={() => runCommand(transcriptionCommand)}
-            >
-                {#snippet child({ props })}
-                    <button {...props} class="hoverable activable transcription-action">
-                        {#if task && task.status !== "failed"}
-                            <Spinner />
-                        {:else}
-                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                            {@html task?.status === "failed" ? taskRemoveIcon : vestige?.runs.length ? taskCompleteIcon : taskAddIcon}
-                        {/if}
-                    </button>
-                {/snippet}
-            </Tooltip>
-            <Tooltip
-                text={confirmingRemove ? "再次点击确认" : vestige ? "从项目中移除" : "取消导入"}
-                bind:open={removeTooltipOpen}
-                disableCloseOnTriggerClick
-                disabled={project.projectState.locked}
-                onclick={handleRemove}
-            >
-                {#snippet child({ props })}
-                    <button {...props} class="hoverable activable danger" bind:this={removeButton}>
-                        {#if confirmingRemove}
-                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                            {@html checkIcon}
-                        {:else}
-                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                            {@html removeIcon}
-                        {/if}
-                    </button>
-                {/snippet}
-            </Tooltip>
+            <div class="media-actions">
+                <Tooltip
+                    text={transcriptionLabel(transcription.getAction(mediaId))}
+                    shortcut={`${modKeyText}+B`}
+                    disabled={commandDisabled(transcriptionCommand)}
+                    tabindex={tabStop === 3 ? 0 : -1}
+                    onfocus={() => focusedTarget = 3}
+                    onclick={() => runCommand(transcriptionCommand)}
+                >
+                    {#snippet child({ props })}
+                        <button {...props} class="hoverable activable focusable translate">
+                            {#if task && task.status !== "failed"}
+                                <Spinner />
+                            {:else}
+                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                {@html task?.status === "failed" ? taskRemoveIcon : vestige?.runs.length ? taskCompleteIcon : taskAddIcon}
+                            {/if}
+                        </button>
+                    {/snippet}
+                </Tooltip>
+                <Tooltip
+                    text={confirmingRemove ? i18n.t("common.confirmAgain") : vestige ? i18n.t("media.remove") : i18n.t("media.cancelImport")}
+                    bind:open={removeTooltipOpen}
+                    disableCloseOnTriggerClick
+                    disabled={project.projectState.locked}
+                    tabindex={tabStop === 4 ? 0 : -1}
+                    onfocus={() => focusedTarget = 4}
+                    onclick={handleRemove}
+                >
+                    {#snippet child({ props })}
+                        <button {...props} class="hoverable activable focusable danger" bind:this={removeButton}>
+                            {#if confirmingRemove}
+                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                {@html checkIcon}
+                            {:else}
+                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                {@html removeIcon}
+                            {/if}
+                        </button>
+                    {/snippet}
+                </Tooltip>
+            </div>
         </div>
     </div>
 {/if}
@@ -90,33 +100,54 @@
         border-radius: 8px;
         --bg: var(--c-background);
         background: var(--bg);
+        cursor: pointer;
+        --hover-lightness: 0.98;
+    }
+    .media.selected :global(*)::selection {
+        background-color: hsl(from var(--c-selection) h s calc(l * 0.85));
+    }
+    :where(.media *) {
+        cursor: default;
+        --hover-lightness: 0.94;
+        --active-lightness: 0.88;
     }
     .media.selected {
-        --selected-bg: color-mix(in srgb, var(--c-selection) 40%, var(--c-background));
-        --bg: var(--selected-bg);
+        --bg: var(--c-selection-bg);
     }
     .media.ignored {
         --bg: color-mix(in srgb, var(--c-danger) 12%, var(--c-background));
     }
     .media.selected.ignored {
-        --bg: color-mix(in srgb, var(--c-danger) 12%, var(--selected-bg));
+        --bg: color-mix(in srgb, var(--c-danger) 12%, var(--c-selection-bg));
     }
-    .media-actions {
+    .media-secondary-wrapper {
         display: flex;
         flex-flow: row nowrap;
         justify-content: space-between;
         align-items: center;
         gap: 8px;
+        min-height: 1.1lh;
+        pointer-events: none;
+    }
+    :where(.media-secondary-wrapper > *) {
+        pointer-events: auto;
     }
     .media-info {
-        color: var(--c-muted);
-        font-size: 12px;
+        color: var(--c-text-80p);
+        font-size: 13px;
         display: flex;
-        flex-direction: column;
+        flex-flow: column nowrap;
         align-items: flex-start;
+        word-wrap: break-word;
+        word-break: break-all;
         gap: 4px;
         min-width: 0;
-        flex: 1;
+    }
+    .media-actions {
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        gap: 4px;
     }
     .import-progress {
         display: flex;
@@ -131,8 +162,10 @@
     button {
         display: grid;
         place-items: center;
-        height: 1lh;
-        width: 1lh;
+        height: 18px;
+        width: 18px;
+        padding: 4px;
+        border-radius: 4px;
         flex-shrink: 0;
     }
     button.media-issue {
@@ -147,16 +180,24 @@
     button:disabled {
         opacity: 0.4;
     }
+    button:focus-visible {
+        border-radius: 4px;
+    }
     button :global(svg) {
         display: block;
         height: 100%;
         width: 100%;
         pointer-events: none;
     }
+    .translate :global(svg) {
+        transform: translateX(-1px);
+    }
 </style>
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
+    import { describeFailure, transcriptionLabel } from "../feedback";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as project from "../../states/project.svelte";
     import * as transcription from "../../states/transcription.svelte";
@@ -171,6 +212,7 @@
     import checkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
     import Tooltip from "../util/Tooltip.svelte";
 
+    const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
     const { mediaId }: { mediaId: string } = $props();
     const item = $derived(mediaImport.get(mediaId));
     const issue = $derived(item && mediaImport.isIssue(item) ? item : null);
@@ -183,19 +225,27 @@
     let confirmingRemove = $state(false);
     let removeTooltipOpen = $state(false);
     let removeButton = $state<HTMLButtonElement>();
+    let focusedTarget = $state(0);
+    const targetDisabled = $derived([
+        false,
+        project.projectState.locked,
+        !issue || project.projectState.locked,
+        commandDisabled(transcriptionCommand),
+        project.projectState.locked
+    ]);
+    const tabStop = $derived(targetDisabled[focusedTarget] ? 0 : focusedTarget);
 
-    const importStages = {
-        queued: "等待导入",
-        path: "正在读取文件路径",
-        reading: "正在读取媒体信息和哈希",
-        relocating: "正在重新定位媒体文件",
-        ready: "导入完成"
-    };
-    const issueLabels = {
-        missing: "找不到媒体文件",
-        changed: "媒体文件已变化",
-        unreadable: "无法读取媒体文件"
-    };
+    const importStages = $derived({
+        queued: i18n.t("media.importStage.queued"),
+        path: i18n.t("media.importStage.path"),
+        reading: i18n.t("media.importStage.reading"),
+        relocating: i18n.t("media.importStage.relocating")
+    });
+    const issueLabels = $derived({
+        missing: i18n.t("media.issue.missing"),
+        changed: i18n.t("media.issue.changed"),
+        unreadable: i18n.t("media.issue.unreadable")
+    });
 
     $effect(() => {
         const locked = project.projectState.locked;
@@ -217,6 +267,24 @@
             window.removeEventListener("click", reset, true);
         };
     });
+
+    function handleKeydown(event: KeyboardEvent): void {
+        if (event.defaultPrevented || event.isComposing) return;
+        if (!(event.currentTarget instanceof HTMLDivElement) || !(event.target instanceof HTMLElement) || event.target.isContentEditable) return;
+        if (event.target === event.currentTarget && event.key === "Enter") {
+            event.preventDefault();
+            if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
+            return;
+        }
+        if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        const targets = [event.currentTarget, ...event.currentTarget.querySelectorAll<HTMLElement>("[tabindex]:not(:disabled):not([data-disabled])")];
+        const index = targets.indexOf(event.target);
+        if (index < 0) return;
+        event.preventDefault();
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        targets[(index + direction + targets.length) % targets.length]?.focus();
+    }
 
     function handleRemove(event: MouseEvent): void {
         event.stopPropagation();

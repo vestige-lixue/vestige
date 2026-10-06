@@ -26,7 +26,7 @@ export async function execute(context: ExecutionContext): Promise<Run> {
     catch (error) {
         if (!isSystemError(error)) throw error;
         // Some native failures exit with 0 without creating their output file.
-        throw new TranscriptionError(output.stderr || output.stdout || error.message, { cause: error });
+        throw new TranscriptionError({ kind: "transcription-invalid-result", diagnostic: output.stderr || output.stdout || error.message }, { cause: error });
     }
     return toRun(id, request, parseResult(raw, output.stderr), duration, elapsed);
 }

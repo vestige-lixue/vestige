@@ -2,11 +2,13 @@ import * as project from "./project.svelte";
 import * as mediaImport from "./mediaImport.svelte";
 import * as dialogs from "./dialogs.svelte";
 import * as transcription from "./transcription.svelte";
+import * as transcript from "./transcript.svelte";
 import * as player from "./player.svelte";
 import * as mediaSelection from "./mediaSelection.svelte";
+import * as config from "./config.svelte";
 
 type ParameterlessCommand = {
-    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools";
+    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "focusPlaybackSpeed" | "focusPlaybackVolume" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization";
 };
 
 // Select a project file, read it, and handle saving the current project before switching.
@@ -26,7 +28,7 @@ type PlaySelectedMediaCommand = {
 
 type OpenPanelCommand = {
     kind: "openPanel";
-    panel: "vocabulary" | "tasks" | "settings";
+    panel: "vocabulary" | "tasks" | "settings" | "licenses" | "about";
 };
 
 type TranscriptionCommand = {
@@ -60,6 +62,17 @@ type AdjacentCommand = {
 type SeekSelectedMediaCommand = {
     kind: "seekSelectedMedia";
     time: number;
+    mode?: player.SeekMode;
+};
+
+type SetPlaybackSpeedCommand = {
+    kind: "setPlaybackSpeed";
+    speed: number;
+};
+
+type SetPlaybackVolumeCommand = {
+    kind: "setPlaybackVolume";
+    volume: number;
 };
 
 export type Command = (
@@ -73,11 +86,13 @@ export type Command = (
     RelocateMediaCommand |
     RenameMediaCommand |
     AdjacentCommand |
-    SeekSelectedMediaCommand
+    SeekSelectedMediaCommand |
+    SetPlaybackSpeedCommand |
+    SetPlaybackVolumeCommand
 );
 
 export function interfaceBlocked(): boolean {
-    return project.projectState.locked || project.projectState.error !== null || project.saveConfirmation.fileName !== null
+    return project.projectState.locked || project.projectState.error !== null || project.saveConfirmation.pending
         || dialogs.state.dialogs.length > 0 || mediaImport.isPicking() || mediaImport.isCollecting()
         || mediaImport.getIssue() !== null || mediaImport.getImportFailures().length > 0 || mediaImport.isRelocating();
 }
@@ -93,7 +108,7 @@ function showTranscriptionFailure(mediaId: string): void {
     dialogs.show({ kind: "failure", mediaId, error: task.error, onConfigure: () => configureTranscription(mediaId), onClosed: () => { } });
 }
 
-function openPanel(panel: "vocabulary" | "tasks" | "settings"): void {
+function openPanel(panel: "vocabulary" | "tasks" | "settings" | "licenses" | "about"): void {
     if (panel === "tasks") {
         dialogs.show({
             kind: "tasks", getTasks: transcription.getTasks,
@@ -104,11 +119,7 @@ function openPanel(panel: "vocabulary" | "tasks" | "settings"): void {
 }
 
 export function wordPosition(direction: -1 | 1): number | null {
-    const vestige = project.getVestige(mediaSelection.get());
-    const segments = vestige?.runs[vestige.primaryRunIdx]?.transcript ?? [];
-    const starts = segments.filter(segment => segment.token.text.trim()).map(segment => segment.range.start).sort((a, b) => a - b);
-    return direction === 1 ? starts.find(time => time > player.getCurrentTime() + 0.001) ?? null
-        : starts.findLast(time => time < player.getCurrentTime() - 0.001) ?? null;
+    return transcript.getWordPosition(player.getCurrentTime(), direction);
 }
 
 export function commandDisabled(command: Command): boolean {
@@ -117,13 +128,16 @@ export function commandDisabled(command: Command): boolean {
         case "saveProjectAs": case "closeProject": return !project.projectState.project && !mediaImport.hasPendingImports();
         case "openTranscriptionConfig": {
             const task = command.mediaId ? transcription.getTask(command.mediaId) : null;
-            return !command.mediaId || !mediaImport.isReady(command.mediaId) || (task !== null && task.status !== "failed");
+            return !config.isReady() || !command.mediaId || !mediaImport.isReady(command.mediaId) || (task !== null && task.status !== "failed");
         }
-        case "stopTranscription": return !command.mediaId || transcription.getTask(command.mediaId)?.status !== "running";
+        case "stopTranscription": {
+            const status = command.mediaId ? transcription.getTask(command.mediaId)?.status : null;
+            return status !== "running" && status !== "queued";
+        }
         case "reviewTranscriptionError": return !command.mediaId || transcription.getTask(command.mediaId)?.status !== "failed";
         case "selectMedia": return !mediaImport.isReady(command.mediaId);
         case "playSelectedMedia": case "seekSelectedMedia": return !player.getURL();
-        case "selectAdjacentMedia": return mediaSelection.adjacent(command.direction) === null;
+        case "selectAdjacentMedia": return mediaSelection.adjacent(command.direction, true) === null;
         case "seekAdjacentWord": return !player.getURL() || wordPosition(command.direction) === null;
         default: return false;
     }
@@ -153,13 +167,21 @@ export function runCommand(command: Command): void {
         case "ignoreMediaImportError": project.ignoreMedia(command.mediaId); break;
         case "reviewMediaImportError": project.reviewMedia(command.mediaId); break;
         case "playSelectedMedia": player.togglePlaying(); break;
-        case "seekSelectedMedia": project.seekPlayback(command.time); break;
-        case "selectAdjacentMedia": project.selectMedia(mediaSelection.adjacent(command.direction)); break;
+        case "focusPlaybackSpeed": player.requestSpeedFocus(); break;
+        case "focusPlaybackVolume": player.requestVolumeFocus(); break;
+        case "setPlaybackSpeed": player.setSpeed(command.speed); break;
+        case "savePlaybackSpeed": player.saveSpeed(); break;
+        case "restorePlaybackSpeed": player.restoreSpeed(); break;
+        case "setPlaybackVolume": player.setVolume(command.volume); break;
+        case "toggleVolumeStabilization": player.toggleVolumeStabilization(); break;
+        case "seekSelectedMedia": project.seekPlayback(command.time, command.mode); break;
+        case "selectAdjacentMedia": project.selectMedia(mediaSelection.adjacent(command.direction, true)); break;
         case "seekAdjacentWord": {
             const time = wordPosition(command.direction);
             if (time !== null) project.seekPlayback(time);
             break;
         }
         case "openDevTools": window.api.openDevTools(); break;
+        case "openProjectRepository": window.open("https://github.com/vestige-lixue/vestige", "_blank"); break;
     }
 }

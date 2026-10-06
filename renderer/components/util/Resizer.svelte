@@ -1,14 +1,19 @@
+<svelte:window onpointerup={onpointerup} onpointercancel={onpointerup} onblur={stopDragging} />
+
 <div
     class="handle"
     class:dragging
+    bind:this={handle}
+    tabindex="0"
     style:width={direction === "horizontal" ? "100%" : `${thickness}px`}
     style:height={direction === "vertical" ? "100%" : `${thickness}px`}
     style:cursor={direction === "horizontal" ? "ns-resize" : "ew-resize"}
+    {onkeydown}
     {onpointerdown}
     {onpointermove}
     {onpointerup}
     onpointercancel={onpointerup}
-    onlostpointercapture={() => dragging = false}
+    onlostpointercapture={onpointerup}
 ></div>
 <div
     class="resizer-measurement-div"
@@ -26,11 +31,12 @@
     .handle {
         -webkit-app-region: no-drag;
         background-color: var(--c-border);
+        outline: none;
         flex-grow: 0;
         flex-shrink: 0;
         touch-action: none;
     }
-    .handle:hover, .handle.dragging {
+    .handle:hover, .handle:focus, .handle.dragging {
         background-color: var(--c-accent);
     }
     .resizer-measurement-div {
@@ -55,8 +61,10 @@
 
     const { direction, thickness = 5, changeCB, origin, min, max }: Props = $props();
 
+    let handle: HTMLDivElement;
     let measurement: HTMLDivElement;
-    let dragging = $state(false);
+    let pointerId = $state<number | null>(null);
+    const dragging = $derived(pointerId !== null);
     let dragStart = 0;
     let dragOrigin = 0;
     const dimension = $derived(direction === "horizontal" ? "height" : "width");
@@ -69,27 +77,49 @@
         return direction === "horizontal" ? event.clientY : event.clientX;
     }
 
+    function onkeydown(event: KeyboardEvent): void {
+        if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+        const decreaseKey = direction === "vertical" ? "ArrowLeft" : "ArrowUp";
+        const increaseKey = direction === "vertical" ? "ArrowRight" : "ArrowDown";
+        if (event.key !== decreaseKey && event.key !== increaseKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        measurement.style[dimension] = toLength(origin)!;
+        const size = measurement.getBoundingClientRect()[dimension];
+        measurement.style[dimension] = `${Math.max(0, size + (event.key === decreaseKey ? -1 : 1))}px`;
+        changeCB(measurement.getBoundingClientRect()[dimension]);
+    }
+
     function onpointerdown(event: PointerEvent): void {
-        if (event.button !== 0 || !event.isPrimary || dragging) return;
-        const handle = event.currentTarget as HTMLDivElement;
+        if (event.button !== 0 || !event.isPrimary) return;
+        // A cancelled pending capture may never dispatch lostpointercapture.
+        if (pointerId !== null && handle.hasPointerCapture(pointerId)) return;
         event.preventDefault();
         handle.setPointerCapture(event.pointerId);
         measurement.style[dimension] = toLength(origin)!;
         dragStart = getPos(event);
         dragOrigin = measurement.getBoundingClientRect()[dimension];
-        dragging = true;
+        pointerId = event.pointerId;
     }
 
     function onpointermove(event: PointerEvent): void {
-        const handle = event.currentTarget as HTMLDivElement;
-        if (!handle.hasPointerCapture(event.pointerId)) return;
+        if (event.pointerId !== pointerId) return;
+        if (!handle.hasPointerCapture(event.pointerId)) {
+            stopDragging();
+            return;
+        }
         // CSS resolves relative units and min/max expressions against the current layout.
         measurement.style[dimension] = `${Math.max(0, dragOrigin + getPos(event) - dragStart)}px`;
         changeCB(measurement.getBoundingClientRect()[dimension]);
     }
 
     function onpointerup(event: PointerEvent): void {
-        const handle = event.currentTarget as HTMLDivElement;
-        if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+        if (event.pointerId === pointerId) stopDragging();
+    }
+
+    function stopDragging(): void {
+        const previous = pointerId;
+        pointerId = null;
+        if (previous !== null && handle.hasPointerCapture(previous)) handle.releasePointerCapture(previous);
     }
 </script>

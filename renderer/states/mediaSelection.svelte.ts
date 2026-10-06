@@ -13,8 +13,9 @@ export function select(id: string | null): boolean {
     return true;
 }
 
-export function adjacent(direction: -1 | 1): string | null {
+export function adjacent(direction: -1 | 1, wrap = false): string | null {
     const ids = mediaImport.getReadyIds();
     const index = selected === null ? -1 : ids.indexOf(selected);
-    return index < 0 ? null : ids[index + direction] ?? null;
+    if (index < 0 || ids.length < 2) return null;
+    return ids[wrap ? (index + direction + ids.length) % ids.length : index + direction] ?? null;
 }

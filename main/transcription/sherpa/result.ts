@@ -4,7 +4,7 @@ import { type NativeObject, type Piece, object, array, number, probability, rang
 import { TranscriptionError } from "../failure";
 
 function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
-    if (typeof output.text !== "string") throw new TranscriptionError("sherpa-onnx returned no transcript text.");
+    if (typeof output.text !== "string") throw new TranscriptionError({ kind: "transcription-invalid-output", executer: "sherpa-onnx", field: "text" });
     const tokens = array(output.tokens);
     const timestamps = array(output.timestamps);
     const durations = array(output.durations);

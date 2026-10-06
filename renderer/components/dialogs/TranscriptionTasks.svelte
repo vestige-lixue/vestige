@@ -1,28 +1,28 @@
-<Modal bind:open escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
+<Modal bind:open width="80%" height="80%" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
     if (!open) onClosed(nextAction);
 }}>
-    <Dialog.Title class="modal-title">转写任务</Dialog.Title>
+    <Dialog.Title class="modal-title">{i18n.t("transcription.tasks")}</Dialog.Title>
     <div class="tasks">
         {#each tasks as task (task.id)}
             <div class="task">
                 <span>{project.getMedia(task.mediaId)?.name ?? ""}</span>
-                <span>{task.status === "failed" ? "失败" : task.status === "stopping" ? "正在停止" : "正在转写"}</span>
-                <button class="hoverable activable" disabled={task.status === "stopping"} onclick={() => {
+                <span>{task.status === "failed" ? i18n.t("transcription.failed") : task.status === "stopping" ? i18n.t("transcription.stopping") : task.status === "queued" ? i18n.t("transcription.queued") : i18n.t("transcription.running")}</span>
+                <button class="hoverable activable focusable" disabled={task.status === "stopping"} onclick={() => {
                     if (task.status === "failed") {
                         nextAction = () => onFailure(task.mediaId);
                         open = false;
                     }
                     else onStop(task.mediaId);
-                }}>{task.status === "failed" ? "失败详情" : "停止转写"}</button>
+                }}>{task.status === "failed" ? i18n.t("transcription.review-failure") : task.status === "queued" ? i18n.t("transcription.cancel-queued") : i18n.t("transcription.stop")}</button>
             </div>
         {:else}
-            <p>暂无转写任务</p>
+            <div>{i18n.t("transcription.empty")}</div>
         {/each}
     </div>
     {#snippet actions()}
-        <button class="primary hoverable activable" onclick={() => {
+        <button class="primary hoverable activable focusable" onclick={() => {
             open = false;
-        }}>关闭</button>
+        }}>{i18n.t("common.close")}</button>
     {/snippet}
 </Modal>
 
@@ -52,6 +52,7 @@
 
 
 <script lang="ts">
+    import * as i18n from "../../i18n.svelte";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import * as project from "../../states/project.svelte";

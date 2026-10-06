@@ -51,7 +51,11 @@ export default defineConfig(
     {
         files: ["**/*.svelte"],
         rules: {
-            "svelte/indent": ["warn", { indent: 4 }]
+            "svelte/indent": ["warn", { indent: 4 }],
+            "svelte/no-restricted-html-elements": ["error", {
+                elements: ["p"],
+                message: "Use div, or main/nav/footer/section/article/aside when semantically appropriate."
+            }]
         },
         languageOptions: {
             parserOptions: { parser: tseslint.parser }
