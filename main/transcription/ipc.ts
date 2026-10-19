@@ -1,16 +1,31 @@
 import { type WebContents } from "electron";
 import { type TranscriptionResult, executerChannel, cancelExecuterChannel } from "../../shared/transcription/executer";
 import { type ExecutionPaths, transcribe } from "./execute";
+import { type TaskOutputStore } from "../task/store";
 
-export function registerTranscriptionIPCs(contents: WebContents, paths: ExecutionPaths): void {
+export function registerTranscriptionIPCs(contents: WebContents, paths: ExecutionPaths, tasks: TaskOutputStore): void {
     const running = new Map<string, AbortController>();
     contents.ipc.handle(executerChannel, async (event, id: unknown, request: unknown): Promise<TranscriptionResult> => {
         if (event.senderFrame !== contents.mainFrame) return { success: false, error: { kind: "ipc-not-main-frame" } };
-        if (typeof id !== "string" || !id || id.length > 128 || running.has(id)) return { success: false, error: { kind: "transcription-invalid-id" } };
+        if (typeof id !== "string" || !id || id.length > 128 || running.has(id) || tasks.get(id)?.status === "running") return { success: false, error: { kind: "transcription-invalid-id" } };
         const controller = new AbortController();
+        tasks.start(id, "transcription");
         running.set(id, controller);
         try {
-            return await transcribe(id, request, paths, controller.signal);
+            const result = await transcribe(id, request, paths, controller.signal, {
+                output: (_stream, text) => tasks.append(id, text),
+                progress: value => tasks.progress(id, value),
+                record: (event, value) => tasks.record(id, event, value)
+            });
+            if (result.success) tasks.record(id, "Run", JSON.stringify(result.run));
+            if (!result.success) tasks.append(id, `\n${JSON.stringify(result.error)}\n`);
+            tasks.finish(id, result.success ? "succeeded" : result.error.kind === "transcription-cancelled" ? "cancelled" : "failed");
+            return result;
+        }
+        catch (error) {
+            tasks.append(id, `\n${error instanceof Error ? error.message : String(error)}\n`);
+            tasks.finish(id, "failed");
+            throw error;
         }
         finally {
             running.delete(id);

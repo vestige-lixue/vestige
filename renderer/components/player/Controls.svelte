@@ -1,4 +1,10 @@
-<svelte:window onpointerup={finishProgress} onpointercancel={finishProgress} onblur={finishProgress} />
+<svelte:window
+    onkeyupcapture={handleProgressKeyup}
+    onpointerdowncapture={cancelProgressNavigation}
+    onpointerup={finishProgress}
+    onpointercancel={finishProgress}
+    onblur={finishProgress}
+/>
 
 <div class="controls"
     data-keyboard={keyboardFocus}
@@ -26,22 +32,36 @@
                 <div class="track">
                     <Slider.Range class="slider-range" />
                 </div>
-                <Slider.Thumb index={0} class="slider-thumb" onkeydown={handleProgressKeydown} />
+                <Slider.Thumb
+                    bind:ref={progressThumb}
+                    index={0}
+                    class="slider-thumb"
+                    onkeydown={handleProgressKeydown}
+                    onfocus={() => progressTooltipOpen = keyboard.current}
+                    onblur={() => {
+                        progressTooltipOpen = false;
+                        cancelProgressNavigation();
+                    }}
+                />
             </Slider.Root>
         </div>
-        <div class="time">{formatTime(player.getCurrentTime())} / {formatTime(duration)}</div>
+        <Tooltip text={i18n.t("player.actions.focusSlider")} shortcut={`${modKeyText}+⇧+P`} tabindex={-1} bind:open={progressTooltipOpen}>
+            {#snippet child({ props })}
+                <div {...props} class="time">{formatTime(player.getCurrentTime())} / {formatTime(duration)}</div>
+            {/snippet}
+        </Tooltip>
     </div>
     <div class="control-row">
         <div class="adjustment volume">
             <Tooltip onclick={() => runCommand({ kind: "toggleVolumeStabilization" })}>
                 {#snippet text()}
                     <div class="shortcuts">
-                        <div><b>{player.isVolumeStabilizationEnabled() ? i18n.t("player.disableStabilization") : i18n.t("player.enableStabilization")}</b> <kbd><b>{modKeyText}+E</b></kbd></div>
-                        <div>{i18n.t("player.focusSlider")} <kbd>{modKeyText}+Shift+E</kbd></div>
+                        <div><b>{player.isVolumeStabilizationEnabled() ? i18n.t("player.actions.disableStabilization") : i18n.t("player.actions.enableStabilization")}</b> <kbd><b>{modKeyText}+E</b></kbd></div>
+                        <div>{i18n.t("player.actions.focusSlider")} <kbd>{modKeyText}+⇧+E</kbd></div>
                     </div>
                 {/snippet}
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" class:enabled={player.isVolumeStabilizationEnabled()} aria-pressed={player.isVolumeStabilizationEnabled()} type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" class:enabled={player.isVolumeStabilizationEnabled()} type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html player.isVolumeStabilizationEnabled() ? volumeAutoIcon : volumeUpIcon}
                     </button>
@@ -55,18 +75,18 @@
                 max={100}
                 step={1}
                 onpointerdowncapture={() => keyboardFocus = false}
-                bind:value={() => Math.round(player.getVolume() * 100), value => runCommand({ kind: "setPlaybackVolume", volume: value / 100 })}
+                bind:value={() => volumePosition, value => runCommand({ kind: "setPlaybackVolume", volume: sliderToVolume(value, settings.getPlayback()) })}
             >
                 <div class="track">
                     <Slider.Range class="slider-range" />
                 </div>
                 <Slider.Thumb bind:ref={volumeThumb} index={0} class="slider-thumb" />
             </Slider.Root>
-            <span class="value">{Math.round(player.getVolume() * 100)}%</span>
+            <span class="value">{volumePosition}%</span>
         </div>
-        <div class="buttons" role="toolbar" onkeydown={handleButtonKeydown}>
+        <div class="buttons" onkeydown={handleButtonKeydown}>
             <Tooltip
-                text={i18n.t("player.previousMedia")}
+                text={i18n.t("player.actions.previousMedia")}
                 shortcut={`${modKeyText}+⇧+←`}
                 disabled={buttonDisabled[0]}
                 tabindex={tabStop === 0 ? 0 : -1}
@@ -74,14 +94,14 @@
                 onclick={() => runCommand({ kind: "selectAdjacentMedia", direction: -1 })}
             >
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html skipBackIcon}
                     </button>
                 {/snippet}
             </Tooltip>
             <Tooltip
-                text={player.isPlaying() ? i18n.t("player.pause") : i18n.t("player.play")}
+                text={player.isPlaying() ? i18n.t("player.actions.pause") : i18n.t("player.actions.play")}
                 shortcut="Space"
                 {disabled}
                 tabindex={tabStop === 1 ? 0 : -1}
@@ -89,14 +109,14 @@
                 onclick={() => runCommand({ kind: "playSelectedMedia" })}
             >
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html player.isPlaying() ? pauseIcon : playIcon}
                     </button>
                 {/snippet}
             </Tooltip>
             <Tooltip
-                text={i18n.t("player.nextMedia")}
+                text={i18n.t("player.actions.nextMedia")}
                 shortcut={`${modKeyText}+⇧+→`}
                 disabled={buttonDisabled[2]}
                 tabindex={tabStop === 2 ? 0 : -1}
@@ -104,14 +124,14 @@
                 onclick={() => runCommand({ kind: "selectAdjacentMedia", direction: 1 })}
             >
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html skipForwardIcon}
                     </button>
                 {/snippet}
             </Tooltip>
             <Tooltip
-                text={i18n.t("player.previousWord")}
+                text={i18n.t("player.actions.previousWord")}
                 shortcut={`${modKeyText}+←`}
                 disabled={buttonDisabled[3]}
                 tabindex={tabStop === 3 ? 0 : -1}
@@ -119,14 +139,14 @@
                 onclick={() => runCommand({ kind: "seekAdjacentWord", direction: -1 })}
             >
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html previousOutlineIcon}
                     </button>
                 {/snippet}
             </Tooltip>
             <Tooltip
-                text={i18n.t("player.nextWord")}
+                text={i18n.t("player.actions.nextWord")}
                 shortcut={`${modKeyText}+→`}
                 disabled={buttonDisabled[4]}
                 tabindex={tabStop === 4 ? 0 : -1}
@@ -134,7 +154,7 @@
                 onclick={() => runCommand({ kind: "seekAdjacentWord", direction: 1 })}
             >
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html nextOutlineIcon}
                     </button>
@@ -145,12 +165,12 @@
             <Tooltip onclick={() => runCommand({ kind: "restorePlaybackSpeed" })}>
                 {#snippet text()}
                     <div class="shortcuts">
-                        <div><b>{i18n.t("player.restoreSpeed")}</b> <kbd><b>{modKeyText}+R</b></kbd></div>
-                        <div>{i18n.t("player.focusSlider")} <kbd>{modKeyText}+⇧+R</kbd></div>
+                        <div><b>{i18n.t("player.actions.restoreSpeed")}</b> <kbd><b>{modKeyText}+R</b></kbd></div>
+                        <div>{i18n.t("player.actions.focusSlider")} <kbd>{modKeyText}+⇧+R</kbd></div>
                     </div>
                 {/snippet}
                 {#snippet child({ props })}
-                    <button {...props} class="hoverable activable focusable" type="button">
+                    <button {...props} class="icon-button hoverable activable focusable" type="button">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html meterAltIcon}
                     </button>
@@ -176,6 +196,9 @@
             <span class="value">{player.getSpeed().toFixed(2).replace(/0$/, "")}×</span>
         </div>
     </div>
+    {#if mediaSelection.get() !== null && settings.getPlayback().showLevelMeter}
+        <LevelMeter {levels} />
+    {/if}
 </div>
 
 
@@ -205,19 +228,10 @@
         flex-shrink: 0;
     }
     .controls button {
-        display: grid;
-        place-items: center;
         flex-shrink: 0;
         width: 24px;
         height: 24px;
-        padding: 4px;
         border-radius: 6px;
-    }
-    .controls button :global(svg) {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
     }
     .controls button:disabled {
         opacity: 0.5;
@@ -346,11 +360,17 @@
 
 
 <script lang="ts">
+    import LevelMeter from "./LevelMeter.svelte";
+    import { type AudioLevels } from "../../audio/levels";
+    import { sliderToVolume, volumeToSlider } from "../../audio/volume";
+
     import * as i18n from "../../i18n.svelte";
-    import { onDestroy } from "svelte";
+    import { onDestroy, onMount } from "svelte";
+    import { register as registerFocus } from "../../focus";
     import { IsUsingKeyboard, Slider } from "bits-ui";
     import Tooltip from "../util/Tooltip.svelte";
     import * as player from "../../states/player.svelte";
+    import * as settings from "../../states/settings.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as project from "../../states/project.svelte";
 
@@ -365,45 +385,60 @@
     import previousOutlineIcon from "../../../resources/icons/carbon--previous-outline.svg?raw";
     import nextOutlineIcon from "../../../resources/icons/carbon--next-outline.svg?raw";
 
+    const { levels }: { levels: AudioLevels | null } = $props();
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
     const keyboard = new IsUsingKeyboard();
     let keyboardFocus = $state(false);
+    let progressTooltipOpen = $state(false);
     let progressInput: "pointer" | "keyboard" | null = null;
+    let progressNavigation: {
+        direction: -1 | 1;
+        mediaId: string | null;
+        time: number;
+        seekVersion: number;
+    } | null = null;
 
     onDestroy(finishProgress);
 
     $effect(() => {
         player.getURL();
         progressInput = null;
+        cancelProgressNavigation();
     });
 
     // Keep the slider's step rounding from writing back to the precise playback time.
     const progressSteps = 1000;
+    const volumePosition = $derived(volumeToSlider(player.getVolume(), settings.getPlayback()));
     const duration = $derived(project.getMedia(mediaSelection.get())?.duration ?? 0);
     const disabled = $derived(!player.getURL() || !Number.isFinite(duration) || duration <= 0);
     const progress = $derived(disabled || !Number.isFinite(player.getCurrentTime())
         ? 0
         : Math.round(Math.min(1, Math.max(0, player.getCurrentTime() / duration)) * progressSteps));
 
+    let progressThumb = $state<HTMLSpanElement | null>(null);
     let speedThumb = $state<HTMLSpanElement | null>(null);
-    let speedFocusVersion = player.getSpeedFocusVersion();
     let volumeThumb = $state<HTMLSpanElement | null>(null);
-    let volumeFocusVersion = player.getVolumeFocusVersion();
 
-    $effect(() => {
-        const version = player.getSpeedFocusVersion();
-        if (version === speedFocusVersion) return;
-        speedFocusVersion = version;
-        keyboardFocus = keyboard.current;
-        speedThumb?.focus({ preventScroll: true });
-    });
-
-    $effect(() => {
-        const version = player.getVolumeFocusVersion();
-        if (version === volumeFocusVersion) return;
-        volumeFocusVersion = version;
-        keyboardFocus = keyboard.current;
-        volumeThumb?.focus({ preventScroll: true });
+    onMount(() => {
+        const unregisterProgress = registerFocus("playback-progress", () => {
+            if (disabled) return;
+            keyboardFocus = keyboard.current;
+            progressThumb?.focus({ preventScroll: true });
+            progressTooltipOpen = keyboard.current;
+        });
+        const unregisterSpeed = registerFocus("playback-speed", () => {
+            keyboardFocus = keyboard.current;
+            speedThumb?.focus({ preventScroll: true });
+        });
+        const unregisterVolume = registerFocus("playback-volume", () => {
+            keyboardFocus = keyboard.current;
+            volumeThumb?.focus({ preventScroll: true });
+        });
+        return () => {
+            unregisterProgress();
+            unregisterSpeed();
+            unregisterVolume();
+        };
     });
 
     let focusedButton = $state(0);
@@ -429,23 +464,44 @@
     }
 
     function handleProgressKeydown(event: KeyboardEvent): void {
-        if (disabled || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        if (disabled || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
+            || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) {
+            cancelProgressNavigation();
+            return;
+        }
         event.preventDefault();
-        const time = player.getCurrentTime();
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        const mediaId = mediaSelection.get();
+        const seekVersion = player.getSeekVersion();
+        // Continue from this held key's last target, even while playback advances.
+        const time = event.repeat && progressNavigation?.direction === direction && progressNavigation.mediaId === mediaId
+            && progressNavigation.seekVersion === seekVersion ? progressNavigation.time : player.getCurrentTime();
         runCommand({
             kind: "seekSelectedMedia",
-            time: event.key === "ArrowRight" ? Math.floor(time) + 1 : Math.ceil(time) - 1
+            time: direction === 1 ? Math.floor(time) + 1 : Math.ceil(time) - 1
         });
+        const nextVersion = player.getSeekVersion();
+        progressNavigation = nextVersion === seekVersion + 1
+            ? { direction, mediaId, time: player.getCurrentTime(), seekVersion: nextVersion } : null;
+    }
+
+    function handleProgressKeyup(event: KeyboardEvent): void {
+        if (progressNavigation && event.key === (progressNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")) cancelProgressNavigation();
+    }
+
+    function cancelProgressNavigation(): void {
+        progressNavigation = null;
     }
 
     function beginProgressDrag(event: PointerEvent): void {
         keyboardFocus = false;
+        progressTooltipOpen = false;
         if (event.button === 0 && !disabled) progressInput = "pointer";
     }
 
     function finishProgress(): void {
         progressInput = null;
+        cancelProgressNavigation();
         player.commitSeekPreview();
     }
 

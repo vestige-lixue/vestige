@@ -1,12 +1,7 @@
 <Modal bind:open width="80%" height="80%" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
     if (!open) onClosed();
 }}>
-    <Dialog.Title class="modal-title">{i18n.t("dialogs.vocabulary")}</Dialog.Title>
-    {#snippet actions()}
-        <button class="primary hoverable activable focusable" onclick={() => {
-            open = false;
-        }}>{i18n.t("common.close")}</button>
-    {/snippet}
+    <Dialog.Title class="modal-title">{i18n.t("transcription.vocabulary.title")}</Dialog.Title>
 </Modal>
 
 

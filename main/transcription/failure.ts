@@ -1,3 +1,3 @@
-import { FailureError } from "../../shared/failure";
+import { VestigeErrors } from "../../shared/failure";
 
-export class TranscriptionError extends FailureError {}
+export class TranscriptionFailure extends VestigeErrors {}

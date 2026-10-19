@@ -15,7 +15,7 @@
     origin={width}
     min={minWidth}
     max={maxWidth}
-    changeCB={value => void config.setSidebarWidth(value)}
+    changeCB={value => void settings.update({ layout: { sidebarWidth: value } })}
     thickness={3}
 />
 
@@ -28,6 +28,10 @@
         align-items: center;
         min-height: 0;
         background: var(--bg);
+    }
+    :global(:root.mica) aside {
+        --bg: var(--c-background);
+        background: color-mix(in srgb, var(--c-background), transparent var(--sidebar-transparency));
     }
     .logo {
         -webkit-app-region: drag;
@@ -56,10 +60,10 @@
     import RecordList from "./MediaList.svelte";
     import SideNav from "./SideNav.svelte";
     import Resizer from "../util/Resizer.svelte";
-    import * as config from "../../states/config.svelte";
-    import { minSidebarWidth, maxSidebarWidth } from "../../../shared/config/defaults";
+    import * as settings from "../../states/settings.svelte";
+    import { minSidebarWidth, maxSidebarWidth } from "../../../shared/constants";
 
     const minWidth = minSidebarWidth;
     const maxWidth = `min(40vw, ${maxSidebarWidth}px)`;
-    const width = $derived(config.getSidebarWidth() ?? "min(22vw, 200px)");
+    const width = $derived(settings.getSidebarWidth() ?? "min(22vw, 200px)");
 </script>

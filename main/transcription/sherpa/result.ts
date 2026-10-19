@@ -1,10 +1,10 @@
 import { type Run, type Segment } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, number, probability, range, segments, createRun } from "../result";
-import { TranscriptionError } from "../failure";
+import { TranscriptionFailure } from "../failure";
 
 function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
-    if (typeof output.text !== "string") throw new TranscriptionError({ kind: "transcription-invalid-output", executer: "sherpa-onnx", field: "text" });
+    if (typeof output.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executer: "sherpa-onnx", field: "text" });
     const tokens = array(output.tokens);
     const timestamps = array(output.timestamps);
     const durations = array(output.durations);
@@ -16,7 +16,7 @@ function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
         const logProb = number(logProbs[index]);
         return {
             text: typeof token === "string" ? token.replace(/▁/g, " ").replace(/@@$/g, "") : "",
-            range: range(start, end, duration),
+            range: range(start, end),
             prob: logProb === undefined ? 1 : probability(Math.exp(logProb))
         };
     });
@@ -31,7 +31,7 @@ function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
             const start = number(starts[index]);
             const length = number(lengths[index]);
             return {
-                range: range(start, start !== undefined && length !== undefined ? start + length : undefined, duration)
+                range: range(start, start !== undefined && length !== undefined ? start + length : undefined)
                     ?? { start: 0, end: duration },
                 blankProb: 0,
                 token: { text: text as string, prob: 1 }

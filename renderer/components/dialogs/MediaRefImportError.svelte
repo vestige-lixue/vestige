@@ -9,16 +9,17 @@
     <Dialog.Title class="modal-title">{labels[issue.status]}</Dialog.Title>
     <Dialog.Description class="modal-description">{description}</Dialog.Description>
     {#snippet actions()}
-        <button class="hoverable activable focusable" onclick={() => close(onRetry)}>{i18n.t("common.retry")}</button>
-        <button class="primary hoverable activable focusable" onclick={() => close(onRelink)}>{i18n.t("common.relocate")}</button>
-        <button class="hoverable activable focusable" onclick={() => close(onIgnore)}>{i18n.t("common.ignore")}</button>
+        <TextButton onclick={() => close(onRetry)}>{i18n.t("common.retry")}</TextButton>
+        <TextButton class="primary" onclick={() => close(onRelink)}>{i18n.t("media.reference.actions.relocate")}</TextButton>
+        <TextButton onclick={() => close(onIgnore)}>{i18n.t("media.reference.actions.ignore")}</TextButton>
     {/snippet}
 </Modal>
 
 
 <script lang="ts">
+    import TextButton from "../util/TextButton.svelte";
     import * as i18n from "../../i18n.svelte";
-    import { describeFailure } from "../feedback";
+    import { describeFailure } from "../../failures";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import { type MediaIssueStatus } from "../../../shared/media/check";
@@ -36,9 +37,9 @@
     let action: (() => void) | undefined;
 
     const labels = $derived<Record<MediaIssueStatus, string>>({
-        missing: i18n.t("dialogs.mediaMissing"),
-        changed: i18n.t("dialogs.mediaChanged"),
-        unreadable: i18n.t("dialogs.mediaUnreadable")
+        missing: i18n.t("media.reference.failure.title.missing"),
+        changed: i18n.t("media.reference.failure.title.changed"),
+        unreadable: i18n.t("media.reference.failure.title.unreadable")
     });
 
     function close(next: () => void): void {
@@ -49,10 +50,10 @@
     const description = $derived.by(() => {
         const { mediaId, path } = issue;
         const media = project.getMedia(mediaId);
-        const original = !media || path === media.path ? "" : i18n.t("dialogs.originalPath", { path: media.path });
+        const original = !media || path === media.path ? "" : i18n.t("media.reference.failure.originalPath", { path: media.path });
         const guidance = issue.status === "changed"
-            ? i18n.t("dialogs.sameMedia")
-            : i18n.t("dialogs.restoreMedia");
-        return i18n.t("dialogs.mediaRefDescription", { path, original, error: describeFailure(issue.error), guidance });
+            ? i18n.t("media.reference.failure.guidance.sameContent")
+            : i18n.t("media.reference.failure.guidance.restoreFile");
+        return i18n.t("media.reference.failure.description", { path, original, error: describeFailure(issue.error), guidance });
     });
 </script>

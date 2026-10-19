@@ -1,14 +1,15 @@
-import { FailureError } from "../../shared/failure";
+import { VestigeErrors } from "../../shared/failure";
 import { selectOpenProjectPath, selectSaveProjectPath } from "../ui/fileDialogs";
 import { type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { getProject, saveProject } from "./file";
 import { type Project } from "../../shared/project/Project";
 import { projectChannels } from "../../shared/ipc";
+import * as settings from "../settings/store";
 
 export function registerProjectIPCs(window: BrowserWindow): void {
     const contents = window.webContents;
     const checkSender = (event: IpcMainInvokeEvent): void => {
-        if (event.senderFrame !== contents.mainFrame) throw new FailureError({ kind: "ipc-not-main-frame" });
+        if (event.senderFrame !== contents.mainFrame) throw new VestigeErrors({ kind: "ipc-not-main-frame" });
     };
     contents.ipc.handle(projectChannels.get, (event, path: unknown) => {
         checkSender(event);
@@ -16,7 +17,8 @@ export function registerProjectIPCs(window: BrowserWindow): void {
     });
     contents.ipc.handle(projectChannels.save, (event, path: unknown, project: Project) => {
         checkSender(event);
-        return saveProject(path, project);
+        const { compressProjectFiles, playback } = settings.get().settings;
+        return saveProject(path, project, compressProjectFiles, playback.rememberPlaybackPosition);
     });
     contents.ipc.handle(projectChannels.openDialog, event => {
         checkSender(event);

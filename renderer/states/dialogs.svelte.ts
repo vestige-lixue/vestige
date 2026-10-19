@@ -1,8 +1,9 @@
-import { type Failure } from "../../shared/failure";
+import { type FailureInfo } from "../../shared/failure";
 import { type MediaIssueStatus } from "../../shared/media/check";
 import { type AbsolutePath } from "../../shared/util/path";
 import * as mediaImport from "./mediaImport.svelte";
 import * as transcription from "./transcription.svelte";
+import { type Config } from "../../shared/transcription/Config";
 
 export type SaveChoice = "save" | "discard" | "cancel" | "memory" | "retry";
 
@@ -43,41 +44,49 @@ export type ProjectError = ({
     kind: "pending-imports" | "active-transcriptions";
 } | {
     kind: "operation-failed";
-    failure: Failure;
+    failure: FailureInfo;
 } | {
     kind: "read-failed";
     path: AbsolutePath;
-    failure: Failure;
+    failure: FailureInfo;
 });
 
 export type MediaRefImportIssue = {
     status: MediaIssueStatus;
     mediaId: string;
     path: AbsolutePath;
-    error: Failure;
+    error: FailureInfo;
 };
 
 type PanelDialog = {
-    kind: "vocabulary" | "settings" | "licenses" | "about";
+    kind: "transcription-backends" | "transcription-models" | "vocabulary" | "settings" | "licenses" | "about" | "guide" | "parameter-guide";
 };
 
 type TranscriptionTasksDialog = {
     kind: "tasks";
     getTasks: () => transcription.TranscriptionTask[];
-    onStop: (mediaId: string) => void;
-    onFailure: (mediaId: string) => void;
+    focusTaskId?: string;
+    onStop: (taskId: string) => void;
+    onRetry: (taskId: string) => void;
+    onRemove: (taskId: string) => void;
 };
 
 type TranscriptionConfigDialog = {
     kind: "transcription";
     mediaId: string;
+    taskId?: string;
 };
 
-type TranscriptionFailureDialog = {
-    kind: "failure";
+type SwitchDisplayedRunDialog = {
+    kind: "switch-displayed-run";
     mediaId: string;
-    error: Failure;
-    onConfigure: () => void;
+    onConfirm: () => void;
+};
+
+type TranscriptionPresetsDialog = {
+    kind: "transcription-presets";
+    selectedName?: string;
+    onApply?: (name: string, config: Config) => void;
 };
 
 type SaveConfirmationDialog = {
@@ -89,7 +98,7 @@ type SaveConfirmationDialog = {
 type SaveFailureDialog = {
     kind: "save-failure";
     fileName: string | null;
-    error: Failure;
+    error: FailureInfo;
     answer: (choice: SaveChoice) => void;
 };
 
@@ -120,7 +129,8 @@ export type DialogDescriptor = (
     PanelDialog |
     TranscriptionTasksDialog |
     TranscriptionConfigDialog |
-    TranscriptionFailureDialog |
+    SwitchDisplayedRunDialog |
+    TranscriptionPresetsDialog |
     SaveConfirmationDialog |
     SaveFailureDialog |
     ProjectBusyDialog |
@@ -129,6 +139,7 @@ export type DialogDescriptor = (
     MediaRefImportErrorDialog
 ) & {
     onClosed: () => void;
+    parentId?: string;
 };
 
 export type ApplicationDialog = DialogDescriptor & {
@@ -152,6 +163,17 @@ export function close(id: string): void {
 }
 
 export function remove(id: string): void {
+    // Cascade only after the parent accepted closing; a form may reject the request.
+    for (const child of state.dialogs.filter(dialog => dialog.parentId === id)) {
+        remove(child.id);
+        child.onClosed();
+    }
     const index = state.dialogs.findIndex(dialog => dialog.id === id);
     if (index >= 0) state.dialogs.splice(index, 1);
+}
+
+export function showTranscriptionPresets(parentId?: string, onApply?: (name: string, config: Config) => void, selectedName?: string): string {
+    const existing = state.dialogs.find(dialog => dialog.kind === "transcription-presets");
+    if (existing) return existing.id;
+    return show({ kind: "transcription-presets", parentId, onApply, selectedName, onClosed: () => {} });
 }

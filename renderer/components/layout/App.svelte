@@ -1,15 +1,15 @@
 <svelte:head>
-    <title>{project.projectState.project ? `${(project.getFileName() ?? i18n.t("common.unsaved")).replace(/\.vestige$/i, "")} - ` : ""}Vestige</title>
+    <title>{project.projectState.project ? `${(project.getFileName() ?? i18n.t("project.unsaved.name")).replace(/\.vestige$/i, "")} - ` : ""}Vestige</title>
 </svelte:head>
 
 <Tooltip.Provider delayDuration={300}>
-    <FileDropOverlay locked={project.projectState.locked} />
+    <FileDropOverlay />
     <ApplicationDialogs />
     <Sidebar />
     <div>
         <Menu />
-        <main>
-            <Player />
+        <main bind:contentBoxSize={null, sizes => availableHeight = sizes?.[0]?.blockSize ?? 0}>
+            <Player {availableHeight} />
             <Transcript />
         </main>
     </div>
@@ -20,6 +20,9 @@
     div, main {
         display: flex;
         flex-flow: column nowrap;
+    }
+    div {
+        background: var(--c-background);
     }
     main {
         flex: 1;
@@ -40,9 +43,11 @@
     import ApplicationDialogs from "./ApplicationDialogs.svelte";
     import Transcript from "../transcript/Transcript.svelte";
     import * as project from "../../states/project.svelte";
-    import * as config from "../../states/config.svelte";
+    import * as settings from "../../states/settings.svelte";
     import * as transcription from "../../states/transcription.svelte";
     import * as dialogs from "../../states/dialogs.svelte";
+
+    let availableHeight = $state(0);
 
     $effect(() => {
         document.documentElement.lang = i18n.getLocale();
@@ -50,10 +55,10 @@
     });
 
     onMount(() => {
-        void config.initialize();
+        void settings.initialize();
         const stopTranscription = transcription.startLifecycle();
         const stopProject = project.startLifecycle(async () => {
-            if (await config.save()) return true;
+            if (await settings.save()) return true;
             if (!dialogs.state.dialogs.some(dialog => dialog.kind === "settings" && dialog.open)) {
                 dialogs.show({ kind: "settings", onClosed: () => {} });
             }
@@ -62,7 +67,7 @@
         return () => {
             stopTranscription();
             stopProject();
-            config.dispose();
+            settings.dispose();
         };
     });
 </script>

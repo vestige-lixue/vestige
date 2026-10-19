@@ -1,15 +1,18 @@
 {#if item}
-    <div class="media hoverable focusable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored}
-        role="button" tabindex={tabStop === 0 ? 0 : -1}
+    <div class="media hoverable focusable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored} bind:this={mediaElement}
+        tabindex={tabStop === 0 ? 0 : -1}
         onfocus={event => {
             if (event.target === event.currentTarget) focusedTarget = 0;
+        }}
+        onfocusout={event => {
+            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) focusedTarget = 0;
         }}
         onclick={() => {
             if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
         }}
         onkeydown={handleKeydown}
     >
-        <Tooltip text={i18n.t("media.rename")} disabled={project.projectState.locked}
+        <Tooltip text={i18n.t("media.renameHint")} disabled={project.projectState.locked}
             tabindex={tabStop === 1 ? 0 : -1} onfocus={() => focusedTarget = 1}
         >
             {#snippet child({ props })}
@@ -25,16 +28,16 @@
             {/snippet}
         </Tooltip>
         <div class="media-secondary-wrapper">
-            <div class="media-info" title={issue ? describeFailure(issue.error) : undefined}>
+            <div class="media-info">
                 {#if vestige}
-                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.audio" : "media.video"), duration: getSemanticDuration(vestige.media.duration) })}
+                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.types.audio" : "media.types.video"), duration: getSemanticDuration(vestige.media.duration) })}
                 {/if}
                 {#if mediaImport.isIssue(item)}
                     <button class="media-issue import-error focusable" disabled={project.projectState.locked}
                         tabindex={tabStop === 2 ? 0 : -1} onfocus={() => focusedTarget = 2}
                         onclick={() => runCommand({ kind: "reviewMediaImportError", mediaId })}
                     >
-                        {item.ignored ? i18n.t("media.ignored", { status: issueLabels[item.stage] }) : issueLabels[item.stage]}
+                        {item.ignored ? i18n.t("media.reference.ignored", { status: issueLabels[item.stage] }) : issueLabels[item.stage]}
                     </button>
                 {:else if item.stage !== "ready"}
                     <span class="import-progress">
@@ -45,46 +48,33 @@
                 {#if task?.status === "queued"}<span>{i18n.t("media.queuedTranscription")}</span>{/if}
             </div>
             <div class="media-actions">
+                <MediaRuns {mediaId} anchor={mediaElement} disabled={!vestige || project.projectState.locked}
+                    tabindex={tabStop === 3 ? 0 : -1} onfocus={() => focusedTarget = 3} />
                 <Tooltip
-                    text={transcriptionLabel(transcription.getAction(mediaId))}
-                    shortcut={`${modKeyText}+B`}
+                    text={i18n.t(transcriptionCommand.kind === "openTranscriptionConfig" ? "transcription.actions.new" : "transcription.tasks.title")}
+                    shortcut={transcriptionCommand.kind === "openTranscriptionConfig" ? `${modKeyText}+B` : `${modKeyText}+T`}
                     disabled={commandDisabled(transcriptionCommand)}
-                    tabindex={tabStop === 3 ? 0 : -1}
-                    onfocus={() => focusedTarget = 3}
+                    tabindex={tabStop === 4 ? 0 : -1}
+                    onfocus={() => focusedTarget = 4}
                     onclick={() => runCommand(transcriptionCommand)}
                 >
                     {#snippet child({ props })}
-                        <button {...props} class="hoverable activable focusable translate">
-                            {#if task && task.status !== "failed"}
+                        <button {...props} class="icon-button hoverable activable focusable" class:translate={!hasActiveTask} class:danger={task?.status === "failed"}>
+                            {#if hasActiveTask}
                                 <Spinner />
                             {:else}
                                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                {@html task?.status === "failed" ? taskRemoveIcon : vestige?.runs.length ? taskCompleteIcon : taskAddIcon}
+                                {@html task?.status === "failed" ? taskRemoveIcon : taskAddIcon}
                             {/if}
                         </button>
                     {/snippet}
                 </Tooltip>
-                <Tooltip
-                    text={confirmingRemove ? i18n.t("common.confirmAgain") : vestige ? i18n.t("media.remove") : i18n.t("media.cancelImport")}
-                    bind:open={removeTooltipOpen}
-                    disableCloseOnTriggerClick
-                    disabled={project.projectState.locked}
-                    tabindex={tabStop === 4 ? 0 : -1}
-                    onfocus={() => focusedTarget = 4}
-                    onclick={handleRemove}
-                >
-                    {#snippet child({ props })}
-                        <button {...props} class="hoverable activable focusable danger" bind:this={removeButton}>
-                            {#if confirmingRemove}
-                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                {@html checkIcon}
-                            {:else}
-                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                {@html removeIcon}
-                            {/if}
-                        </button>
-                    {/snippet}
-                </Tooltip>
+                <ConfirmDeleteButton
+                    text={vestige ? i18n.t("media.actions.remove") : i18n.t("media.import.actions.cancel")}
+                    disabled={project.projectState.locked} resetKey={item.stage}
+                    tabindex={tabStop === 5 ? 0 : -1} onfocus={() => focusedTarget = 5}
+                    onconfirm={() => runCommand({ kind: "removeMedia", mediaId })}
+                />
             </div>
         </div>
     </div>
@@ -101,7 +91,12 @@
         --bg: var(--c-background);
         background: var(--bg);
         cursor: pointer;
-        --hover-lightness: 0.98;
+    }
+    .media.hoverable:active:not(:has(:global(:active))) {
+        background-color: hsl(from var(--bg) h s calc(l * var(--active-lightness)));
+    }
+    :root[data-theme="dark"] .media.hoverable:active:not(:has(:global(:active))) {
+        background-color: hsl(from var(--bg) h s calc(100 - (100 - l) * var(--active-lightness)));
     }
     .media.selected :global(*)::selection {
         background-color: hsl(from var(--c-selection) h s calc(l * 0.85));
@@ -115,10 +110,10 @@
         --bg: var(--c-selection-bg);
     }
     .media.ignored {
-        --bg: color-mix(in srgb, var(--c-danger) 12%, var(--c-background));
+        --bg: color-mix(in srgb, var(--c-danger) 20%, var(--c-background));
     }
     .media.selected.ignored {
-        --bg: color-mix(in srgb, var(--c-danger) 12%, var(--c-selection-bg));
+        --bg: color-mix(in srgb, var(--c-danger) 30%, var(--c-selection-bg));
     }
     .media-secondary-wrapper {
         display: flex;
@@ -156,19 +151,22 @@
     }
     .import-error {
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
-    button {
-        display: grid;
-        place-items: center;
+    .icon-button {
         height: 18px;
         width: 18px;
-        padding: 4px;
-        border-radius: 4px;
         flex-shrink: 0;
     }
+    .media-actions :global(button) {
+        --hover-lightness: 0.92;
+        --active-lightness: 0.88;
+    }
+    :root[data-theme="dark"] .media-actions :global(button) {
+        --hover-lightness: 0.9;
+        --active-lightness: 0.94;
+    }
     button.media-issue {
+        padding: 0;
         display: block;
         width: auto;
         min-width: 0;
@@ -176,18 +174,14 @@
         height: auto;
         text-align: left;
         color: inherit;
+        border-radius: 4px;
+        flex-shrink: 0;
     }
     button:disabled {
         opacity: 0.4;
     }
     button:focus-visible {
         border-radius: 4px;
-    }
-    button :global(svg) {
-        display: block;
-        height: 100%;
-        width: 100%;
-        pointer-events: none;
     }
     .translate :global(svg) {
         transform: translateX(-1px);
@@ -197,7 +191,6 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
-    import { describeFailure, transcriptionLabel } from "../feedback";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as project from "../../states/project.svelte";
     import * as transcription from "../../states/transcription.svelte";
@@ -205,11 +198,10 @@
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import Spinner from "../util/Spinner.svelte";
     import NiceLabel from "../util/NiceLabel.svelte";
+    import MediaRuns from "./MediaRuns.svelte";
     import taskAddIcon from "../../../resources/icons/carbon--task-add.svg?raw";
-    import taskCompleteIcon from "../../../resources/icons/carbon--task-complete.svg?raw";
     import taskRemoveIcon from "../../../resources/icons/carbon--task-remove.svg?raw";
-    import removeIcon from "../../../resources/icons/carbon--trash-can.svg?raw";
-    import checkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+    import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
     import Tooltip from "../util/Tooltip.svelte";
 
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
@@ -218,54 +210,33 @@
     const issue = $derived(item && mediaImport.isIssue(item) ? item : null);
     const vestige = $derived(project.getVestige(mediaId));
     const task = $derived(transcription.getTask(mediaId));
+    const hasActiveTask = $derived(transcription.isPending(task));
     const transcriptionCommand = $derived<Command>({
-        kind: task?.status === "failed" ? "reviewTranscriptionError" : task ? "stopTranscription" : "openTranscriptionConfig",
+        kind: hasActiveTask || task?.status === "failed" ? "openTranscriptionTask" : "openTranscriptionConfig",
         mediaId
     });
-    let confirmingRemove = $state(false);
-    let removeTooltipOpen = $state(false);
-    let removeButton = $state<HTMLButtonElement>();
+    let mediaElement = $state<HTMLDivElement | null>(null);
     let focusedTarget = $state(0);
     const targetDisabled = $derived([
         false,
         project.projectState.locked,
         !issue || project.projectState.locked,
+        !vestige || project.projectState.locked,
         commandDisabled(transcriptionCommand),
         project.projectState.locked
     ]);
     const tabStop = $derived(targetDisabled[focusedTarget] ? 0 : focusedTarget);
 
     const importStages = $derived({
-        queued: i18n.t("media.importStage.queued"),
-        path: i18n.t("media.importStage.path"),
-        reading: i18n.t("media.importStage.reading"),
-        relocating: i18n.t("media.importStage.relocating")
+        queued: i18n.t("media.import.status.queued"),
+        path: i18n.t("media.import.status.path"),
+        reading: i18n.t("media.import.status.reading"),
+        relocating: i18n.t("media.import.status.relocating")
     });
     const issueLabels = $derived({
-        missing: i18n.t("media.issue.missing"),
-        changed: i18n.t("media.issue.changed"),
-        unreadable: i18n.t("media.issue.unreadable")
-    });
-
-    $effect(() => {
-        const locked = project.projectState.locked;
-        if (item?.stage === "ready" || locked) {
-            confirmingRemove = false;
-            removeTooltipOpen = false;
-        }
-    });
-
-    $effect(() => {
-        if (!confirmingRemove) return;
-        const reset = (event: Event): void => {
-            if (!removeButton || !event.composedPath().includes(removeButton)) confirmingRemove = false;
-        };
-        window.addEventListener("pointerdown", reset, true);
-        window.addEventListener("click", reset, true);
-        return () => {
-            window.removeEventListener("pointerdown", reset, true);
-            window.removeEventListener("click", reset, true);
-        };
+        missing: i18n.t("media.reference.status.missing"),
+        changed: i18n.t("media.reference.status.changed"),
+        unreadable: i18n.t("media.reference.status.unreadable")
     });
 
     function handleKeydown(event: KeyboardEvent): void {
@@ -284,16 +255,6 @@
         event.preventDefault();
         const direction = event.key === "ArrowRight" ? 1 : -1;
         targets[(index + direction + targets.length) % targets.length]?.focus();
-    }
-
-    function handleRemove(event: MouseEvent): void {
-        event.stopPropagation();
-        if (project.projectState.locked) return;
-        if (confirmingRemove) runCommand({ kind: "removeMedia", mediaId });
-        else {
-            confirmingRemove = true;
-            removeTooltipOpen = true;
-        }
     }
 
     function getSemanticDuration(duration: number): string {

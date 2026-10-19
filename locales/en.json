@@ -3,149 +3,471 @@
         "close": "Close",
         "ok": "OK",
         "cancel": "Cancel",
+        "browse": "Browse",
         "save": "Save",
         "retry": "Retry",
-        "unsaved": "<Unsaved>",
-        "confirmAgain": "Click again to confirm",
-        "ignore": "Ignore",
-        "relocate": "Locate file",
-        "discard": "Don’t save"
+        "confirmAgain": "Click again to confirm"
+    },
+    "colorPicker": {
+        "hex": "Hex",
+        "pick": "Pick color"
     },
     "menu": {
-        "project": "Project",
-        "new": "New",
-        "open": "Open",
-        "saveAs": "Save as",
-        "media": "Media",
-        "import": "Import",
-        "edit": "Edit",
-        "selectAll": "Select all",
-        "undo": "Undo",
-        "redo": "Redo",
-        "cut": "Cut",
-        "copy": "Copy",
-        "paste": "Paste",
-        "other": "More",
-        "quit": "Quit",
-        "developerTools": "Open developer tools",
-        "repository": "GitHub repository",
-        "about": "About",
-        "playback": "Playback"
+        "project": {
+            "title": "Project",
+            "new": "New",
+            "open": "Open",
+            "saveAs": "Save as"
+        },
+        "media": {
+            "title": "Media",
+            "import": "Import"
+        },
+        "transcription": {
+            "title": "Transcription"
+        },
+        "edit": {
+            "title": "Edit",
+            "selectAll": "Select all",
+            "undo": "Undo",
+            "redo": "Redo",
+            "cut": "Cut",
+            "copy": "Copy",
+            "paste": "Paste"
+        },
+        "other": {
+            "title": "Other",
+            "quit": "Quit",
+            "developerTools": "Open developer tools",
+            "repository": "GitHub repository",
+            "about": "About"
+        },
+        "playback": {
+            "title": "Playback"
+        }
     },
     "player": {
-        "play": "Play",
-        "pause": "Pause",
-        "enableStabilization": "Enable volume stabilization",
-        "disableStabilization": "Disable volume stabilization",
-        "restoreSpeed": "Restore playback speed",
-        "focusSlider": "Focus slider",
-        "previousMedia": "Previous media",
-        "nextMedia": "Next media",
-        "previousWord": "Previous word",
-        "nextWord": "Next word",
+        "actions": {
+            "play": "Play",
+            "pause": "Pause",
+            "enableStabilization": "Enable volume stabilization",
+            "disableStabilization": "Disable volume stabilization",
+            "restoreSpeed": "Restore playback speed",
+            "focusSlider": "Focus slider",
+            "previousMedia": "Previous media",
+            "nextMedia": "Next media",
+            "previousWord": "Previous word",
+            "nextWord": "Next word"
+        },
         "noMedia": "No media selected"
     },
     "media": {
-        "rename": "Double-click to rename",
-        "audio": "Audio",
-        "video": "Video",
-        "remove": "Remove from project",
-        "cancelImport": "Cancel import",
+        "reference": {
+            "actions": {
+                "ignore": "Ignore",
+                "relocate": "Locate file"
+            },
+            "status": {
+                "missing": "Media missing",
+                "changed": "Media changed",
+                "unreadable": "Cannot read media"
+            },
+            "ignored": "{{status}} (ignored)",
+            "failure": {
+                "title": {
+                    "missing": "Media file not found",
+                    "changed": "Media file changed",
+                    "unreadable": "Cannot read media file"
+                },
+                "guidance": {
+                    "sameContent": "Choose a file with the same content as the original media. Import different content as new media.",
+                    "restoreFile": "Restore the file and retry, or locate it at its new location."
+                },
+                "originalPath": "\nOriginal project path: {{path}}",
+                "description": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\nIgnoring keeps this media and its transcripts. You can also remove it from the sidebar."
+            }
+        },
+        "renameHint": "Double-click to rename",
+        "types": {
+            "audio": "Audio",
+            "video": "Video"
+        },
+        "actions": {
+            "remove": "Remove from project"
+        },
+        "import": {
+            "actions": {
+                "cancel": "Cancel import"
+            },
+            "status": {
+                "queued": "Queued for import",
+                "path": "Reading path",
+                "reading": "Reading media",
+                "relocating": "Locating file"
+            },
+            "failure": {
+                "title": "Media import failed",
+                "droppedFile": "Dropped file",
+                "description": "{{path}}\n\n{{error}}\nMake sure the file is readable and uses a supported audio or video format."
+            }
+        },
         "queuedTranscription": "Queued for transcription",
-        "importStage": {
-            "queued": "Queued for import",
-            "path": "Reading path",
-            "reading": "Reading media",
-            "relocating": "Locating file"
-        },
-        "issue": {
-            "missing": "Media missing",
-            "changed": "Media changed",
-            "unreadable": "Cannot read media"
-        },
         "summary": "{{kind}}, {{duration}}",
-        "ignored": "{{status}} (ignored)",
-        "empty": "Drag media files here, <action/>, or press <shortcut/> to import.",
-        "importLink": "click here"
+        "empty": {
+            "description": "Drag in media files, <action/>, or press <shortcut/> to import.",
+            "importAction": "click here"
+        }
     },
     "project": {
-        "unsavedHint": "Not saved yet. Click to save.",
-        "busy": {
-            "new": "Creating project",
-            "close": "Closing project",
-            "quit": "Quitting",
-            "open": "Opening project",
-            "read": "Reading and validating project",
-            "save": "Saving project",
-            "wait-save": "Waiting for project to save"
+        "unsaved": {
+            "name": "<Unsaved>",
+            "hint": "Not saved yet. Click to save."
         },
-        "chooseFile": "Choose a project file in the file picker.",
-        "chooseSaveLocation": "Choose a save location in the file picker."
+        "saveConfirmation": {
+            "discard": "Don’t save",
+            "title": "Save the project before continuing?",
+            "description": "“{{name}}” has unsaved changes."
+        },
+        "busy": {
+            "status": {
+                "new": "Creating project",
+                "close": "Closing project",
+                "quit": "Quitting",
+                "open": "Opening project",
+                "read": "Reading and validating project",
+                "save": "Saving project",
+                "waitSave": "Waiting for project to save"
+            },
+            "chooseFile": "Choose a project file in the file picker.",
+            "chooseSaveLocation": "Choose a save location in the file picker."
+        },
+        "operationFailure": {
+            "title": "Operation failed",
+            "pendingImports": "Some media are still being imported. Cancel their imports using the remove buttons in the sidebar, or wait for them to finish before saving or closing the project.",
+            "activeTranscriptions": "Transcription tasks are still running. Stop them or wait for them to finish before closing or switching projects.",
+            "readFailed": "Could not read project “{{path}}”. Error:\n{{error}}"
+        },
+        "saveFailure": {
+            "title": "Save failed",
+            "actions": {
+                "editInMemory": "Keep editing in memory",
+                "saveAs": "Save as…"
+            },
+            "description": "Could not save to “{{name}}”.\n{{error}}\nSave to a different file?"
+        }
     },
     "transcription": {
-        "start": "Start transcription",
-        "continue": "Continue transcription",
-        "review-failure": "Error details",
-        "cancel-queued": "Cancel queued task",
-        "stopping": "Stopping",
-        "stop": "Stop transcription",
-        "configuration": "Transcription settings",
-        "tasks": "Transcription tasks",
-        "failed": "Failed",
-        "queued": "Queued",
-        "running": "Transcribing",
-        "empty": "No transcription tasks"
+        "backends": {
+            "actions": {
+                "manage": "Manage backends"
+            },
+            "title": "Transcription backends"
+        },
+        "models": {
+            "actions": {
+                "manage": "Manage models"
+            },
+            "title": "Transcription models"
+        },
+        "presets": {
+            "actions": {
+                "manage": "Manage presets",
+                "new": "New preset",
+                "copy": "Duplicate preset",
+                "remove": "Delete preset",
+                "apply": "Apply to current transcription"
+            },
+            "title": "Transcription presets",
+            "name": {
+                "label": "Name",
+                "required": "Enter a preset name.",
+                "duplicate": "Preset names must be unique."
+            },
+            "builtinCannotRemove": "Built-in presets cannot be deleted.",
+            "newName": "New preset",
+            "copyName": "{{name}} copy",
+            "empty": "No transcription presets",
+            "loading": "Loading presets…",
+            "saveError": "Could not save presets: {{error}}"
+        },
+        "config": {
+            "submit": "New transcription",
+            "title": "Transcription configuration",
+            "executer": {
+                "label": "Executer"
+            },
+            "modelDirectory": {
+                "label": "Model directory",
+                "required": "Choose a model directory."
+            },
+            "backendDirectory": {
+                "required": "Choose a backend directory.",
+                "label": "Backend directory"
+            },
+            "preset": {
+                "label": "Preset",
+                "custom": "Custom"
+            }
+        },
+        "actions": {
+            "new": "New transcription",
+            "reviewFailure": "Error details",
+            "cancelQueued": "Cancel queued task",
+            "stop": "Stop transcription"
+        },
+        "tasks": {
+            "status": {
+                "stopping": "Stopping",
+                "failed": "Failed",
+                "succeeded": "Completed",
+                "cancelled": "Cancelled",
+                "queued": "Queued",
+                "running": "Transcribing"
+            },
+            "actions": {
+                "remove": "Remove"
+            },
+            "title": "Transcription tasks",
+            "output": {
+                "loading": "Loading transcription logs…",
+                "unavailable": "Transcription logs are unavailable."
+            },
+            "empty": "No transcription tasks"
+        },
+        "parameters": {
+            "title": "Parameters",
+            "key": {
+                "label": "Key"
+            },
+            "value": {
+                "label": "Value"
+            },
+            "actions": {
+                "remove": "Remove parameter"
+            },
+            "guide": {
+                "title": "Quick reference"
+            }
+        },
+        "vocabulary": {
+            "title": "Vocabulary"
+        }
     },
     "transcript": {
+        "runs": {
+            "title": "Transcriptions",
+            "empty": "No transcriptions",
+            "actions": {
+                "remove": "Delete this transcription",
+                "removeWithEdits": "Delete this transcription and edits on it"
+            }
+        },
+        "switchRun": {
+            "title": "Switch displayed result",
+            "description": "Switching the displayed result will remove all text edits.",
+            "confirm": "Discard edits and switch"
+        },
         "emptyMedia": "This media has no transcript yet.",
         "empty": "Your transcript will appear here."
     },
-    "dialogs": {
-        "vocabulary": "Vocabulary",
-        "operationFailed": "Operation failed",
-        "transcriptionFailed": "Transcription failed",
-        "mediaImportFailed": "Media import failed",
-        "mediaMissing": "Media file not found",
-        "mediaChanged": "Media file changed",
-        "mediaUnreadable": "Cannot read media file",
-        "saveConfirm": "Save the project before continuing?",
-        "saveFailed": "Save failed",
-        "editInMemory": "Keep editing in memory",
-        "saveAs": "Save as…",
-        "sameMedia": "Choose a file with the same content as the original media. Import different content as new media.",
-        "restoreMedia": "Restore the file and retry, or locate it at its new location.",
-        "pendingImports": "Some media are still being imported. Cancel their imports using the remove buttons in the sidebar, or wait for them to finish before saving or closing the project.",
-        "activeTranscriptions": "Transcription tasks are still running. Stop them or wait for them to finish before closing or switching projects.",
-        "droppedFile": "Dropped file",
-        "mediaImportDescription": "{{path}}\n\n{{error}}\nMake sure the file is readable and uses a supported audio or video format.",
-        "originalPath": "\nOriginal project path: {{path}}",
-        "mediaRefDescription": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\nIgnoring keeps this media and its transcripts. You can also remove it from the sidebar.",
-        "readFailed": "Could not read project “{{path}}”. Error:\n{{error}}",
-        "unsavedChanges": "“{{name}}” has unsaved changes.",
-        "saveFailedDescription": "Could not save to “{{name}}”.\n{{error}}\nSave to a different file?"
-    },
     "settings": {
         "title": "Settings",
-        "concurrency": "Concurrent transcription tasks",
-        "concurrencyHelp": "Lowering the limit lets running tasks finish. Queued tasks start according to the new limit.",
         "loading": "Loading settings…",
-        "invalidConcurrency": "The number of concurrent transcription tasks must be a positive integer.",
-        "retry": "Retry loading",
-        "language": "Interface language",
-        "error": "Could not save settings: {{error}}"
+        "saveError": "Could not save settings: {{error}}",
+        "validation": {
+            "number": "Enter a number between {{min}} and {{max}}."
+        },
+        "general": {
+            "title": "General",
+            "language": {
+                "label": "Interface language",
+                "options": {
+                    "zh-CN": "简体中文",
+                    "en": "English"
+                }
+            },
+            "compressProjectFiles": {
+                "label": "Compress project files",
+                "description": "Remove whitespaces in JSON to reduce file size, but decreases readability."
+            }
+        },
+        "transcription": {
+            "title": "Transcription",
+            "concurrency": {
+                "label": "Concurrent transcription tasks",
+                "description": "Lowering the limit does not affect running tasks.\nQueued tasks start according to the new limit.",
+                "invalid": "The number of concurrent transcription tasks must be a positive integer."
+            }
+        },
+        "editing": {
+            "title": "Edit",
+            "spellcheck": {
+                "label": "Spell check",
+                "description": "Enable the browser's built-in spell checking in the transcript editor."
+            },
+            "fontSize": {
+                "label": "Editor font size (px)",
+                "description": "Applies only to transcript text."
+            }
+        },
+        "playback": {
+            "title": "Playback",
+            "volumeSliderMapping": {
+                "label": "Volume slider mapping",
+                "description": "Equal dB steps help distinguish quiet sounds, but damage the relationship between volume adjustment and perceived loudness.",
+                "options": {
+                    "amplitude": "Equal amplitude steps",
+                    "decibel": "Equal dB steps"
+                }
+            },
+            "volumeSliderMinDb": {
+                "label": "Minimum non-muted gain (dB)",
+                "description": "The gain at 1% slider position. 0% always mutes the audio.",
+                "invalid": "Enter a number no greater than {{max}}."
+            },
+            "mediaSwitchPlayback": {
+                "label": "Play state after switching media"
+            },
+            "wordSwitchPlayback": {
+                "label": "Play state after previous/next word"
+            },
+            "rememberPlaybackPosition": {
+                "label": "Remember playback progress",
+                "description": "Save playback progress in the project. Resume from the saved position when switching media."
+            },
+            "pauseOnOutputDeviceChange": {
+                "label": "Pause on audio output device changes",
+                "description": "Pause playback when the system default audio output device changes or disconnects.\nPlayback will be paused regardless, if audio output device is taken by another device."
+            },
+            "switchPlayback": {
+                "options": {
+                    "pause": "Pause",
+                    "play": "Play",
+                    "keep": "Keep unchanged",
+                    "invert": "Toggle"
+                }
+            },
+            "showLevelMeter": {
+                "label": "Show audio levels"
+            },
+            "levelMeterReadout": {
+                "label": "Audio level readout",
+                "description": "The selected level is also used for the full-scale indicator.",
+                "options": {
+                    "source": "Source",
+                    "project": "Project",
+                    "monitor": "Monitor"
+                }
+            }
+        },
+        "theme": {
+            "title": "Theme",
+            "mode": {
+                "label": "Appearance",
+                "options": {
+                    "light": "Light",
+                    "system": "System",
+                    "dark": "Dark"
+                }
+            },
+            "translucentSidebar": {
+                "label": "Translucent sidebar",
+                "description": "Blend the sidebar with the colors of your desktop wallpaper."
+            },
+            "sidebarTransparency": {
+                "label": "Transparency (%)",
+                "description": "Higher values make the sidebar background more transparent."
+            },
+            "schemes": {
+                "light": "Light Theme",
+                "dark": "Dark Theme"
+            },
+            "actions": {
+                "reset": "Reset to default"
+            },
+            "colors": {
+                "--c-accent": "Accent color",
+                "--c-background": "Primary background",
+                "--c-surface": "Secondary background",
+                "--c-text": "Primary text",
+                "--c-text-80p": "Secondary text",
+                "--c-audio-level": "Audio level"
+            }
+        },
+        "advanced": {
+            "title": "Advanced settings",
+            "volumeStabilization": {
+                "title": "Volume Stabilization",
+                "maxGainDb": {
+                    "label": "Maximum boost (dB)",
+                    "description": "Limit how much quiet audio is amplified. Higher values may make background noise louder."
+                },
+                "gainAttackMs": {
+                    "label": "Gain reduction time (ms)",
+                    "description": "Smooth gain reduction when audio gets louder. Lower values reduce the gain faster."
+                },
+                "gainReleaseMs": {
+                    "label": "Gain recovery time (ms)",
+                    "description": "Smooth gain increases when audio gets quieter. Higher values make the change more gradual."
+                },
+                "gateThresholdDb": {
+                    "label": "Quiet threshold (dBFS)",
+                    "description": "Stop increasing gain below this level, then remove the boost if audio stays quiet."
+                },
+                "targetLevelDb": {
+                    "label": "Target level (dBFS RMS)",
+                    "description": "The average level automatic gain aims for (subjects to the maximum boost and peak limit)."
+                }
+            }
+        }
     },
-    "drop": {
-        "busy": "Processing project",
-        "release": "Drop to import media or open a project",
-        "wait": "Please wait before dropping files",
-        "formats": "Audio, video, folders, or a single .vestige project file"
+    "fileDrop": {
+        "release": "Drop to import files",
+        "formats": "Media files, folders of media files, or one .vestige project"
+    },
+    "downloads": {
+        "models": {
+            "actions": {
+                "openDirectory": "Open model folder"
+            },
+            "description": "Download a built-in model below, or download one yourself and arrange its files as described in the <guide/>.",
+            "title": "Built-in models"
+        },
+        "loading": "Loading downloads…",
+        "backends": {
+            "title": "Built-in backends",
+            "actions": {
+                "openDirectory": "Open backend folder"
+            },
+            "description": "Download a built-in backend below, or download one yourself and arrange its files as described in the <guide/>."
+        },
+        "estimatedSize": " ({{size}} MiB)",
+        "empty": "No built-in downloads are available for this platform.",
+        "status": {
+            "installed": "Installed",
+            "loading": "Loading download status…",
+            "running": "Downloading",
+            "cancelling": "Cancelling download",
+            "succeeded": "Download complete",
+            "failed": "Download failed",
+            "cancelled": "Download cancelled",
+            "unavailable": "Download history is unavailable."
+        },
+        "actions": {
+            "download": "Download"
+        }
     },
     "licenses": {
-        "title": "Open-source licenses",
-        "project": "Project",
-        "license": "License",
-        "url": "Website",
-        "ffmpegNote": "FFmpeg’s license depends on its build configuration. Refer to the license included in the distributed package."
+        "title": "Open source licenses",
+        "columns": {
+            "project": "Project",
+            "license": "License",
+            "url": "Website"
+        },
+        "ffmpegNote": "FFmpeg’s license depends on its build configuration. Refer to the license included in the distributed package.",
+        "actions": {
+            "openFFmpegDirectory": "Open FFmpeg folder"
+        }
     },
     "about": {
         "name": "Vestige (理学)",
@@ -153,79 +475,137 @@
         "quote": "<div>I have made many choices. Some quietly, without noticing; others after careful thought. In happiness and in sorrow. Some of my own accord, others under pressure. Some fell naturally into place; others came about by chance.</div><div>I know that, long from now, somewhere, one night, I will remember the roads to the rose garden that I never took.</div><div>I chose one road, and that has made all the difference.</div>",
         "license": "Open source under <license/>"
     },
-    "languages": {
-        "zh-CN": "简体中文",
-        "en": "English"
+    "guide": {
+        "title": "User guide"
     },
     "native": {
-        "mediaFiles": "Audio and video files",
-        "allFiles": "All files",
-        "locateMedia": "Locate media file",
-        "importMedia": "Import media",
-        "projectFiles": "Vestige project",
-        "untitled": "Untitled.vestige",
-        "saveProject": "Save",
-        "saveProjectAs": "Save as"
+        "filters": {
+            "media": "Audio and video files",
+            "all": "All files",
+            "project": "Vestige project"
+        },
+        "media": {
+            "locate": {
+                "title": "Locate media file",
+                "confirm": "Locate media file"
+            },
+            "import": {
+                "title": "Import media",
+                "confirm": "Import media"
+            }
+        },
+        "project": {
+            "defaultFileName": "Untitled.vestige",
+            "open": {
+                "title": "Open",
+                "confirm": "Open"
+            },
+            "save": {
+                "title": "Save",
+                "confirm": "Save"
+            },
+            "saveAs": {
+                "title": "Save as",
+                "confirm": "Save"
+            }
+        },
+        "directories": {
+            "model": {
+                "title": "Choose model directory",
+                "confirm": "Choose model directory"
+            },
+            "backend": {
+                "title": "Choose backend directory",
+                "confirm": "Choose backend directory"
+            }
+        }
     },
     "errors": {
-        "media-not-file": "This path is not a regular file.",
-        "media-size-changed": "The file size does not match the project record.",
-        "media-hash-changed": "The file hash does not match the project record.",
-        "media-changed-during-read": "The file changed during verification. Please retry.",
-        "media-missing": "The media file was not found at this path. It may have been moved or renamed.",
-        "media-cancelled": "Media reading was cancelled.",
-        "media-source-invalidated": "The media request was cancelled because the interface was reloaded or closed.",
-        "media-invalid-info": "ffprobe returned invalid media information.",
-        "media-no-streams": "The file contains no usable audio or video streams.",
-        "media-no-duration": "The media duration could not be determined.",
-        "media-timeout": "Reading media information timed out. Please retry.",
-        "media-format": "Unsupported media format.",
-        "media-invalid-reference": "A media size and hash are required.",
-        "media-invalid-check-id": "A unique media check ID is required.",
-        "media-invalid-concurrency": "Media import concurrency must be a positive integer.",
-        "media-invalid-import": "A pending, unique media import is required.",
-        "transcription-media-unavailable": "The media file is unavailable or has moved. Please configure transcription again.",
-        "transcription-cancelled": "Transcription cancelled.",
-        "transcription-invalid-request": "A transcription request is required.",
-        "transcription-invalid-id": "A unique transcription task ID is required.",
-        "transcription-params-text": "Parameters must be JSON text.",
-        "transcription-params-object": "Parameters must be a JSON object.",
-        "transcription-param-value": "Parameter values must be JSON values.",
-        "transcription-param-null": "Parameter values must not contain null characters.",
-        "audio-invalid-wave": "Audio conversion did not produce a PCM WAV file.",
-        "audio-truncated-wave": "Converted WAV file is truncated.",
-        "audio-empty-wave": "Converted WAV file contains no audio data.",
-        "config-invalid-update": "Settings contain invalid values or unsupported fields.",
-        "config-invalid-playback": "Invalid playback settings.",
-        "config-invalid-sidebar-width": "Invalid sidebar width.",
-        "path-not-absolute": "An absolute file path is required.",
-        "path-drive-relative": "Relative file paths must not specify a drive.",
-        "project-path-not-file": "The project path must refer to a file.",
-        "ipc-not-main-frame": "This operation is only available to the main frame.",
-        "native-not-found": "{{executable}} was not found. Install it with its native libraries in {{directory}}, or add it to PATH.",
-        "native-output-limit": "Executer output exceeded {{limitMiB}} MiB.",
-        "native-failed": "Executer exited with {{reason}}",
-        "media-playback-failed": "The media player could not read or decode this file.",
-        "drop-file": "Could not read the dropped file.",
-        "drop-directory": "Could not read the dropped folder.",
-        "drop-file-diagnostic": "Could not read the dropped file: {{diagnostic}}",
-        "drop-directory-diagnostic": "Could not read the dropped folder: {{diagnostic}}",
-        "file-not-local": "A local file path is required: {{name}}",
-        "transcription-unknown-executer": "Unknown executer: {{executer}}",
-        "transcription-empty-path": "{{field}} must be a non-empty path.",
-        "transcription-invalid-result": "Executer produced no JSON result.",
-        "transcription-invalid-option": "Invalid option name: {{option}}",
-        "transcription-managed-option": "Option {{option}} is managed by Vestige; use mediaPath for the input.",
-        "transcription-output-array": "{{executer}} returned no transcription array.",
-        "transcription-output-text": "{{executer}} returned no transcript text.",
-        "transcription-output-segment": "{{executer}} returned a segment without text.",
-        "project-invalid-structure": "{{path}} must be {{expected}}.",
-        "project-invalid-integer": "{{path}} must be a valid non-negative integer.",
-        "project-invalid-number": "{{path}} must be a valid non-negative number.",
-        "project-version": "Unsupported project version: {{version}}.",
-        "project-invalid-uuid": "{{path}} must be a UUID.",
-        "project-duplicate-media": "{{path}} must be unique in the project.",
-        "project-invalid-path": "{{path}}: An absolute file path is required.",
-        "project-reversed-range": "{{path}} is reversed."
+        "media": {
+            "notFile": "This path is not a regular file.",
+            "sizeChanged": "The file size does not match the project record.",
+            "mtimeChanged": "The file modification time does not match the project record.",
+            "changedDuringRead": "The file changed during verification. Please retry.",
+            "missing": "The media file was not found at this path. It may have been moved or renamed.",
+            "cancelled": "Media reading was cancelled.",
+            "sourceInvalidated": "The media request was cancelled because the interface was reloaded or closed.",
+            "invalidInfo": "ffprobe returned invalid media information.",
+            "noStreams": "The file contains no usable audio or video streams.",
+            "noDuration": "The media duration could not be determined.",
+            "timeout": "Reading media information timed out. Please retry.",
+            "format": "Unsupported media format.",
+            "invalidReference": "A media file size and modification time are required.",
+            "invalidCheckId": "A unique media check ID is required.",
+            "invalidConcurrency": "Media import concurrency must be a positive integer.",
+            "invalidImport": "A pending, unique media import is required.",
+            "playbackFailed": "The media player could not read or decode this file."
+        },
+        "transcription": {
+            "mediaUnavailable": "The media file is unavailable or has moved. Please configure transcription again.",
+            "cancelled": "Transcription cancelled.",
+            "invalidRequest": "A transcription request is required.",
+            "invalidId": "A unique transcription task ID is required.",
+            "paramsText": "Parameters must be JSON text.",
+            "paramsObject": "Parameters must be a JSON object.",
+            "paramValue": "Parameter values must be strings.",
+            "paramNull": "Parameter values must not contain null characters.",
+            "unknownExecuter": "Unknown executer: {{executer}}",
+            "emptyPath": "{{field}} must be a non-empty path.",
+            "invalidResult": "Executer produced no JSON result.",
+            "invalidOption": "Invalid option name: {{option}}",
+            "managedOption": "Option {{option}} is managed by Vestige.",
+            "output": {
+                "array": "{{executer}} returned no transcription array.",
+                "text": "{{executer}} returned no transcript text.",
+                "segment": "{{executer}} returned a segment without text."
+            }
+        },
+        "audio": {
+            "invalidWave": "Audio conversion did not produce a PCM WAV file.",
+            "truncatedWave": "Converted WAV file is truncated.",
+            "emptyWave": "Converted WAV file contains no audio data."
+        },
+        "settings": {
+            "invalidUpdate": "Settings contain invalid values or unsupported fields."
+        },
+        "path": {
+            "notAbsolute": "An absolute file path is required.",
+            "driveRelative": "Relative file paths must not specify a drive."
+        },
+        "project": {
+            "pathNotFile": "The project path must refer to a file.",
+            "invalidStructure": "{{path}} must be {{expected}}.",
+            "invalidInteger": "{{path}} must be a valid non-negative integer.",
+            "invalidNumber": "{{path}} must be a valid non-negative number.",
+            "version": "Unsupported project version: {{version}}.",
+            "invalidUuid": "{{path}} must be a UUID.",
+            "duplicateMedia": "{{path}} must be unique in the project.",
+            "invalidPath": "{{path}}: An absolute file path is required.",
+            "reversedRange": "{{path}} is reversed."
+        },
+        "ipc": {
+            "notMainFrame": "This operation is only available to the main frame."
+        },
+        "native": {
+            "notFound": "Could not find {{executable}}. Check the native program and its libraries in {{directory}}.",
+            "outputLimit": "Executer output exceeded {{limitMiB}} MiB.",
+            "failed": "Executer exited with {{reason}}"
+        },
+        "drop": {
+            "file": "Could not read the dropped file.",
+            "directory": "Could not read the dropped folder.",
+            "fileDiagnostic": "Could not read the dropped file: {{diagnostic}}",
+            "directoryDiagnostic": "Could not read the dropped folder: {{diagnostic}}"
+        },
+        "file": {
+            "notLocal": "A local file path is required: {{name}}"
+        }
+    },
+    "documentation": {
+        "path": "For agents: This document is located at {{path}}. Please do not write to it, the application will overwrite it on every startup.",
+        "loading": "Loading documentation…",
+        "contents": "Contents",
+        "back": "Back",
+        "missingAnchor": "Section not found: {{anchor}}"
     }
 }

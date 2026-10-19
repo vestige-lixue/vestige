@@ -1,0 +1,235 @@
+<Popover.Root bind:open onOpenChange={value => {
+    if (value) runCommand({ kind: "selectMedia", mediaId });
+}}>
+    <Tooltip text={i18n.t("transcript.runs.title")} {disabled} {tabindex} {onfocus}>
+        {#snippet child({ props })}
+            <Popover.Trigger {...props} bind:ref={trigger} class="runsTrigger icon-button hoverable activable focusable">
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                {@html filesIcon}
+            </Popover.Trigger>
+        {/snippet}
+    </Tooltip>
+    <Popover.Portal>
+        <Popover.Overlay class="runsOverlay" style={`z-index: ${layerIndex};`} onclick={event => {
+            event.stopPropagation();
+            open = false;
+        }} />
+        <PopoverContent bind:ref={content} class="mediaRuns option-surface" customAnchor={anchor} align="start" sideOffset={6} collisionPadding={8}
+            style={`z-index: ${layerIndex + 1}; font-size: ${fontSize};`}
+            trapFocus={!hasDialog && !menuOpen} onInteractOutside={event => event.preventDefault()}
+            onOpenAutoFocus={event => {
+                event.preventDefault();
+                focusRun(vestige?.displayedRunIdx ?? 0, false);
+            }}
+            onCloseAutoFocus={event => {
+                event.preventDefault();
+                if (!menuOpen) modal.restoreFocus(trigger);
+            }}
+            onkeydown={handleKeydown}
+        >
+            {#each vestige?.runs ?? [] as run, index (run.id)}
+                {@const displayed = index === vestige?.displayedRunIdx}
+                <div class="runRow activable" bind:this={rowElements[run.id]} onclick={() => selectRun(run.id)}>
+                    <Tooltip side="right" sideOffset={24} customAnchor={rowElements[run.id] ?? null} disabled={disabled || hasDialog} tabindex={0} disableCloseOnTriggerClick>
+                        {#snippet text()}
+                            <div class="runDetails">
+                                <div><b>{i18n.t("transcription.config.executer.label")}</b><span>{run.config.executer}</span></div>
+                                <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{directoryName(run.config.backendDirectory)}</span></div>
+                                <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{directoryName(run.config.modelDirectory)}</span></div>
+                            </div>
+                        {/snippet}
+                        {#snippet child({ props })}
+                            <NiceLabel {...props} class="runLabel focusable" value={`#${index + 1} ${formatStartedAt(run.startedAt)}`}
+                                editable={false} onchange={() => {}} scrollMode="ontime" scrollParam={1.5} scrollPause={0.5} />
+                        {/snippet}
+                    </Tooltip>
+                    {#if displayed}
+                        <span class="option-checkmark">
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                            {@html checkmarkIcon}
+                        </span>
+                    {/if}
+                    <ConfirmDeleteButton text={i18n.t(displayed ? "transcript.runs.actions.removeWithEdits" : "transcript.runs.actions.remove")}
+                        disabled={disabled || hasDialog} resetKey={displayed} onconfirm={() => removeRun(run.id)} />
+                </div>
+            {:else}
+                <div class="empty">{i18n.t("transcript.runs.empty")}</div>
+            {/each}
+        </PopoverContent>
+    </Popover.Portal>
+</Popover.Root>
+
+
+<style>
+    :global(.runsTrigger) {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+    }
+    :global(.runsTrigger:disabled) {
+        opacity: 0.4;
+    }
+    :global(.runsOverlay) {
+        position: fixed;
+        inset: env(titlebar-area-height) 0 0;
+        background: transparent;
+        -webkit-app-region: no-drag;
+    }
+    :global(.mediaRuns) {
+        width: var(--bits-popover-anchor-width);
+        gap: 4px;
+    }
+    .runRow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+    .runRow:hover, .runRow:focus-within {
+        background: var(--c-selection-bg);
+    }
+    .runRow :global(.runLabel) {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+        padding: 4px 0;
+    }
+    .runDetails {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .runDetails > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+    }
+    .runDetails b {
+        flex-shrink: 0;
+    }
+    .runDetails span {
+        min-width: 0;
+        text-align: right;
+    }
+    .empty {
+        padding: 8px;
+        color: var(--c-text-80p);
+    }
+</style>
+
+
+<script lang="ts">
+    import { Popover } from "bits-ui";
+    import { onDestroy, tick, untrack } from "svelte";
+    import * as i18n from "../../i18n.svelte";
+    import * as project from "../../states/project.svelte";
+    import * as dialogs from "../../states/dialogs.svelte";
+    import * as modal from "../../states/modal.svelte";
+    import * as menu from "../../states/menu.svelte";
+    import { runCommand } from "../../states/commands";
+    import NiceLabel from "../util/NiceLabel.svelte";
+    import Tooltip from "../util/Tooltip.svelte";
+    import PopoverContent from "../util/PopoverContent.svelte";
+    import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
+    import filesIcon from "../../../resources/icons/lucide--files.svg?raw";
+    import checkmarkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+
+    type Props = {
+        mediaId: string;
+        anchor: HTMLDivElement | null;
+        disabled: boolean;
+        tabindex: number;
+        onfocus: (event: FocusEvent) => void;
+    };
+
+    let { mediaId, anchor, disabled, tabindex, onfocus }: Props = $props();
+    const vestige = $derived(project.getVestige(mediaId));
+    const hasDialog = $derived(dialogs.state.dialogs.length > 0);
+    const menuOpen = $derived(menu.get() !== "");
+    let open = $state(false);
+    let trigger = $state<HTMLButtonElement | null>(null);
+    let content = $state<HTMLDivElement | null>(null);
+    const rowElements = $state<Record<string, HTMLDivElement | undefined>>({});
+    let fontSize = $state("inherit");
+    const layer = Symbol();
+    const layerIndex = $derived(modal.getLayerIndex(layer));
+
+    $effect.pre(() => {
+        if (open) untrack(() => modal.openLayer(layer));
+        else untrack(() => modal.closeLayer(layer));
+    });
+    onDestroy(() => modal.closeLayer(layer));
+
+    $effect.pre(() => {
+        if (disabled || menuOpen) open = false;
+    });
+
+    $effect(() => {
+        const element = anchor;
+        if (!open || !element) return;
+        const syncFontSize = (): void => {
+            fontSize = getComputedStyle(element).fontSize;
+        };
+        syncFontSize();
+        const observer = new ResizeObserver(syncFontSize);
+        observer.observe(element);
+        return () => observer.disconnect();
+    });
+
+    function formatStartedAt(value: number): string {
+        const date = new Date(value);
+        return `${date.getFullYear().toString().padStart(4, "0")}.${date.getMonth() + 1}.${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+    }
+
+    function directoryName(path: string): string {
+        const parts = path.split(path.startsWith("/") ? /\// : /[\\/]/).filter(Boolean);
+        return parts.at(-1) ?? path;
+    }
+
+    function selectRun(runId: string): void {
+        if (disabled || hasDialog || !vestige) return;
+        project.displayRun(mediaId, vestige.runs.findIndex(run => run.id === runId));
+    }
+
+    function focusRun(index: number, showTooltip = true): void {
+        const labels = content?.querySelectorAll<HTMLElement>(".runLabel");
+        const target = labels?.[Math.max(0, Math.min(index, labels.length - 1))] ?? content;
+        if (showTooltip) target?.focus();
+        else modal.restoreFocus(target);
+    }
+
+    async function removeRun(runId: string): Promise<void> {
+        if (disabled || hasDialog || !vestige) return;
+        const index = vestige.runs.findIndex(run => run.id === runId);
+        project.removeRun(mediaId, runId);
+        await tick();
+        if (open) focusRun(index);
+    }
+
+    function handleKeydown(event: KeyboardEvent): void {
+        if (event.defaultPrevented || event.isComposing || hasDialog || !(event.target instanceof HTMLElement)) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            open = false;
+            return;
+        }
+        if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+        const rows = [...content?.querySelectorAll<HTMLElement>(".runRow") ?? []];
+        const index = rows.findIndex(row => row.contains(event.target as Node));
+        if (index < 0) return;
+        if ((event.key === "Enter" || event.key === " ") && event.target.classList.contains("runLabel")) {
+            event.preventDefault();
+            const run = vestige?.runs[index];
+            if (run) selectRun(run.id);
+        }
+        else if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Home" || event.key === "End") {
+            event.preventDefault();
+            focusRun(event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1
+                : (index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length);
+        }
+    }
+</script>

@@ -37,22 +37,22 @@
 
     const title = $derived.by(() => {
         switch (operation.kind) {
-            case "new": return i18n.t("project.busy.new");
-            case "close": return i18n.t("project.busy.close");
-            case "quit": return i18n.t("project.busy.quit");
-            case "open": return i18n.t("project.busy.open");
-            case "read": return i18n.t("project.busy.read");
-            case "save": return i18n.t("project.busy.save");
-            case "wait-save": return i18n.t("project.busy.wait-save");
+            case "new": return i18n.t("project.busy.status.new");
+            case "close": return i18n.t("project.busy.status.close");
+            case "quit": return i18n.t("project.busy.status.quit");
+            case "open": return i18n.t("project.busy.status.open");
+            case "read": return i18n.t("project.busy.status.read");
+            case "save": return i18n.t("project.busy.status.save");
+            case "wait-save": return i18n.t("project.busy.status.waitSave");
         }
     });
     const detail = $derived.by(() => {
         switch (operation.kind) {
             case "new": case "close": case "quit": return "";
-            case "open": return operation.path ?? i18n.t("project.chooseFile");
+            case "open": return operation.path ?? i18n.t("project.busy.chooseFile");
             case "read": return operation.path;
-            case "save": return operation.saveAs || operation.path === null ? i18n.t("project.chooseSaveLocation") : operation.path;
-            case "wait-save": return operation.fileName ?? i18n.t("common.unsaved");
+            case "save": return operation.saveAs || operation.path === null ? i18n.t("project.busy.chooseSaveLocation") : operation.path;
+            case "wait-save": return operation.fileName ?? i18n.t("project.unsaved.name");
         }
     });
 </script>

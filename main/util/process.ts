@@ -1,4 +1,4 @@
-import { FailureError } from "../../shared/failure";
+import { VestigeErrors } from "../../shared/failure";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
@@ -6,7 +6,7 @@ import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { filePath, isSystemError } from "./file";
 
-export class NativeProcessError extends FailureError {}
+export class NativeProcessFailure extends VestigeErrors {}
 
 export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string, name: string): Promise<AbsolutePath> {
     const filename = name + (process.platform === "win32" ? ".exe" : "");
@@ -26,16 +26,18 @@ export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string,
             if (!isSystemError(error)) throw error;
         }
     }
-    throw new NativeProcessError({ kind: "native-not-found", executable: filename, directory: filePath(join(runtimeRoot, runtime)) });
+    throw new NativeProcessFailure({ kind: "native-not-found", executable: filename, directory: filePath(join(runtimeRoot, runtime)) });
 }
 
 export type ProcessOutput = { stdout: string; stderr: string };
+export type ProcessOutputListener = (stream: "stdout" | "stderr", text: string) => void;
 
 export function runProcess(
     executable: AbsolutePath,
     args: string[],
     cwd: AbsolutePath,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onOutput?: ProcessOutputListener
 ): Promise<ProcessOutput> {
     signal?.throwIfAborted();
     return new Promise((accept, reject) => {
@@ -60,23 +62,25 @@ export function runProcess(
         child.stderr.setEncoding("utf8");
         child.stdout.on("data", (data: string) => {
             stdout += data;
+            onOutput?.("stdout", data);
             if (stdout.length > 64 * 1024 * 1024) {
-                failure = new NativeProcessError({ kind: "native-output-limit", limitMiB: 64 });
+                failure = new NativeProcessFailure({ kind: "native-output-limit", limitMiB: 64 });
                 abort();
             }
         });
         child.stderr.on("data", (data: string) => {
             stderr += data;
+            onOutput?.("stderr", data);
         });
         child.on("error", error => {
-            failure = new NativeProcessError({ kind: "native-spawn-failed", diagnostic: error.message }, { cause: error });
+            failure = new NativeProcessFailure({ kind: "native-spawn-failed", diagnostic: error.message }, { cause: error });
         });
         // Wait for close, including on cancellation, before deleting task files.
         child.on("close", (code, terminationSignal) => {
             signal?.removeEventListener("abort", abort);
             if (signal?.aborted) reject(signal.reason);
             else if (failure) reject(failure);
-            else if (code !== 0) reject(new NativeProcessError({ kind: "native-failed", diagnostic: stderr || stdout || null, exitCode: code, signal: terminationSignal }));
+            else if (code !== 0) reject(new NativeProcessFailure({ kind: "native-failed", diagnostic: stderr || stdout || null, exitCode: code, signal: terminationSignal }));
             else accept({ stdout, stderr });
         });
     });

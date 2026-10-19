@@ -1,18 +1,28 @@
 {#each dialogs.state.dialogs as current (current.id)}
-    {#if current.kind === "vocabulary"}
+    {#if current.kind === "transcription-backends"}
+        <TranscriptionBackends bind:open={current.open} dialogId={current.id} onClosed={() => closed(current)} />
+    {:else if current.kind === "transcription-models"}
+        <TranscriptionModels bind:open={current.open} dialogId={current.id} onClosed={() => closed(current)} />
+    {:else if current.kind === "vocabulary"}
         <Vocabulary bind:open={current.open} onClosed={() => closed(current)} />
     {:else if current.kind === "settings"}
-        <Settings bind:open={current.open} onClosed={() => closed(current)} />
+        <Settings bind:open={current.open} dialogId={current.id} onClosed={() => closed(current)} />
+    {:else if current.kind === "guide"}
+        <UserGuide bind:open={current.open} onClosed={() => closed(current)} />
+    {:else if current.kind === "parameter-guide"}
+        <ParameterGuide bind:open={current.open} onClosed={() => closed(current)} />
     {:else if current.kind === "licenses"}
         <OpenSourceLicenses bind:open={current.open} onClosed={() => closed(current)} />
     {:else if current.kind === "about"}
         <About bind:open={current.open} onClosed={() => closed(current)} />
     {:else if current.kind === "tasks"}
-        <TranscriptionTasks bind:open={current.open} tasks={current.getTasks()} onStop={current.onStop} onFailure={current.onFailure} onClosed={next => closed(current, next)} />
+        <TranscriptionTasks bind:open={current.open} tasks={current.getTasks()} focusTaskId={current.focusTaskId} onStop={current.onStop} onRetry={current.onRetry} onRemove={current.onRemove} onClosed={next => closed(current, next)} />
     {:else if current.kind === "transcription"}
-        <TranscriptionConfig bind:open={current.open} mediaId={current.mediaId} onClosed={() => closed(current)} />
-    {:else if current.kind === "failure"}
-        <TranscriptionFailure bind:open={current.open} mediaId={current.mediaId} error={current.error} onConfigure={current.onConfigure} onClosed={next => closed(current, next)} />
+        <TranscriptionConfig bind:open={current.open} dialogId={current.id} mediaId={current.mediaId} taskId={current.taskId} onClosed={() => closed(current)} />
+    {:else if current.kind === "switch-displayed-run"}
+        <SwitchDisplayedRun bind:open={current.open} onConfirm={current.onConfirm} onClosed={() => closed(current)} />
+    {:else if current.kind === "transcription-presets"}
+        <TranscriptionPresets bind:open={current.open} dialogId={current.id} selectedName={current.selectedName} onApply={current.onApply} onClosed={() => closed(current)} />
     {:else if current.kind === "save-confirmation"}
         <SaveConfirmation bind:open={current.open} fileName={current.fileName} answer={current.answer} onClosed={() => closed(current)} />
     {:else if current.kind === "save-failure"}
@@ -31,13 +41,18 @@
 
 <script lang="ts">
     import { untrack } from "svelte";
+    import TranscriptionBackends from "../dialogs/TranscriptionBackends.svelte";
+    import TranscriptionModels from "../dialogs/TranscriptionModels.svelte";
     import Vocabulary from "../dialogs/Vocabulary.svelte";
     import TranscriptionTasks from "../dialogs/TranscriptionTasks.svelte";
     import Settings from "../dialogs/Settings.svelte";
     import OpenSourceLicenses from "../dialogs/OpenSourceLicenses.svelte";
     import About from "../dialogs/About.svelte";
+    import UserGuide from "../dialogs/UserGuide.svelte";
+    import ParameterGuide from "../dialogs/ParameterGuide.svelte";
     import TranscriptionConfig from "../dialogs/TranscriptionConfig.svelte";
-    import TranscriptionFailure from "../dialogs/TranscriptionFailure.svelte";
+    import SwitchDisplayedRun from "../dialogs/SwitchDisplayedRun.svelte";
+    import TranscriptionPresets from "../dialogs/TranscriptionPresets.svelte";
     import SaveConfirmation from "../dialogs/SaveConfirmation.svelte";
     import SaveFailure from "../dialogs/SaveFailure.svelte";
     import ProjectBusy from "../dialogs/ProjectBusy.svelte";
@@ -49,6 +64,9 @@
     const presented = new WeakSet<dialogs.ApplicationDialog>();
     $effect(() => {
         for (const current of [...dialogs.state.dialogs]) {
+            if (current.parentId && !dialogs.state.dialogs.some(parent => parent.id === current.parentId)) {
+                untrack(() => dialogs.close(current.id));
+            }
             if (current.open) presented.add(current);
             // A dialog closed before its first render has no closing animation to report.
             else if (!presented.has(current)) untrack(() => closed(current));

@@ -16,6 +16,7 @@
                 event.preventDefault();
                 returnFocus = document.activeElement;
                 content?.focus();
+                onOpenAutoFocus?.();
             }}
             onCloseAutoFocus={event => {
                 event.preventDefault();
@@ -24,7 +25,9 @@
                 modal.restoreFocus(target);
             }}
         >
-            {@render children()}
+            <div class="body" bind:this={scrollElement}>
+                {@render children()}
+            </div>
             {#if actions}
                 <div class="actions">
                     {@render actions()}
@@ -82,6 +85,7 @@
     }
     :global(.modal-content) {
         --bg: var(--c-background);
+        timeline-scope: --modal-scroll;
         position: fixed;
         top: calc(42% + env(titlebar-area-height) / 2);
         left: 50%;
@@ -90,9 +94,7 @@
         max-width: calc(100vw - 48px);
         height: var(--modal-height);
         max-height: calc(100vh - env(titlebar-area-height) - 48px);
-        overflow-x: clip;
-        overflow-y: auto;
-        padding: 24px;
+        overflow: clip;
         border: 1px solid var(--c-border);
         border-radius: 12px;
         color: var(--c-text);
@@ -100,11 +102,20 @@
         box-shadow: 0 8px 32px var(--c-shadow-3);
         display: flex;
         flex-flow: column nowrap;
+    }
+    .body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-x: clip;
+        overflow-y: auto;
+        scroll-timeline: --modal-scroll block;
+        padding: 24px;
+        display: flex;
+        flex-flow: column nowrap;
         gap: 24px;
     }
-    :global(.modal-content .modal-title) {
-        font-size: 26px;
-        font-weight: bold;
+    .body > :global(*) {
+        flex-shrink: 0;
     }
     :global(.modal-content .modal-description) {
         margin: 0;
@@ -114,25 +125,38 @@
         line-height: 1.6;
         user-select: text;
     }
-    .actions {
+    :global(.modal-content .actions) {
         --bg: var(--c-surface);
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
+        flex-shrink: 0;
+        padding: 20px;
         margin-top: auto;
+        border-top: 1px solid transparent;
+        animation: actions-border auto step-end both;
+        animation-timeline: --modal-scroll;
+        font-size: 14px;
     }
-    .actions :global(button) {
+    @keyframes actions-border {
+        from { border-top-color: var(--c-border); }
+        to { border-top-color: transparent; }
+    }
+    :global(.modal-content .actions .text-button) {
         padding: 8px 14px;
-        border: 1px solid var(--c-border-120p);
-        border-radius: 6px;
         background: var(--bg);
+        border-color: var(--c-border-120p);
+        font-size: inherit;
     }
-    .actions :global(.primary) {
-        --bg: var(--c-accent);
-        color: var(--c-background);
+    :global(.modal-content .actions .primary) {
+        --bg: oklch(from var(--c-accent) max(l, 0.8) c h);
+        color: var(--c-text);
     }
-    .actions :global(button:only-child) {
+    :global(:root[data-theme="dark"] .modal-content .actions .primary) {
+        --bg: oklch(from var(--c-accent) min(l, 0.45) c h);
+    }
+    :global(.modal-content .actions button:only-child) {
         margin-left: auto;
     }
 </style>
@@ -150,8 +174,10 @@
         width?: string;
         height?: string;
         class?: string;
+        scrollElement?: HTMLDivElement | null;
         children: Snippet;
         actions?: Snippet;
+        onOpenAutoFocus?: () => void;
         // Clear content data or unmount the caller only after this reports false.
         onOpenChangeComplete: (open: boolean) => void;
     };
@@ -163,8 +189,10 @@
         width = "440px",
         height = "auto",
         class: className = "",
+        scrollElement = $bindable(null),
         children,
         actions,
+        onOpenAutoFocus,
         onOpenChangeComplete
     }: Props = $props();
 

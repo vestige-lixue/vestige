@@ -12,6 +12,7 @@
     {onpointerdown}
     {onpointermove}
     {onpointerup}
+    ondblclick={resetCB}
     onpointercancel={onpointerup}
     onlostpointercapture={onpointerup}
 ></div>
@@ -54,12 +55,13 @@
         direction: "horizontal" | "vertical";
         thickness?: number;
         changeCB: (value: number) => void;
+        resetCB?: () => void;
         origin: number | string;
         min?: number | string;
         max?: number | string;
     };
 
-    const { direction, thickness = 5, changeCB, origin, min, max }: Props = $props();
+    const { direction, thickness = 5, changeCB, resetCB, origin, min, max }: Props = $props();
 
     let handle: HTMLDivElement;
     let measurement: HTMLDivElement;

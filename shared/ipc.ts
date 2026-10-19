@@ -1,10 +1,8 @@
-export const configChannels = {
-    get: "config:get",
-    update: "config:update",
-    setSidebarWidth: "config:set-sidebar-width",
-    updatePlayback: "config:update-playback",
-    save: "config:save",
-    changed: "config:changed"
+export const settingsChannels = {
+    get: "settings:get",
+    update: "settings:update",
+    save: "settings:save",
+    changed: "settings:changed"
 } as const;
 
 export const fileChannels = {
@@ -14,7 +12,10 @@ export const fileChannels = {
     getMediaURL: "file:get-media-url",
     releaseMediaURL: "file:release-media-url",
     selectMediaPath: "file:select-media-path",
-    selectMediaPaths: "file:select-media-paths"
+    selectMediaPaths: "file:select-media-paths",
+    selectDirectory: "file:select-directory",
+    listDirectories: "file:list-directories",
+    openFFmpegDirectory: "file:open-ffmpeg-directory"
 } as const;
 
 export const projectChannels = {
@@ -25,9 +26,11 @@ export const projectChannels = {
 } as const;
 
 export const appChannels = {
+    ready: "app:ready",
     quit: "app:quit",
     edit: "app:edit",
     beforeQuit: "app:before-quit",
     beforeQuitResult: "app:before-quit-result",
-    openDevTools: "window:open-devtools"
+    openDevTools: "window:open-devtools",
+    supportsMica: "window:supports-mica"
 } as const;

@@ -5,7 +5,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig({
     main: {
-        plugins: [UnpluginTypia({ tsconfig: "configs/tsconfig.node.json" })],
+        plugins: [UnpluginTypia({ tsconfig: "configs/tsconfig.node.json", typia: { undefined: false } })],
         build: {
             outDir: "dist/main",
             rollupOptions: {
@@ -14,6 +14,10 @@ export default defineConfig({
         }
     },
     preload: {
+        esbuild: {
+            // Erase inline type imports so the sandbox does not try to require their modules.
+            tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: false } }
+        },
         build: {
             outDir: "dist/preload",
             rollupOptions: {
@@ -40,6 +44,14 @@ export default defineConfig({
                 input: resolve("renderer/index.html")
             }
         },
-        plugins: [svelte({ configFile: resolve("configs/svelte.config.js") })]
+        plugins: [
+            UnpluginTypia({
+                tsconfig: "configs/tsconfig.web.json",
+                // Validators live in TypeScript modules; component text can mention typia.
+                include: [/\.[cm]?tsx?$/],
+                typia: { undefined: false }
+            }),
+            svelte({ configFile: resolve("configs/svelte.config.js") })
+        ]
     }
 });

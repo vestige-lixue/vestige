@@ -10,14 +10,16 @@
     }}
 />
 
-<div class="file-drop-overlay" class:active={dragging} bind:this={dropArea}>
-    <div class="file-drop-message">
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        {@html downloadIcon}
-        <strong>{locked ? i18n.t("drop.busy") : i18n.t("drop.release")}</strong>
-        <div>{locked ? i18n.t("drop.wait") : i18n.t("drop.formats")}</div>
+<Portal to="body">
+    <div class="file-drop-overlay" class:active={dragging && !disabled} style:z-index={modal.getTopLayer() + 1} bind:this={dropArea}>
+        <div class="file-drop-message">
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html downloadIcon}
+            <strong>{i18n.t("fileDrop.release")}</strong>
+            <div>{i18n.t("fileDrop.formats")}</div>
+        </div>
     </div>
-</div>
+</Portal>
 
 
 <style>
@@ -25,7 +27,6 @@
         -webkit-app-region: no-drag;
         position: fixed;
         inset: calc(env(titlebar-area-height) + 2px) 0 0;
-        z-index: 12914;
         display: grid;
         place-items: center;
         padding: 0;
@@ -57,6 +58,7 @@
         gap: 12px;
         color: var(--c-text);
         text-align: center;
+        padding-bottom: 10vh;
     }
     .file-drop-message :global(svg) {
         width: 48px;
@@ -64,13 +66,13 @@
         margin-bottom: 8px;
     }
     strong {
-        font-size: 20px;
+        font-size: 24px;
         font-weight: 600;
     }
     .file-drop-message > div {
         margin: 0;
         color: var(--c-text-80p);
-        font-size: 14px;
+        font-size: 18px;
     }
 </style>
 
@@ -78,18 +80,24 @@
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
     import { onDestroy } from "svelte";
+    import { Portal } from "bits-ui";
     import downloadIcon from "../../../resources/icons/carbon--download.svg?raw";
     import { interfaceBlocked } from "../../states/commands";
     import * as project from "../../states/project.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
+    import * as modal from "../../states/modal.svelte";
 
-    let { locked }: { locked: boolean } = $props();
+    const disabled = $derived(interfaceBlocked());
     let dropArea: HTMLDivElement;
     let dragDepth = 0;
     let dragging = $state(false);
 
     type DroppedItem = { file: File | null; entry: FileSystemEntry | null };
     let collection: AbortController | null = null;
+
+    $effect.pre(() => {
+        if (disabled) resetDrag();
+    });
 
     onDestroy(() => {
         if (!collection) return;
@@ -176,9 +184,14 @@
     function handleDragOver(event: DragEvent): void {
         if (!event.dataTransfer?.types.includes("Files")) return;
         event.preventDefault();
+        if (disabled) {
+            resetDrag();
+            event.dataTransfer.dropEffect = "none";
+            return;
+        }
         dragDepth = Math.max(1, dragDepth);
         dragging = isInDropArea(event);
-        event.dataTransfer.dropEffect = locked || !dragging ? "none" : "copy";
+        event.dataTransfer.dropEffect = dragging ? "copy" : "none";
     }
 
     function handleDragLeave(event: DragEvent): void {
@@ -195,7 +208,7 @@
         resetDrag();
         if (!event.dataTransfer?.types.includes("Files")) return;
         event.preventDefault();
-        if (locked || interfaceBlocked() || !isInDropArea(event)) return;
+        if (disabled || !isInDropArea(event)) return;
         // Capture entries during drop, while the browser's drag data store is readable.
         const items: DroppedItem[] = Array.from(event.dataTransfer.items).filter(item => item.kind === "file")
             .map(item => ({ file: item.getAsFile(), entry: item.webkitGetAsEntry() }));

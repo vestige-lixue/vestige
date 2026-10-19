@@ -3,149 +3,471 @@
         "close": "关闭",
         "ok": "确定",
         "cancel": "取消",
+        "browse": "浏览",
         "save": "保存",
         "retry": "重试",
-        "unsaved": "<未保存>",
-        "confirmAgain": "再次点击确认",
-        "ignore": "忽略",
-        "relocate": "重新定位",
-        "discard": "不保存"
+        "confirmAgain": "再次点击确认"
+    },
+    "colorPicker": {
+        "hex": "颜色代码",
+        "pick": "选择颜色"
     },
     "menu": {
-        "project": "项目",
-        "new": "新建",
-        "open": "打开",
-        "saveAs": "另存为",
-        "media": "媒体",
-        "import": "导入",
-        "edit": "编辑",
-        "selectAll": "全选",
-        "undo": "撤销",
-        "redo": "重做",
-        "cut": "剪切",
-        "copy": "复制",
-        "paste": "粘贴",
-        "other": "其他",
-        "quit": "退出应用",
-        "developerTools": "打开开发者工具",
-        "repository": "项目 GitHub 仓库",
-        "about": "关于",
-        "playback": "播放"
+        "project": {
+            "title": "项目",
+            "new": "新建",
+            "open": "打开",
+            "saveAs": "另存为"
+        },
+        "media": {
+            "title": "媒体",
+            "import": "导入"
+        },
+        "transcription": {
+            "title": "转写"
+        },
+        "edit": {
+            "title": "编辑",
+            "selectAll": "全选",
+            "undo": "撤销",
+            "redo": "重做",
+            "cut": "剪切",
+            "copy": "复制",
+            "paste": "粘贴"
+        },
+        "other": {
+            "title": "其他",
+            "quit": "退出应用",
+            "developerTools": "打开开发者工具",
+            "repository": "项目 GitHub 仓库",
+            "about": "关于"
+        },
+        "playback": {
+            "title": "播放"
+        }
     },
     "player": {
-        "play": "播放",
-        "pause": "暂停",
-        "enableStabilization": "开启稳定音量",
-        "disableStabilization": "关闭稳定音量",
-        "restoreSpeed": "还原播放速度",
-        "focusSlider": "聚焦滑动条",
-        "previousMedia": "上一媒体",
-        "nextMedia": "下一媒体",
-        "previousWord": "上一词",
-        "nextWord": "下一词",
+        "actions": {
+            "play": "播放",
+            "pause": "暂停",
+            "enableStabilization": "开启稳定音量",
+            "disableStabilization": "关闭稳定音量",
+            "restoreSpeed": "还原播放速度",
+            "focusSlider": "聚焦滑动条",
+            "previousMedia": "上一媒体",
+            "nextMedia": "下一媒体",
+            "previousWord": "上一词",
+            "nextWord": "下一词"
+        },
         "noMedia": "未选择媒体"
     },
     "media": {
-        "rename": "双击编辑名称",
-        "audio": "音频",
-        "video": "视频",
-        "remove": "从项目中移除",
-        "cancelImport": "取消导入",
+        "reference": {
+            "actions": {
+                "ignore": "忽略",
+                "relocate": "重新定位"
+            },
+            "status": {
+                "missing": "媒体缺失",
+                "changed": "媒体已更改",
+                "unreadable": "无法读取媒体"
+            },
+            "ignored": "{{status}} (已忽略)",
+            "failure": {
+                "title": {
+                    "missing": "找不到媒体文件",
+                    "changed": "媒体文件已变化",
+                    "unreadable": "无法读取媒体文件"
+                },
+                "guidance": {
+                    "sameContent": "请选择与原媒体内容相同的文件。要使用新内容，请另行导入。",
+                    "restoreFile": "可在外部恢复文件后重试，或重定位到文件的新位置。"
+                },
+                "originalPath": "\n项目原路径：{{path}}",
+                "description": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\n忽略后保留此媒体及已有转写，也可在侧栏删除此媒体。"
+            }
+        },
+        "renameHint": "双击编辑名称",
+        "types": {
+            "audio": "音频",
+            "video": "视频"
+        },
+        "actions": {
+            "remove": "从项目中移除"
+        },
+        "import": {
+            "actions": {
+                "cancel": "取消导入"
+            },
+            "status": {
+                "queued": "等待导入",
+                "path": "正在读取路径",
+                "reading": "正在读取媒体",
+                "relocating": "正在重新定位"
+            },
+            "failure": {
+                "title": "媒体导入失败",
+                "droppedFile": "拖入文件",
+                "description": "{{path}}\n\n{{error}}\n请确认文件可读取且为支持的音视频格式。"
+            }
+        },
         "queuedTranscription": "等待转写",
-        "importStage": {
-            "queued": "等待导入",
-            "path": "正在读取路径",
-            "reading": "正在读取媒体",
-            "relocating": "正在重新定位"
-        },
-        "issue": {
-            "missing": "媒体缺失",
-            "changed": "媒体已更改",
-            "unreadable": "无法读取媒体"
-        },
         "summary": "{{kind}}，{{duration}}",
-        "ignored": "{{status}} (忽略)",
-        "empty": "拖入媒体文件、<action/>或按下 <shortcut/> 导入媒体。",
-        "importLink": "点击此处"
+        "empty": {
+            "description": "拖入媒体文件、<action/>或按下 <shortcut/> 导入媒体。",
+            "importAction": "点击此处"
+        }
     },
     "project": {
-        "unsavedHint": "尚未保存，点击保存",
-        "busy": {
-            "new": "正在新建项目",
-            "close": "正在关闭项目",
-            "quit": "正在退出应用",
-            "open": "正在打开项目",
-            "read": "正在读取并校验项目",
-            "save": "正在保存项目",
-            "wait-save": "正在等待项目保存"
+        "unsaved": {
+            "name": "<未保存>",
+            "hint": "尚未保存，点击保存"
         },
-        "chooseFile": "请在文件选择器中选择项目文件",
-        "chooseSaveLocation": "请在文件选择器中选择保存位置"
+        "saveConfirmation": {
+            "discard": "不保存",
+            "title": "保存项目后再继续？",
+            "description": "“{{name}}”有未保存的更改。"
+        },
+        "busy": {
+            "status": {
+                "new": "正在新建项目",
+                "close": "正在关闭项目",
+                "quit": "正在退出应用",
+                "open": "正在打开项目",
+                "read": "正在读取并校验项目",
+                "save": "正在保存项目",
+                "waitSave": "正在等待项目保存"
+            },
+            "chooseFile": "请在文件选择器中选择项目文件",
+            "chooseSaveLocation": "请在文件选择器中选择保存位置"
+        },
+        "operationFailure": {
+            "title": "操作失败",
+            "pendingImports": "仍有未完成导入的媒体。请在侧栏点击删除按钮取消导入，或等待导入完成后再保存或关闭项目。",
+            "activeTranscriptions": "仍有正在运行的转写任务。请停止任务或等待完成后，再关闭或切换项目。",
+            "readFailed": "无法读取项目“{{path}}”。错误信息：\n{{error}}"
+        },
+        "saveFailure": {
+            "title": "保存失败",
+            "actions": {
+                "editInMemory": "在内存中编辑",
+                "saveAs": "另存为…"
+            },
+            "description": "无法保存到“{{name}}”。\n{{error}}\n是否另存为其他文件？"
+        }
     },
     "transcription": {
-        "start": "开始转写",
-        "continue": "继续转写",
-        "review-failure": "失败详情",
-        "cancel-queued": "取消排队",
-        "stopping": "正在停止",
-        "stop": "停止转写",
-        "configuration": "转写配置",
-        "tasks": "转写任务",
-        "failed": "失败",
-        "queued": "等待中",
-        "running": "正在转写",
-        "empty": "暂无转写任务"
+        "backends": {
+            "actions": {
+                "manage": "转写后端管理"
+            },
+            "title": "转写后端管理"
+        },
+        "models": {
+            "actions": {
+                "manage": "转写模型管理"
+            },
+            "title": "转写模型管理"
+        },
+        "presets": {
+            "actions": {
+                "manage": "转写预设管理",
+                "new": "新建预设",
+                "copy": "复制预设",
+                "remove": "删除预设",
+                "apply": "应用到当前转写配置"
+            },
+            "title": "转写预设管理",
+            "name": {
+                "label": "名称",
+                "required": "请输入预设名称。",
+                "duplicate": "预设名称不能重复。"
+            },
+            "builtinCannotRemove": "该预设为内置预设，不可删除",
+            "newName": "新预设",
+            "copyName": "{{name}} 副本",
+            "empty": "暂无转写预设",
+            "loading": "正在读取预设……",
+            "saveError": "保存预设时出现错误：{{error}}"
+        },
+        "config": {
+            "submit": "新建转写",
+            "title": "转写配置",
+            "executer": {
+                "label": "执行器"
+            },
+            "modelDirectory": {
+                "label": "模型目录",
+                "required": "请选择模型目录。"
+            },
+            "backendDirectory": {
+                "required": "请选择后端目录。",
+                "label": "后端目录"
+            },
+            "preset": {
+                "label": "预设",
+                "custom": "自定义"
+            }
+        },
+        "actions": {
+            "new": "新建转写",
+            "reviewFailure": "失败详情",
+            "cancelQueued": "取消排队",
+            "stop": "停止转写"
+        },
+        "tasks": {
+            "status": {
+                "stopping": "正在停止",
+                "failed": "失败",
+                "succeeded": "已完成",
+                "cancelled": "已取消",
+                "queued": "等待中",
+                "running": "正在转写"
+            },
+            "actions": {
+                "remove": "移除"
+            },
+            "title": "转写任务",
+            "output": {
+                "loading": "正在读取转写日志…",
+                "unavailable": "暂无转写日志。"
+            },
+            "empty": "暂无转写任务"
+        },
+        "parameters": {
+            "title": "参数",
+            "key": {
+                "label": "键"
+            },
+            "value": {
+                "label": "值"
+            },
+            "actions": {
+                "remove": "删除参数"
+            },
+            "guide": {
+                "title": "参数指南"
+            }
+        },
+        "vocabulary": {
+            "title": "词库"
+        }
     },
     "transcript": {
+        "runs": {
+            "title": "转写列表",
+            "empty": "暂无转写",
+            "actions": {
+                "remove": "删除此转写",
+                "removeWithEdits": "删除此转写及所有修改"
+            }
+        },
+        "switchRun": {
+            "title": "切换显示的转录结果",
+            "description": "切换显示的转录结果将清空您的所有修改。",
+            "confirm": "清空修改并切换"
+        },
         "emptyMedia": "此媒体暂无转写结果。",
         "empty": "转写正文将在这里显示。"
     },
-    "dialogs": {
-        "vocabulary": "词库",
-        "operationFailed": "操作失败",
-        "transcriptionFailed": "转写失败",
-        "mediaImportFailed": "媒体导入失败",
-        "mediaMissing": "找不到媒体文件",
-        "mediaChanged": "媒体文件已变化",
-        "mediaUnreadable": "无法读取媒体文件",
-        "saveConfirm": "保存项目后再继续？",
-        "saveFailed": "保存失败",
-        "editInMemory": "在内存中编辑",
-        "saveAs": "另存为…",
-        "sameMedia": "请选择与原媒体内容相同的文件。要使用新内容，请另行导入。",
-        "restoreMedia": "可在外部恢复文件后重试，或重定位到文件的新位置。",
-        "pendingImports": "仍有未完成导入的媒体。请在侧栏点击删除按钮取消导入，或等待导入完成后再保存或关闭项目。",
-        "activeTranscriptions": "仍有正在运行的转写任务。请停止任务或等待完成后，再关闭或切换项目。",
-        "droppedFile": "拖入文件",
-        "mediaImportDescription": "{{path}}\n\n{{error}}\n请确认文件可读取且为支持的音视频格式。",
-        "originalPath": "\n项目原路径：{{path}}",
-        "mediaRefDescription": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\n忽略后保留此媒体及已有转写，也可在侧栏删除此媒体。",
-        "readFailed": "无法读取项目“{{path}}”。错误信息：\n{{error}}",
-        "unsavedChanges": "“{{name}}”有未保存的更改。",
-        "saveFailedDescription": "无法保存到“{{name}}”。\n{{error}}\n是否另存为其他文件？"
-    },
     "settings": {
         "title": "设置",
-        "concurrency": "转写并行任务数",
-        "concurrencyHelp": "降低数量后，正在执行的任务会继续，等待中的任务按新的上限开始。",
         "loading": "正在读取设置……",
-        "invalidConcurrency": "转写并行任务数必须是正整数。",
-        "retry": "重试读取",
-        "language": "界面语言",
-        "error": "保存设置时出现错误：{{error}}"
+        "saveError": "保存设置时出现错误：{{error}}",
+        "validation": {
+            "number": "请输入 {{min}} 到 {{max}} 之间的数值。"
+        },
+        "general": {
+            "title": "通用",
+            "language": {
+                "label": "界面语言",
+                "options": {
+                    "zh-CN": "简体中文",
+                    "en": "English"
+                }
+            },
+            "compressProjectFiles": {
+                "label": "压缩项目文件",
+                "description": "去除 JSON 空白符，可减少文件体积，但会降低可读性。"
+            }
+        },
+        "transcription": {
+            "title": "转写",
+            "concurrency": {
+                "label": "转写并行任务数",
+                "description": "降低数量后，正在执行的任务会继续，等待中的任务按新的上限开始。",
+                "invalid": "转写并行任务数必须是正整数。"
+            }
+        },
+        "editing": {
+            "title": "编辑",
+            "spellcheck": {
+                "label": "拼写检查",
+                "description": "在转写编辑区启用浏览器原生拼写检查。"
+            },
+            "fontSize": {
+                "label": "编辑器字号（px）",
+                "description": "仅应用于转写正文。"
+            }
+        },
+        "playback": {
+            "title": "播放",
+            "volumeSliderMapping": {
+                "label": "音量滑块映射",
+                "description": "dB 等距有助于分辨小声内容，但会使音量调节与听感不匹配。",
+                "options": {
+                    "amplitude": "振幅等距",
+                    "decibel": "dB 等距"
+                }
+            },
+            "volumeSliderMinDb": {
+                "label": "最低非静音增益（dB）",
+                "description": "滑块为 1% 时的增益；0% 始终静音。",
+                "invalid": "请输入不大于 {{max}} 的数值。"
+            },
+            "mediaSwitchPlayback": {
+                "label": "切换媒体后播放状态"
+            },
+            "wordSwitchPlayback": {
+                "label": "选择上/下一词后播放状态"
+            },
+            "rememberPlaybackPosition": {
+                "label": "保留播放进度",
+                "description": "在项目中保存播放进度。在切换媒体时从保存进度开始播放。"
+            },
+            "pauseOnOutputDeviceChange": {
+                "label": "切换音频输出设备时暂停播放",
+                "description": "系统默认音频输出设备变化或断开连接时，暂停播放。\n音频设备被另一输出设备抢占时总会暂停。"
+            },
+            "switchPlayback": {
+                "options": {
+                    "pause": "暂停",
+                    "play": "播放",
+                    "keep": "不变",
+                    "invert": "反转"
+                }
+            },
+            "showLevelMeter": {
+                "label": "显示电平"
+            },
+            "levelMeterReadout": {
+                "label": "电平读出来源",
+                "description": "选择的电平也作为满幅提示的基准。",
+                "options": {
+                    "source": "媒体",
+                    "project": "项目",
+                    "monitor": "监听"
+                }
+            }
+        },
+        "theme": {
+            "title": "主题",
+            "mode": {
+                "label": "显示模式",
+                "options": {
+                    "light": "浅色",
+                    "system": "跟随系统",
+                    "dark": "深色"
+                }
+            },
+            "translucentSidebar": {
+                "label": "半透明侧栏",
+                "description": "让侧栏背景呈现桌面壁纸的色调。"
+            },
+            "sidebarTransparency": {
+                "label": "透明程度（%）",
+                "description": "数值越大，侧栏背景越通透。"
+            },
+            "schemes": {
+                "light": "浅色配色",
+                "dark": "深色配色"
+            },
+            "actions": {
+                "reset": "还原默认设置"
+            },
+            "colors": {
+                "--c-accent": "强调色",
+                "--c-background": "主要背景色",
+                "--c-surface": "次要背景色",
+                "--c-text": "主要文字",
+                "--c-text-80p": "次要文字",
+                "--c-audio-level": "电平颜色"
+            }
+        },
+        "advanced": {
+            "title": "高级设置",
+            "volumeStabilization": {
+                "title": "音量稳定",
+                "maxGainDb": {
+                    "label": "最大提升（dB）",
+                    "description": "限制小声内容的放大幅度。数值越大，底噪也可能越明显。"
+                },
+                "gainAttackMs": {
+                    "label": "压低时间（ms）",
+                    "description": "声音变大时降低增益的平滑时间。数值越小，压低越快。"
+                },
+                "gainReleaseMs": {
+                    "label": "抬升时间（ms）",
+                    "description": "声音变小时提高增益的平滑时间。数值越大，变化越平缓。"
+                },
+                "gateThresholdDb": {
+                    "label": "微弱声音阈值（dBFS）",
+                    "description": "低于此电平时停止继续放大，持续低于阈值后撤回已有提升。"
+                },
+                "targetLevelDb": {
+                    "label": "目标电平（dBFS RMS）",
+                    "description": "自动增益希望达到的平均电平，实际输出受最大提升和峰值上限限制。"
+                }
+            }
+        }
     },
-    "drop": {
-        "busy": "正在处理项目",
-        "release": "松开鼠标，导入媒体或打开项目",
-        "wait": "请稍候再拖入文件",
-        "formats": "音频、视频、文件夹或单个 .vestige 项目文件"
+    "fileDrop": {
+        "release": "松开鼠标导入文件",
+        "formats": "音视频文件、文件夹，或单个 .vestige 项目"
+    },
+    "downloads": {
+        "models": {
+            "actions": {
+                "openDirectory": "打开模型文件夹"
+            },
+            "description": "选择下方的内置模型进行下载，或自行下载并按<guide/>整理。",
+            "title": "内置模型"
+        },
+        "loading": "正在读取下载列表…",
+        "backends": {
+            "title": "内置后端",
+            "actions": {
+                "openDirectory": "打开后端文件夹"
+            },
+            "description": "选择下方的内置后端进行下载，或自行下载并按<guide/>整理。"
+        },
+        "estimatedSize": "（{{size}} MiB）",
+        "empty": "此平台暂无内置下载。",
+        "status": {
+            "installed": "已下载",
+            "loading": "正在读取下载状态…",
+            "running": "正在下载",
+            "cancelling": "正在取消下载",
+            "succeeded": "下载完成",
+            "failed": "下载失败",
+            "cancelled": "下载已取消",
+            "unavailable": "暂无下载记录。"
+        },
+        "actions": {
+            "download": "下载"
+        }
     },
     "licenses": {
         "title": "开源许可证",
-        "project": "项目名称",
-        "license": "许可证",
-        "url": "项目地址",
-        "ffmpegNote": "FFmpeg 的许可证随构建配置变化，以所附发行包的许可证为准。"
+        "columns": {
+            "project": "名称",
+            "license": "许可证",
+            "url": "地址"
+        },
+        "ffmpegNote": "FFmpeg 的许可证随构建配置变化，以所附发行包的许可证为准。",
+        "actions": {
+            "openFFmpegDirectory": "打开 FFmpeg 文件夹"
+        }
     },
     "about": {
         "name": "Vestige（理学）",
@@ -153,79 +475,137 @@
         "quote": "<div>我经历过很多抉择。在悄然无意间，在深思熟虑后；在开心时，在失落时。有的是自发所想，有的是为人所迫；有的顺理成章，有的阴差阳错。</div><div>我知道，很久很久之后，在某处地方、某个夜晚，我会想起那些通往玫瑰园的、未曾走过的道路。</div><div>我选择了一条路，因此造就了以后所有的不同。</div>",
         "license": "以 <license/> 协议开源"
     },
-    "languages": {
-        "zh-CN": "简体中文",
-        "en": "English"
+    "guide": {
+        "title": "使用文档"
     },
     "native": {
-        "mediaFiles": "音视频文件",
-        "allFiles": "所有文件",
-        "locateMedia": "重新定位媒体文件",
-        "importMedia": "导入媒体",
-        "projectFiles": "Vestige 项目",
-        "untitled": "未命名.vestige",
-        "saveProject": "保存",
-        "saveProjectAs": "另存为"
+        "filters": {
+            "media": "音视频文件",
+            "all": "所有文件",
+            "project": "Vestige 项目"
+        },
+        "media": {
+            "locate": {
+                "title": "重新定位媒体文件",
+                "confirm": "重新定位媒体文件"
+            },
+            "import": {
+                "title": "导入媒体",
+                "confirm": "导入媒体"
+            }
+        },
+        "project": {
+            "defaultFileName": "未命名.vestige",
+            "open": {
+                "title": "打开",
+                "confirm": "打开"
+            },
+            "save": {
+                "title": "保存",
+                "confirm": "保存"
+            },
+            "saveAs": {
+                "title": "另存为",
+                "confirm": "保存"
+            }
+        },
+        "directories": {
+            "model": {
+                "title": "选择模型目录",
+                "confirm": "选择模型目录"
+            },
+            "backend": {
+                "title": "选择后端目录",
+                "confirm": "选择后端目录"
+            }
+        }
     },
     "errors": {
-        "media-not-file": "该路径不是普通文件。",
-        "media-size-changed": "文件大小与项目记录不一致。",
-        "media-hash-changed": "文件哈希与项目记录不一致。",
-        "media-changed-during-read": "检查期间文件发生了变化，请重试。",
-        "media-missing": "找不到此路径下的媒体文件，文件可能已移动或重命名。",
-        "media-cancelled": "媒体读取已取消。",
-        "media-source-invalidated": "前端已重新加载或退出，媒体源请求已取消。",
-        "media-invalid-info": "ffprobe 返回了无效的媒体信息。",
-        "media-no-streams": "文件中没有可用的音频或视频流。",
-        "media-no-duration": "无法确定媒体时长。",
-        "media-timeout": "读取媒体信息超时，请重试。",
-        "media-format": "媒体格式不符合。",
-        "media-invalid-reference": "需要有效的媒体文件大小和哈希。",
-        "media-invalid-check-id": "需要唯一的媒体检查 ID。",
-        "media-invalid-concurrency": "媒体导入并发数必须是正整数。",
-        "media-invalid-import": "需要尚未完成且唯一的媒体导入任务。",
-        "transcription-media-unavailable": "媒体文件已不可用或位置已变化，请重新配置转写。",
-        "transcription-cancelled": "转写已取消。",
-        "transcription-invalid-request": "需要有效的转写请求。",
-        "transcription-invalid-id": "需要唯一的转写任务 ID。",
-        "transcription-params-text": "参数必须是 JSON 文本。",
-        "transcription-params-object": "参数必须是 JSON 对象。",
-        "transcription-param-value": "参数值必须是有效的 JSON 值。",
-        "transcription-param-null": "参数值不能包含空字符。",
-        "audio-invalid-wave": "音频转换未生成 PCM WAV 文件。",
-        "audio-truncated-wave": "转换后的 WAV 文件不完整。",
-        "audio-empty-wave": "转换后的 WAV 文件不包含音频数据。",
-        "config-invalid-update": "设置包含无效值或不允许修改的设置项。",
-        "config-invalid-playback": "无效的播放设置。",
-        "config-invalid-sidebar-width": "无效的侧栏宽度。",
-        "path-not-absolute": "需要绝对文件路径。",
-        "path-drive-relative": "相对文件路径不能指定驱动器。",
-        "project-path-not-file": "项目路径必须指向文件。",
-        "ipc-not-main-frame": "此操作仅允许主框架使用。",
-        "native-not-found": "找不到 {{executable}}。请将它及其原生库安装到 {{directory}}，或将其添加到 PATH。",
-        "native-output-limit": "执行器输出超过了 {{limitMiB}} MiB。",
-        "native-failed": "执行器退出：{{reason}}",
-        "media-playback-failed": "媒体播放器无法读取或解码此文件。",
-        "drop-file": "无法读取拖入的文件。",
-        "drop-directory": "无法读取拖入的文件夹。",
-        "drop-file-diagnostic": "无法读取拖入的文件：{{diagnostic}}",
-        "drop-directory-diagnostic": "无法读取拖入的文件夹：{{diagnostic}}",
-        "file-not-local": "需要本地文件路径：{{name}}",
-        "transcription-unknown-executer": "未知执行器：{{executer}}",
-        "transcription-empty-path": "{{field}} 必须是非空路径。",
-        "transcription-invalid-result": "执行器未生成 JSON 结果。",
-        "transcription-invalid-option": "无效的选项名称：{{option}}",
-        "transcription-managed-option": "选项 {{option}} 由 Vestige 管理；请使用 mediaPath 指定输入。",
-        "transcription-output-array": "{{executer}} 未返回转写数组。",
-        "transcription-output-text": "{{executer}} 未返回转写文本。",
-        "transcription-output-segment": "{{executer}} 返回的片段缺少文本。",
-        "project-invalid-structure": "{{path}} 必须符合 {{expected}}。",
-        "project-invalid-integer": "{{path}} 必须是有效的非负整数。",
-        "project-invalid-number": "{{path}} 必须是有效的非负数。",
-        "project-version": "不支持的项目版本：{{version}}。",
-        "project-invalid-uuid": "{{path}} 必须是 UUID。",
-        "project-duplicate-media": "{{path}} 在项目中必须唯一。",
-        "project-invalid-path": "{{path}}：需要绝对文件路径。",
-        "project-reversed-range": "{{path}} 的范围起止顺序相反。"
+        "media": {
+            "notFile": "该路径不是普通文件。",
+            "sizeChanged": "文件大小与项目记录不一致。",
+            "mtimeChanged": "文件修改时间与项目记录不一致。",
+            "changedDuringRead": "检查期间文件发生了变化，请重试。",
+            "missing": "找不到此路径下的媒体文件，文件可能已移动或重命名。",
+            "cancelled": "媒体读取已取消。",
+            "sourceInvalidated": "前端已重新加载或退出，媒体源请求已取消。",
+            "invalidInfo": "ffprobe 返回了无效的媒体信息。",
+            "noStreams": "文件中没有可用的音频或视频流。",
+            "noDuration": "无法确定媒体时长。",
+            "timeout": "读取媒体信息超时，请重试。",
+            "format": "媒体格式不符合。",
+            "invalidReference": "需要有效的媒体文件大小和修改时间。",
+            "invalidCheckId": "需要唯一的媒体检查 ID。",
+            "invalidConcurrency": "媒体导入并发数必须是正整数。",
+            "invalidImport": "需要尚未完成且唯一的媒体导入任务。",
+            "playbackFailed": "媒体播放器无法读取或解码此文件。"
+        },
+        "transcription": {
+            "mediaUnavailable": "媒体文件已不可用或位置已变化，请重新配置转写。",
+            "cancelled": "转写已取消。",
+            "invalidRequest": "需要有效的转写请求。",
+            "invalidId": "需要唯一的转写任务 ID。",
+            "paramsText": "参数必须是 JSON 文本。",
+            "paramsObject": "参数必须是 JSON 对象。",
+            "paramValue": "参数值必须是字符串。",
+            "paramNull": "参数值不能包含空字符。",
+            "unknownExecuter": "未知执行器：{{executer}}",
+            "emptyPath": "{{field}} 必须是非空路径。",
+            "invalidResult": "执行器未生成 JSON 结果。",
+            "invalidOption": "无效的选项名称：{{option}}",
+            "managedOption": "选项 {{option}} 由 Vestige 管理。",
+            "output": {
+                "array": "{{executer}} 未返回转写数组。",
+                "text": "{{executer}} 未返回转写文本。",
+                "segment": "{{executer}} 返回的片段缺少文本。"
+            }
+        },
+        "audio": {
+            "invalidWave": "音频转换未生成 PCM WAV 文件。",
+            "truncatedWave": "转换后的 WAV 文件不完整。",
+            "emptyWave": "转换后的 WAV 文件不包含音频数据。"
+        },
+        "settings": {
+            "invalidUpdate": "设置包含无效值或不允许修改的设置项。"
+        },
+        "path": {
+            "notAbsolute": "需要绝对文件路径。",
+            "driveRelative": "相对文件路径不能指定驱动器。"
+        },
+        "project": {
+            "pathNotFile": "项目路径必须指向文件。",
+            "invalidStructure": "{{path}} 必须符合 {{expected}}。",
+            "invalidInteger": "{{path}} 必须是有效的非负整数。",
+            "invalidNumber": "{{path}} 必须是有效的非负数。",
+            "version": "不支持的项目版本：{{version}}。",
+            "invalidUuid": "{{path}} 必须是 UUID。",
+            "duplicateMedia": "{{path}} 在项目中必须唯一。",
+            "invalidPath": "{{path}}：需要绝对文件路径。",
+            "reversedRange": "{{path}} 的范围起止顺序相反。"
+        },
+        "ipc": {
+            "notMainFrame": "此操作仅允许主框架使用。"
+        },
+        "native": {
+            "notFound": "找不到 {{executable}}。请检查 {{directory}} 中的原生程序及其依赖库。",
+            "outputLimit": "执行器输出超过了 {{limitMiB}} MiB。",
+            "failed": "执行器退出：{{reason}}"
+        },
+        "drop": {
+            "file": "无法读取拖入的文件。",
+            "directory": "无法读取拖入的文件夹。",
+            "fileDiagnostic": "无法读取拖入的文件：{{diagnostic}}",
+            "directoryDiagnostic": "无法读取拖入的文件夹：{{diagnostic}}"
+        },
+        "file": {
+            "notLocal": "需要本地文件路径：{{name}}"
+        }
+    },
+    "documentation": {
+        "path": "Agent 友好：该文档位于 {{path}}。请勿写入，应用每次启动会覆盖。",
+        "loading": "正在读取文档…",
+        "contents": "目录",
+        "back": "返回",
+        "missingAnchor": "找不到章节：{{anchor}}"
     }
 }

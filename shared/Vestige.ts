@@ -19,7 +19,8 @@ export type Modificationkind = Modification["type"];
 
 export type Vestige = {
     media: Media;
+    playbackPosition: number;
     runs: Run[];
-    primaryRunIdx: number;
+    displayedRunIdx: number;
     modifications: Modification[];
 };

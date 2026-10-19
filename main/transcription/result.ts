@@ -1,8 +1,7 @@
-import { basename } from "node:path";
 import { type Range } from "../../shared/util/range";
 import { type Run, type Segment } from "../../shared/transcription/Run";
 import { type ParsedRequest } from "./parameters";
-import { TranscriptionError } from "./failure";
+import { TranscriptionFailure } from "./failure";
 
 export type NativeObject = Record<string, unknown>;
 export type Piece = { text: string; range?: Range; prob: number };
@@ -24,11 +23,12 @@ export function probability(value: unknown, fallback = 1): number {
     return result === undefined ? fallback : Math.min(1, Math.max(0, result));
 }
 
-export function range(start: unknown, end: unknown, duration: number, scale = 1): Range | undefined {
+export function range(start: unknown, end: unknown, scale = 1): Range | undefined {
     const from = number(start);
     const to = number(end);
     if (from === undefined || to === undefined || from < 0 || to < from) return undefined;
-    return { start: Math.min(duration, from * scale), end: Math.min(duration, to * scale) };
+    const result = { start: from * scale, end: to * scale };
+    return Number.isFinite(result.start) && Number.isFinite(result.end) ? result : undefined;
 }
 
 export function segments(text: string, pieces: Piece[], fallback: Range, blankProb = 0): Segment[] {
@@ -59,15 +59,15 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     }
     catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
-        throw new TranscriptionError({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
+        throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
     }
 }
 
 export function createRun(id: string, request: ParsedRequest, language: unknown, transcript: Segment[], runTime: number): Run {
     return {
         id,
-        modelName: basename(request.modelDirectory),
-        params: request.params,
+        startedAt: request.startedAt,
+        config: request.config,
         language: typeof language === "string" && language.trim() ? language : "und",
         languageProb: 1,
         runTime,

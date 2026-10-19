@@ -114,10 +114,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libarchive-tools libfuse2t64
 
-      - name: Download native programs for this target
+      - name: Download media and download tools for this target
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          VESTIGE_NATIVE_REPOSITORY: ${{ vars.VESTIGE_NATIVE_REPOSITORY || 'vestige-lixue/macos-whisper-cli' }}
         run: node resources/bin/download.mjs --platform "$TARGET_PLATFORM" --arch "$TARGET_ARCH"
 
       - name: Typecheck and build the application

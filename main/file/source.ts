@@ -1,4 +1,4 @@
-import { FailureError, toFailure } from "../../shared/failure";
+import { VestigeErrors, toFailureInfo } from "../../shared/failure";
 import { net, protocol } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, stat } from "node:fs/promises";
@@ -136,12 +136,12 @@ export async function getMediaURL(input: unknown): Promise<MediaURLResult> {
         return { status: "ready", id, url: `${scheme}://${id}/` };
     }
     catch (error) {
-        if (error instanceof FailureError) return { status: "unreadable", error: error.failure };
+        if (error instanceof VestigeErrors) return { status: "unreadable", error: error.failure };
         if (!isSystemError(error)) throw error;
         const code = error.code;
         return code === "ENOENT" || code === "ENOTDIR"
             ? { status: "missing", error: { kind: "media-missing" } }
-            : { status: "unreadable", error: toFailure(error) };
+            : { status: "unreadable", error: toFailureInfo(error) };
     }
 }
 

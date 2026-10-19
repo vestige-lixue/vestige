@@ -1,7 +1,7 @@
 <Modal bind:open
     escBehavior="close"
     clickMaskBehavior="close"
-    width="511px"
+    width="511.2px"
     onOpenChangeComplete={open => {
         if (!open) onClosed();
     }}
@@ -27,7 +27,8 @@
             <div><a href="https://github.com/vestige-lixue/vestige" target="_blank">https://github.com/vestige-lixue/vestige</a></div>
             <div>Copyright © {new Date().getFullYear()} <a class="focusable" href="https://github.com/ljm12914" target="_blank">LJM12914</a></div>
             <div><LocalizedText text={i18n.t("about.license")} slots={{ license: licenseLink }} />
-                {#snippet licenseLink()}<a class="focusable" href="https://github.com/vestige-lixue/vestige/blob/main/LICENSE" target="_blank">AGPL-3.0-or-later</a>{/snippet}</div>
+                {#snippet licenseLink()}<a class="focusable" href="https://github.com/vestige-lixue/vestige/blob/main/LICENSE" target="_blank">AGPL-3.0-or-later</a>{/snippet}
+            </div>
         </div>
     </div>
 </Modal>
@@ -82,15 +83,17 @@
     }
     .quote > :first-child, .quote > :last-child {
         font-family: "Noto Sans SC", "Noto Sans CJK SC", "Songti SC", "PingFang SC", SimSun, serif;
+        font-size: 28px;
     }
     .quote > :first-child {
         margin-left: -.5em;
-        margin-bottom: -.5em;
-        font-size: 26px;
+        margin-bottom: -32px;
     }
     .quote > :last-child {
-        font-size: 26px;
         margin-bottom: -.5em;
+    }
+    .quote > :global(:nth-child(2)) {
+        text-indent: 26px;
     }
     .meta {
         display: flex;

@@ -15,3 +15,7 @@ node_modules
 /resources/bin/*
 !/resources/bin/README.md
 !/resources/bin/download.mjs
+/resources/models/*
+!/resources/models/README.md
+CLAUDE.md
+.claude

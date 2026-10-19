@@ -1,22 +1,13 @@
-import { type AbsolutePath } from "../../../shared/util/path";
-import { argumentValue, modelPath, optionName } from "../parameters";
-import { TranscriptionError } from "../failure";
+import { TranscriptionFailure } from "../failure";
 
-const fileOptions = new Set(["m", "model", "vm", "vad-model", "fp", "font-path"]);
-
-export function nativeArguments(params: Record<string, unknown>, modelDirectory: AbsolutePath): string[] {
+export function nativeArguments(params: Readonly<Record<string, string>>): string[] {
     const args: string[] = [];
-    for (const [key, original] of Object.entries(params)) {
-        const name = optionName(key);
-        // Input and JSON destination belong to this API invocation.
-        if (["f", "file", "of", "output-file"].includes(name)) {
-            throw new TranscriptionError({ kind: "transcription-managed-option", option: key });
+    for (const [key, value] of Object.entries(params)) {
+        if (["-f", "--file", "-of", "--output-file", "-m", "--model"].includes(key)) {
+            throw new TranscriptionFailure({ kind: "transcription-managed-option", option: key });
         }
-        if (original === false) continue;
-        const value = fileOptions.has(name) && typeof original === "string" && original
-            ? modelPath(original, modelDirectory) : original;
-        args.push(key.startsWith("-") ? key : "--" + key);
-        if (value !== true) args.push(argumentValue(value));
+        args.push(key);
+        if (value !== "") args.push(value);
     }
     return args;
 }

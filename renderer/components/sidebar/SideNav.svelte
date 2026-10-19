@@ -1,15 +1,15 @@
 <nav>
-    <Tooltip text={i18n.t("dialogs.vocabulary")} shortcut={`${modKeyText}+L`} onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
+    <Tooltip text={i18n.t("transcription.vocabulary.title")} shortcut={`${modKeyText}+L`} onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
         {#snippet child({ props })}
-            <button {...props} class="hoverable activable focusable">
+            <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html bookIcon}
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text={i18n.t("transcription.tasks")} shortcut={`${modKeyText}+T`} onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
+    <Tooltip text={i18n.t("transcription.tasks.title")} shortcut={`${modKeyText}+T`} onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
         {#snippet child({ props })}
-            <button {...props} class="hoverable activable focusable">
+            <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html taskBlankIcon}
             </button>
@@ -17,7 +17,7 @@
     </Tooltip>
     <Tooltip text={i18n.t("settings.title")} shortcut={`${modKeyText}+,`} onclick={() => runCommand({ kind: "openPanel", panel: "settings" })}>
         {#snippet child({ props })}
-            <button {...props} class="hoverable activable focusable">
+            <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html settingsIcon}
             </button>
@@ -37,18 +37,10 @@
         margin: 10px 0 8px;
     }
     nav button {
-        display: grid;
-        place-items: center;
         height: 24px;
         width: 24px;
         padding: 12px;
         border-radius: 24px;
-    }
-    nav button :global(svg) {
-        display: block;
-        height: 100%;
-        width: 100%;
-        pointer-events: none;
     }
 </style>
 

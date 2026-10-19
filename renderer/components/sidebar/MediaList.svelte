@@ -4,8 +4,8 @@
     {:else}
         {#if project.projectState.project}
             <div class="empty-state">
-                <LocalizedText text={i18n.t("media.empty")} slots={{ action: importAction, shortcut: importShortcut }} />
-                {#snippet importAction()}<button class="focusable" onclick={() => runCommand({ kind: "importMedia" })}>{i18n.t("media.importLink")}</button>{/snippet}
+                <LocalizedText text={i18n.t("media.empty.description")} slots={{ action: importAction, shortcut: importShortcut }} />
+                {#snippet importAction()}<button class="link-button focusable" onclick={() => runCommand({ kind: "importMedia" })}>{i18n.t("media.empty.importAction")}</button>{/snippet}
                 {#snippet importShortcut()}<kbd>{modKeyText}+I</kbd>{/snippet}
             </div>
         {/if}
@@ -44,8 +44,6 @@
     }
     .empty-state button {
         color: inherit;
-        font: inherit;
-        text-decoration: underline;
         text-underline-offset: .2em;
     }
     .empty-state kbd {

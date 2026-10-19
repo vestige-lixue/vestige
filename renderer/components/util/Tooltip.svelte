@@ -2,9 +2,13 @@
     if (value && modal.isRestoringFocus(ref)) return;
     open = value;
 }} {disableCloseOnTriggerClick}>
-    <Tooltip.Trigger {...triggerProps} bind:ref />
+    <Tooltip.Trigger {...triggerProps} onkeydown={event => {
+        triggerProps.onkeydown?.(event);
+        // Release the parent focus scope before Tab reaches the dialog.
+        if (event.key === "Tab" && !event.defaultPrevented) flushSync(() => open = false);
+    }} bind:ref />
     <Tooltip.Portal>
-        <Tooltip.Content class="tooltip-content" style={`z-index: ${modal.getTopLayer()};`} {side} sideOffset={6} collisionPadding={8}>
+        <Tooltip.Content class="tooltip-content" style={`z-index: ${modal.getTopLayer()};`} {side} {sideOffset} {customAnchor} collisionPadding={8}>
             <div>
                 {#if typeof text === "string"}{text}{:else}{@render text()}{/if}
             </div>
@@ -69,13 +73,15 @@
 
 
 <script lang="ts">
-    import { type Snippet } from "svelte";
+    import { flushSync, type Snippet } from "svelte";
     import { Tooltip } from "bits-ui";
     import * as modal from "../../states/modal.svelte";
     type Props = Tooltip.TriggerProps & {
         text: string | Snippet;
         shortcut?: string;
         side?: Tooltip.ContentProps["side"];
+        sideOffset?: Tooltip.ContentProps["sideOffset"];
+        customAnchor?: Tooltip.ContentProps["customAnchor"];
         open?: boolean;
         disableCloseOnTriggerClick?: boolean;
     };
@@ -84,6 +90,8 @@
         text,
         shortcut,
         side = "top",
+        sideOffset = 6,
+        customAnchor,
         open = $bindable(false),
         ref = $bindable(null),
         disableCloseOnTriggerClick,

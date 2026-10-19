@@ -1,0 +1,15 @@
+Paraformer zh (Paraformer-large Chinese model)
+Model authors/publisher: Alibaba DAMO Academy speech team / iic / FunASR
+License: Apache License 2.0
+Original model: iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8358-tensorflow1
+Original revision: v1.1.9
+https://www.modelscope.cn/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8358-tensorflow1
+Versioned license declaration:
+https://modelscope.cn/api/v1/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8358-tensorflow1/repo?Revision=v1.1.9&FilePath=README.md
+ONNX conversion and distribution: Fangjun Kuang (csukuangfj) / sherpa-onnx
+https://huggingface.co/csukuangfj/sherpa-onnx-paraformer-zh-2024-03-09/tree/906992d326ebf0c5171cde675aa0902be9e5bc6c
+
+The upstream distribution converts the original model to ONNX.
+Vestige packaging filename mapping: model.onnx -> paraformer.onnx.
+The local filename change does not alter its contents; tokens.txt stays unchanged.
+Preserve any additional notices supplied with the actual model files.

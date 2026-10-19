@@ -1,12 +1,7 @@
 :root {
-    --c-accent: #1e90ff;
     --c-link: #2170bf;
     --c-selection: #cfe5fc;
     --c-selection-bg: #c8e1fb;
-    --c-background: #ffffff;
-    --c-surface: #eef0f3;
-    --c-text: #252a30;
-    --c-text-80p: #686e75;
     --c-scrollbar: #808080;
     --c-border: #e1e4e8;
     --c-border-110p: #d1d6dd;
@@ -19,12 +14,34 @@
     --c-shadow-3: rgba(37, 42, 48, 0.12);
 }
 
+:root[data-theme="dark"] {
+    --c-link: #79b8ff;
+    --c-selection: #264a70;
+    --c-selection-bg: #223c58;
+    --c-scrollbar: #7b8592;
+    --c-border: #303944;
+    --c-border-110p: #303741;
+    --c-border-120p: #485566;
+    --c-border-200p: #8794a5;
+    --c-overlay: #0009;
+    --c-danger: #ff7b72;
+    --c-shadow-1: rgba(0, 0, 0, 0.18);
+    --c-shadow-2: rgba(0, 0, 0, 0.28);
+    --c-shadow-3: rgba(0, 0, 0, 0.4);
+    --hover-lightness: 0.92;
+    --active-lightness: 0.96;
+}
+
 :root {
     --bg: var(--c-background);
     --hover-lightness: 0.96;
     --active-lightness: 0.9;
     color: var(--c-text);
     background: var(--bg);
+}
+
+:root.mica {
+    background: transparent;
 }
 
 .hoverable:hover:not(:disabled):not([data-disabled]),
@@ -36,4 +53,14 @@
 
 .activable:active:not(:disabled):not([data-disabled]) {
     background-color: hsl(from var(--bg) h s calc(l * var(--active-lightness)));
+}
+
+:root[data-theme="dark"] .hoverable:hover:not(:disabled):not([data-disabled]),
+:root[data-theme="dark"] [data-menubar-item][data-highlighted]:not([data-disabled]),
+:root[data-theme="dark"] [data-menubar-trigger][data-state="open"]:not([data-disabled]) {
+    background-color: hsl(from var(--bg) h s calc(100 - (100 - l) * var(--hover-lightness)));
+}
+
+:root[data-theme="dark"] .activable:active:not(:disabled):not([data-disabled]) {
+    background-color: hsl(from var(--bg) h s calc(100 - (100 - l) * var(--active-lightness)));
 }

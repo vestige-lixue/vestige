@@ -3,11 +3,11 @@ import { type Executer } from "./transcription/executer";
 
 // Application-owned failures carry identifiers and data, never display text.
 // diagnostic is reserved for unmodified external exception/native output.
-export type Failure = ({
+export type FailureInfo = ({
     kind: "unexpected";
     diagnostic: string;
 } | {
-    kind: "media-not-file" | "media-size-changed" | "media-hash-changed" | "media-changed-during-read"
+    kind: "media-not-file" | "media-size-changed" | "media-mtime-changed" | "media-changed-during-read"
         | "media-missing" | "media-cancelled" | "media-source-invalidated" | "media-invalid-info"
         | "media-no-streams" | "media-no-duration" | "media-timeout" | "media-format"
         | "media-invalid-reference" | "media-invalid-check-id" | "media-invalid-concurrency" | "media-invalid-import"
@@ -15,7 +15,7 @@ export type Failure = ({
         | "transcription-invalid-id" | "transcription-params-text" | "transcription-params-object"
         | "transcription-param-value" | "transcription-param-null"
         | "audio-invalid-wave" | "audio-truncated-wave" | "audio-empty-wave"
-        | "config-invalid-update" | "config-invalid-playback" | "config-invalid-sidebar-width"
+        | "settings-invalid-update"
         | "path-not-absolute" | "path-drive-relative" | "project-path-not-file" | "ipc-not-main-frame";
 } | {
     kind: "native-not-found";
@@ -48,7 +48,7 @@ export type Failure = ({
     executer: string;
 } | {
     kind: "transcription-empty-path";
-    field: "modelDirectory" | "mediaPath";
+    field: "backendDirectory" | "modelDirectory" | "mediaPath";
 } | {
     kind: "transcription-invalid-json" | "transcription-invalid-result" | "project-invalid-json";
     diagnostic: string;
@@ -76,16 +76,16 @@ export type Failure = ({
 });
 
 // Only used within a process. IPC replies transport failure as a plain object.
-export class FailureError extends Error {
-    readonly failure: Failure;
+export class VestigeErrors extends Error {
+    readonly failure: FailureInfo;
 
-    constructor(failure: Failure, options?: ErrorOptions) {
+    constructor(failure: FailureInfo, options?: ErrorOptions) {
         super(failure.kind, options);
         this.failure = failure;
     }
 }
 
-export function toFailure(error: unknown): Failure {
-    if (error instanceof FailureError) return error.failure;
+export function toFailureInfo(error: unknown): FailureInfo {
+    if (error instanceof VestigeErrors) return error.failure;
     return { kind: "unexpected", diagnostic: error instanceof Error ? error.message : String(error) };
 }

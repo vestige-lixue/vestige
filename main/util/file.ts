@@ -1,8 +1,8 @@
-import { FailureError } from "../../shared/failure";
+import { VestigeErrors } from "../../shared/failure";
 import { posix, win32 } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 
-export class InvalidPathError extends FailureError {}
+export class InvalidPathFailure extends VestigeErrors {}
 
 export function isSystemError(error: unknown): error is NodeJS.ErrnoException {
     return error instanceof Error && "code" in error && typeof error.code === "string"
@@ -13,7 +13,7 @@ export function filePath(path: unknown, platform: NodeJS.Platform = process.plat
     const syntax = platform === "win32" ? win32 : posix;
     if (typeof path !== "string" || path.includes("\0") || !syntax.isAbsolute(path)
         || (platform === "win32" && syntax.parse(path).root.length === 1)) {
-        throw new InvalidPathError({ kind: "path-not-absolute" });
+        throw new InvalidPathFailure({ kind: "path-not-absolute" });
     }
     // Windows paths rooted at '\' still depend on the current drive. Reject them
     // above so normalization never introduces a dependency on the working directory.
@@ -24,7 +24,7 @@ export function resolveFilePath(directory: AbsolutePath, path: string, platform:
     const syntax = platform === "win32" ? win32 : posix;
     if (syntax.isAbsolute(path)) return filePath(path, platform);
     // A drive-relative path such as D:clip.wav can silently read that drive's cwd.
-    if (syntax.parse(path).root) throw new InvalidPathError({ kind: "path-drive-relative" });
+    if (syntax.parse(path).root) throw new InvalidPathFailure({ kind: "path-drive-relative" });
     return filePath(syntax.resolve(filePath(directory, platform), path), platform);
 }
 

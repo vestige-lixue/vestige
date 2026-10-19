@@ -1,6 +1,6 @@
 {
     "name": "vestige",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "A workspace for media transcription and records.",
     "author": "LJM12914",
     "type": "module",
@@ -10,8 +10,6 @@
     "scripts": {
         "lint": "eslint --config configs/eslint.config.js --cache --cache-location dist/.eslintcache .",
         "lint:fix": "eslint --config configs/eslint.config.js --fix .",
-        "lint:test": "node configs/config.test.js",
-        "test:i18n": "node configs/i18n.test.js",
         "typecheck:node": "tsc --noEmit -p configs/tsconfig.node.json",
         "svelte-check": "svelte-check --tsconfig ./configs/tsconfig.web.json --config ./configs/svelte.config.js",
         "typecheck": "pnpm typecheck:node && pnpm svelte-check",
@@ -19,7 +17,6 @@
         "check:watch": "pnpm svelte-check --watch",
         "start": "electron-vite preview --skipBuild --config configs/electron.vite.config.ts",
         "dev": "electron-vite dev --config configs/electron.vite.config.ts",
-        "preview": "pnpm start",
         "build": "pnpm typecheck && electron-vite build --config configs/electron.vite.config.ts",
         "build:unpack": "pnpm build && electron-builder --dir",
         "build:win": "pnpm build && electron-builder --win",
@@ -33,8 +30,12 @@
         "extends": "./configs/electron-builder.yml"
     },
     "dependencies": {
+        "@tiptap/core": "3.31.3",
+        "@tiptap/pm": "3.31.3",
         "bits-ui": "^2.19.3",
+        "dompurify": "^3.4.16",
         "i18next": "^26.4.2",
+        "marked": "^18.1.0",
         "typia": "12.1.1"
     },
     "devDependencies": {

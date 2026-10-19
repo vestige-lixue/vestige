@@ -1,4 +1,4 @@
-import { type Failure, FailureError, toFailure } from "../../shared/failure";
+import { type FailureInfo, VestigeErrors, toFailureInfo } from "../../shared/failure";
 import { SvelteMap } from "svelte/reactivity";
 import { type MediaIssueStatus } from "../../shared/media/check";
 import { type InputSource } from "../../shared/util/file";
@@ -11,12 +11,12 @@ export type ImportState = { id: string } & ({
     stage: "queued" | "path" | "reading" | "relocating" | "ready";
 } | {
     stage: MediaIssueStatus;
-    error: Failure;
+    error: FailureInfo;
     path: AbsolutePath;
     ignored: boolean;
 });
 type ImportIssue = Extract<ImportState, { stage: MediaIssueStatus }>;
-export type MediaImportFailure = { name: string | null; path: AbsolutePath | null; error: Failure };
+export type MediaImportFailure = { name: string | null; path: AbsolutePath | null; error: FailureInfo };
 
 type TaskSource = ({
     kind: "import";
@@ -80,7 +80,7 @@ export function getConcurrency(): number {
 }
 
 export function setConcurrency(value: number): void {
-    if (!Number.isSafeInteger(value) || value < 1) throw new FailureError({ kind: "media-invalid-concurrency" });
+    if (!Number.isSafeInteger(value) || value < 1) throw new VestigeErrors({ kind: "media-invalid-concurrency" });
     state.concurrency = value;
     pump();
 }
@@ -195,7 +195,7 @@ export function review(id: string): void {
     showIssue(id);
 }
 
-export function reportPlaybackFailure(id: string, status: MediaIssueStatus, error: Failure): void {
+export function reportPlaybackFailure(id: string, status: MediaIssueStatus, error: FailureInfo): void {
     const media = project.getMedia(id);
     if (media && isReady(id)) reportFailure(id, status, error, media.path);
 }
@@ -222,7 +222,7 @@ export function reportImportFailure(input: MediaImportFailure): void {
     failureDialogs.set(failure, dialog);
 }
 
-function reportFailure(id: string, status: MediaIssueStatus, error: Failure, path: AbsolutePath | null): void {
+function reportFailure(id: string, status: MediaIssueStatus, error: FailureInfo, path: AbsolutePath | null): void {
     const media = project.getMedia(id);
     if (media) {
         update({ id, stage: status, error, path: path ?? media.path, ignored: false });
@@ -272,7 +272,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
         if (typeof source === "string") path = source;
         else {
             const result = await window.api.file.getPathForFile(source);
-            if (!result.success) throw new FailureError(result.error);
+            if (!result.success) throw new VestigeErrors(result.error);
             path = result.path;
         }
         if (tasks.get(id) !== task) return;
@@ -285,7 +285,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
         const cancel = (): void => window.api.file.cancelMediaRead(requestId);
         task.controller.signal.addEventListener("abort", cancel, { once: true });
         const expected = project.getMedia(id);
-        const result = await window.api.file.readMedia(requestId, path, expected ? { size: expected.size, hash: expected.hash } : null)
+        const result = await window.api.file.readMedia(requestId, path, expected ? { size: expected.size, mtimeMs: expected.mtimeMs } : null)
             .finally(() => task.controller.signal.removeEventListener("abort", cancel));
         if (tasks.get(id) !== task) return;
         if (result.status !== "ready") {
@@ -303,7 +303,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
     }
     catch (error) {
         if (tasks.get(id) !== task || task.controller.signal.aborted) return;
-        reportFailure(id, "unreadable", toFailure(error), path);
+        reportFailure(id, "unreadable", toFailureInfo(error), path);
         console.error(error);
     }
     finally {

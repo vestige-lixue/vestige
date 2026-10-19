@@ -10,8 +10,7 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const root = await realpath(dirname(fileURLToPath(import.meta.url)));
-const names = ["ffmpeg", "sherpa-onnx", "whisper.cpp"];
-const nativeRepository = process.env.VESTIGE_NATIVE_REPOSITORY || "vestige-lixue/macos-whisper-cli";
+const names = ["ffmpeg", "aria2"];
 
 function options(args) {
     const result = { platform: process.platform, arch: process.arch, only: null, dryRun: false, help: false };
@@ -60,18 +59,29 @@ function packageFor(name, repo, info, assetName, programs) {
     };
 }
 
-function newestWithAsset(releases, assetName, prefix = "") {
-    return releases.filter(info => !info.draft && info.tag_name.startsWith(prefix))
-        .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))
-        .find(info => info.assets.some(asset => asset.name === assetName));
-}
-
 async function resolveDownloads(platform, arch, selected) {
     if (!["win32", "linux", "darwin"].includes(platform) || !["x64", "arm64"].includes(arch)) {
         throw new Error(`No complete prebuilt CLI set is configured for ${platform}/${arch}.`);
     }
     const suffix = platform === "win32" ? ".exe" : "";
     return Promise.all(selected.map(async name => {
+        if (name === "aria2") {
+            if (platform !== "win32" || arch !== "x64") {
+                throw new Error(`No verified aria2 archive is configured for ${platform}/${arch}. `
+                    + "Supply aria2c and its distribution notices in resources/bin/aria2, then prepare the other packages with --only.");
+            }
+            // This official release predates GitHub asset digests. Pin its SHA-256 from the winget manifest.
+            const repo = "aria2/aria2", tag = "release-1.37.0", assetName = "aria2-1.37.0-win-64bit-build1.zip";
+            return {
+                name, repo, tag, page: `https://github.com/${repo}/releases/tag/${tag}`,
+                programs: ["aria2c.exe"], licenseURL: null,
+                downloads: [{ asset: {
+                    name: assetName, size: 2475379,
+                    digest: "sha256:67d015301eef0b612191212d564c5bb0a14b5b9c4796b76454276a4d28d9b288",
+                    browser_download_url: `https://github.com/${repo}/releases/download/${tag}/${assetName}`
+                } }]
+            };
+        }
         if (name === "ffmpeg") {
             if (platform === "darwin") {
                 const repo = "eugeneware/ffmpeg-static";
@@ -92,36 +102,7 @@ async function resolveDownloads(platform, arch, selected) {
             return packageFor(name, "BtbN/FFmpeg-Builds", info,
                 `ffmpeg-master-latest-${target}-lgpl-shared.${platform === "win32" ? "zip" : "tar.xz"}`, ["ffmpeg" + suffix, "ffprobe" + suffix]);
         }
-        if (name === "sherpa-onnx") {
-            const info = await release("k2-fsa/sherpa-onnx");
-            const target = platform === "win32" ? `win-${arch}-shared-MT-Release-no-tts`
-                : platform === "darwin" ? `osx-${arch}-shared`
-                    : arch === "x64" ? "linux-x64-shared-no-tts" : "linux-aarch64-shared-cpu";
-            return packageFor(name, "k2-fsa/sherpa-onnx", info,
-                `sherpa-onnx-${info.tag_name}-${target}.tar.bz2`, ["sherpa-onnx-offline" + suffix]);
-        }
-        const releases = await release("ggml-org/whisper.cpp", "releases?per_page=20");
-        const asset = platform === "win32" ? arch === "x64" ? "whisper-bin-x64.zip" : "whisper-bin-win-cpu-arm64.zip"
-            : `whisper-bin-${platform === "darwin" ? "macos" : "ubuntu"}-${arch}.tar.gz`;
-        // Semantic releases may contain only source; the newest official build carries the CLI archives.
-        const info = newestWithAsset(releases, asset);
-        if (!info && platform === "darwin") {
-            const built = await release(nativeRepository).catch(error => {
-                if (error.status === 404) return null;
-                throw error;
-            });
-            const required = ["whisper-bin-macos-arm64.tar.gz", "whisper-bin-macos-x64.tar.gz", "SHA256SUMS", "build.json"];
-            if (!built || built.draft || built.prerelease || !built.tag_name.startsWith("native-whisper-")
-                || !required.every(name => built.assets.some(file => file.name === name && file.state === "uploaded"
-                    && file.size > 0 && /^sha256:[a-f\d]{64}$/i.test(file.digest ?? "")))) {
-                throw new Error(`No complete latest macOS Whisper CLI release is published by ${nativeRepository}. `
-                    + `Run Build macOS Whisper CLI in https://github.com/${nativeRepository}/actions to publish both architectures first. No binaries were replaced.`);
-            }
-            // The independent build repository includes Whisper's LICENSE in each archive.
-            return { ...packageFor(name, nativeRepository, built, asset, ["whisper-cli"]), licenseURL: null };
-        }
-        if (!info) throw new Error(`No ${asset} in the latest 20 official whisper.cpp releases. No binaries were replaced.`);
-        return packageFor(name, "ggml-org/whisper.cpp", info, asset, ["whisper-cli" + suffix]);
+        throw new Error(`Unknown program package: ${name}`);
     }));
 }
 
@@ -216,9 +197,9 @@ async function prepare(item, work, platform, arch) {
         if (platform !== "win32") await chmod(join(target, name), 0o755);
     }
     for (const name of item.programs) if (!copied.has(name)) throw new Error(`${item.name} does not contain ${name}.`);
-    if (item.name === "ffmpeg" && platform === process.platform && arch === process.arch) {
+    if (["ffmpeg", "aria2"].includes(item.name) && platform === process.platform && arch === process.arch) {
         for (const name of item.programs) {
-            await run(join(target, name), ["-version"], { windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 });
+            await run(join(target, name), [item.name === "aria2" ? "--version" : "-version"], { windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 });
         }
     }
     if (item.licenseURL) {
@@ -271,9 +252,9 @@ async function replaceAll(work, selected) {
 async function main() {
     const settings = options(process.argv.slice(2));
     if (settings.help) {
-        console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|sherpa-onnx|whisper.cpp] [--platform win32|linux|darwin] [--arch x64|arm64]\n"
-            + "Downloads native CLI packages, shared libraries and licenses (Whisper includes Metal on macOS arm64).\n"
-            + "Replaces the selected program directories only after all selected packages are ready; defaults to all three.");
+        console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|aria2] [--platform win32|linux|darwin] [--arch x64|arm64]\n"
+            + "Downloads media and download tools, shared libraries and licenses. Transcription backends are downloaded in the app.\n"
+            + "Replaces the selected program directories only after all selected packages are ready; defaults to both. aria2's verified archive is Windows x64 only.");
         return;
     }
     const selected = settings.only === null ? names : [settings.only];

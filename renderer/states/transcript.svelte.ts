@@ -5,14 +5,14 @@ import * as mediaSelection from "./mediaSelection.svelte";
 type Interval = { index: number; start: number; end: number };
 type IntervalNode = Interval & { maxEnd: number; left: IntervalNode | null; right: IntervalNode | null };
 
-const run = $derived.by(() => {
-    const vestige = project.getVestige(mediaSelection.get());
-    return vestige?.runs[vestige.primaryRunIdx];
-});
-// These indexes depend on transcript content, never on playback time.
-const wordStarts = $derived(run?.transcript.filter(segment => segment.token.text.trim()).map(segment => segment.range.start).sort((a, b) => a - b) ?? []);
+const vestige = $derived(project.getVestige(mediaSelection.get()));
+const run = $derived(vestige?.runs[vestige.displayedRunIdx]);
+const duration = $derived(vestige?.media.duration ?? 0);
+// Playback indexes exclude unreachable times without changing stored timestamps.
+const wordStarts = $derived([...new Set(run?.transcript.filter(segment => segment.token.text.trim()
+    && segment.range.start >= 0 && segment.range.start < duration).map(segment => segment.range.start) ?? [])].sort((a, b) => a - b));
 const intervals = $derived.by(() => {
-    const ranges = run?.transcript.map((segment, index) => ({ index, start: segment.range.start, end: segment.range.end }))
+    const ranges = run?.transcript.map((segment, index) => ({ index, start: Math.max(0, segment.range.start), end: Math.min(duration, segment.range.end) }))
         .filter(range => range.start < range.end).sort((a, b) => a.start - b.start) ?? [];
     return buildIntervals(ranges, 0, ranges.length);
 });
@@ -30,17 +30,26 @@ export function getRun(): Run | undefined {
     return run;
 }
 
-export function getWordPosition(time: number, direction: -1 | 1): number | null {
+export function getWordStarts(): readonly number[] {
+    return wordStarts;
+}
+
+export function getWordIndex(time: number): number {
     const starts = wordStarts;
-    const boundary = time + direction * 0.001;
+    const boundary = time + 0.001;
     let start = 0;
     let end = starts.length;
     while (start < end) {
         const middle = Math.floor((start + end) / 2);
-        if (direction === 1 ? starts[middle] <= boundary : starts[middle] < boundary) start = middle + 1;
+        if (starts[middle] <= boundary) start = middle + 1;
         else end = middle;
     }
-    return starts[direction === 1 ? start : start - 1] ?? null;
+    return start - 1;
+}
+
+export function getWordPosition(time: number, direction: -1 | 1, fromIndex = getWordIndex(time)): number | null {
+    // An explicit index keeps repeated navigation independent of playback progress.
+    return wordStarts[fromIndex + direction] ?? null;
 }
 
 export function getActiveSegments(time: number): number[] {

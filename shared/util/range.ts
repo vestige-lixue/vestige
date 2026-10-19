@@ -1,16 +1,19 @@
 export type Range = {
-    // [0.0, duration] in seconds.
+    // Finite, non-negative seconds. Timestamps may exceed the media duration.
     start: number;
-    // Same as above.
+    // Finite seconds, greater than or equal to start.
     end: number;
 };
 
 export type TextPosition = {
+    // Original displayed Run segment, or transcript.length for the unique EOF position.
     segmentIdx: number;
+    // Codepoint offset before a character. EOF always has offset 0.
     offset: number;
 };
 
 export type TextRange = {
+    // Half-open original-text range [start, end).
     start: TextPosition;
     end: TextPosition;
 };

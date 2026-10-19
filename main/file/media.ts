@@ -1,5 +1,4 @@
-import { FailureError, toFailure } from "../../shared/failure";
-import { createHash } from "node:crypto";
+import { VestigeErrors, toFailureInfo } from "../../shared/failure";
 import { open } from "node:fs/promises";
 import { type MediaCheckResult, type MediaReference } from "../../shared/media/check";
 import { getFileName, type AbsolutePath } from "../../shared/util/path";
@@ -11,7 +10,7 @@ export async function readMedia(
 ): Promise<MediaCheckResult> {
     try {
         const path = filePath(input);
-        if (reference !== null && (!reference || !Number.isSafeInteger(reference.size) || reference.size < 0 || typeof reference.hash !== "string")) {
+        if (reference !== null && (!reference || !Number.isSafeInteger(reference.size) || reference.size < 0 || !Number.isFinite(reference.mtimeMs))) {
             return { status: "unreadable", error: { kind: "media-invalid-reference" } };
         }
         signal.throwIfAborted();
@@ -21,14 +20,10 @@ export async function readMedia(
             const before = await file.stat();
             if (!before.isFile()) return { status: "unreadable", error: { kind: "media-not-file" } };
             if (reference && before.size !== reference.size) return { status: "changed", error: { kind: "media-size-changed" } };
-            const hash = createHash("sha256");
-            const stream = file.createReadStream({ highWaterMark: 1024 * 1024, autoClose: false, signal });
-            for await (const chunk of stream) hash.update(chunk);
-            signal.throwIfAborted();
-            const fingerprint = hash.digest("hex");
-            if (reference && fingerprint !== reference.hash.toLowerCase()) {
-                return { status: "changed", error: { kind: "media-hash-changed" } };
+            if (reference && before.mtimeMs !== reference.mtimeMs) {
+                return { status: "changed", error: { kind: "media-mtime-changed" } };
             }
+            signal.throwIfAborted();
             const probe = await probeMedia(path, runtimeDirectory, signal);
             if (probe.status !== "ready") return probe;
             const after = await file.stat();
@@ -42,7 +37,7 @@ export async function readMedia(
                     return { status: "changed", error: { kind: "media-changed-during-read" } };
                 }
                 signal.throwIfAborted();
-                return { status: "ready", media: { path, name: getFileName(path), size: before.size, hash: fingerprint, ...probe.metadata } };
+                return { status: "ready", media: { path, name: getFileName(path), size: before.size, mtimeMs: before.mtimeMs, ...probe.metadata } };
             }
             finally {
                 await currentFile.close();
@@ -54,11 +49,11 @@ export async function readMedia(
     }
     catch (error) {
         if (signal.aborted) return { status: "cancelled", error: { kind: "media-cancelled" } };
-        if (error instanceof FailureError) return { status: "unreadable", error: error.failure };
+        if (error instanceof VestigeErrors) return { status: "unreadable", error: error.failure };
         if (!isSystemError(error)) throw error;
         const code = error.code;
         return code === "ENOENT" || code === "ENOTDIR"
             ? { status: "missing", error: { kind: "media-missing" } }
-            : { status: "unreadable", error: toFailure(error) };
+            : { status: "unreadable", error: toFailureInfo(error) };
     }
 }

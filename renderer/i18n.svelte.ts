@@ -1,22 +1,23 @@
 import { createInstance, type ParseKeys, type TOptions } from "i18next";
 import zhCN from "../locales/zh-CN.json";
 import en from "../locales/en.json";
-import { defaultLocale, type Locale } from "../shared/locale";
-import * as config from "./states/config.svelte";
+import { type Locale } from "../shared/locale";
+import { defaultSettings } from "../shared/settings/defaults";
+import * as settings from "./states/settings.svelte";
 
 const instance = createInstance();
 void instance.init({
     resources: { "zh-CN": { translation: zhCN }, en: { translation: en } },
-    lng: defaultLocale,
-    fallbackLng: defaultLocale,
+    lng: defaultSettings.language,
+    fallbackLng: defaultSettings.language,
     supportedLngs: ["zh-CN", "en"],
     initAsync: false,
     returnEmptyString: false,
     interpolation: { escapeValue: false }
 });
 
-// Track only the language, so unrelated config updates do not invalidate every label.
-const language = $derived(config.get()?.language ?? defaultLocale);
+// Track only the language, so unrelated settings updates do not invalidate every label.
+const language = $derived(settings.get()?.language ?? defaultSettings.language);
 
 export function getLocale(): Locale {
     return language;

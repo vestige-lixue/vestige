@@ -4,6 +4,7 @@
         bind:this={element}
         bind:innerText={draft}
         contenteditable="plaintext-only"
+        spellcheck="false"
         onblur={event => {
             if (!isMenuTarget(event.relatedTarget) && event.currentTarget.ownerDocument.hasFocus()) finishEditing();
         }}

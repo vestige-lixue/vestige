@@ -15,9 +15,15 @@ import { type EditAction } from "../shared/app";
 import { filePath } from "./util/file";
 import { registerFileIPCs } from "./file/ipc";
 import { registerMediaScheme, registerMediaProtocol } from "./file/source";
-import { ConfigStore } from "./config/store";
-import { registerConfigIPCs } from "./config/ipc";
-import { minWindowHeight, minWindowWidth } from "../shared/config/defaults";
+import * as settings from "./settings/store";
+import { registerSettingsIPCs } from "./settings/ipc";
+import { minWindowHeight, minWindowWidth } from "../shared/constants";
+import { getWindowColors, registerWindowTheme } from "./theme";
+import { registerTaskOutputIPCs } from "./task/ipc";
+import { registerDocumentationIPCs } from "./documentation/ipc";
+import { registerDownloadIPCs } from "./downloads/ipc";
+import { initializeDocumentation } from "./documentation/file";
+import { captureConsole, LogDirectory } from "./logging";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -38,9 +44,18 @@ const sessionPath = join(dataPath, "chromium");
 mkdirSync(sessionPath, { recursive: true });
 app.setPath("userData", dataPath);
 app.setPath("sessionData", sessionPath);
-const config = new ConfigStore(dataPath);
-setLocale(config.get().config.language);
-config.subscribe(snapshot => setLocale(snapshot.config.language));
+const logs = new LogDirectory(join(dataPath, "logs"));
+const applicationLog = logs.create("application");
+const restoreConsole = captureConsole(applicationLog);
+applicationLog?.record("Environment", { version: app.getVersion(), platform: process.platform, arch: process.arch, versions: process.versions, dataPath });
+process.on("uncaughtExceptionMonitor", error => applicationLog?.record("Uncaught exception", error));
+process.once("exit", code => {
+    restoreConsole();
+    applicationLog?.close(`exit ${code}`);
+});
+settings.initialize(dataPath);
+setLocale(settings.get().settings.language);
+settings.subscribe(snapshot => setLocale(snapshot.settings.language));
 
 function openExternal(url: string): void {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(console.error);
@@ -53,7 +68,8 @@ function getWindowIcon(): string {
 }
 
 function createWindow(): void {
-    const windowState = config.get().config.window;
+    const windowState = settings.get().settings.window;
+    const colors = getWindowColors();
     const workArea = screen.getPrimaryDisplay().workAreaSize;
     const mainWindow = new BrowserWindow({
         title: "Vestige",
@@ -62,13 +78,14 @@ function createWindow(): void {
         minWidth: minWindowWidth,
         minHeight: minWindowHeight,
         show: false,
-        backgroundColor: "#ffffff",
+        fullscreenable: false,
+        backgroundColor: colors["--c-background"],
         titleBarStyle: "hidden",
         ...(process.platform === "darwin"
             ? { titleBarOverlay: true, trafficLightPosition: { x: 16, y: 20 } }
             : { titleBarOverlay: {
-                color: "#ffffff",
-                symbolColor: "#252a30",
+                color: colors["--c-background"],
+                symbolColor: colors["--c-text"],
                 height: 48
             } }),
         icon: getWindowIcon(),
@@ -80,21 +97,36 @@ function createWindow(): void {
         }
     });
 
-    const runtimeDirectory = filePath(join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources"), "bin"));
-    registerFileIPCs(mainWindow, runtimeDirectory);
+    const resourcesDirectory = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources");
+    const runtimeDirectory = filePath(join(resourcesDirectory, "bin"));
+    const modelDirectory = filePath(join(dataPath, "models"));
+    const backendDirectory = filePath(join(dataPath, "backends"));
+    mkdirSync(modelDirectory, { recursive: true });
+    mkdirSync(backendDirectory, { recursive: true });
+    const documentationReady = initializeDocumentation(filePath(dataPath), filePath(join(resourcesDirectory, "docs"))).catch(console.error);
+    mainWindow.webContents.on("console-message", details => {
+        applicationLog?.record(`renderer ${details.level} ${details.sourceId}:${details.lineNumber}`, details.message);
+    });
+    mainWindow.webContents.on("render-process-gone", (_event, details) => applicationLog?.record("Renderer exited", details));
+    const tasks = registerTaskOutputIPCs(mainWindow.webContents, logs);
+    registerDocumentationIPCs(mainWindow.webContents, filePath(dataPath), documentationReady);
+    const stopDownloads = registerDownloadIPCs(mainWindow.webContents, { model: modelDirectory, backend: backendDirectory }, runtimeDirectory, tasks);
+    registerFileIPCs(mainWindow, runtimeDirectory, modelDirectory, backendDirectory);
     mainWindow.webContents.ipc.on(appChannels.edit, (event, action: unknown) => {
         if (event.senderFrame !== mainWindow.webContents.mainFrame || typeof action !== "string"
             || !["undo", "redo", "cut", "copy", "paste"].includes(action)) return;
         mainWindow.webContents[action as EditAction]();
     });
     registerProjectIPCs(mainWindow);
-    const rememberWindow = registerConfigIPCs(mainWindow, config);
-    registerWindowLifecycle(mainWindow);
+    const rememberWindow = registerSettingsIPCs(mainWindow);
+    registerWindowTheme(mainWindow);
+    registerWindowLifecycle(mainWindow, stopDownloads);
     registerTranscriptionIPCs(mainWindow.webContents, {
         runtimeDirectory,
-        modelDirectory: filePath(join(app.getPath("userData"), "models")),
+        modelDirectory,
+        backendDirectory,
         temporaryDirectory: filePath(join(app.getPath("temp"), "vestige-transcription"))
-    });
+    }, tasks);
 
     if (process.platform !== "darwin") {
         mainWindow.removeMenu();
@@ -103,10 +135,22 @@ function createWindow(): void {
         mainWindow.once("closed", () => nativeTheme.off("updated", updateWindowIcon));
     }
 
-    mainWindow.once("ready-to-show", () => {
+    let rendererReady = false, windowReady = false;
+    const showWindow = (): void => {
+        if (!rendererReady || !windowReady || mainWindow.isDestroyed()) return;
+        rendererReady = false;
         if (windowState.maximized) mainWindow.maximize();
         rememberWindow();
         mainWindow.show();
+    };
+    mainWindow.webContents.ipc.on(appChannels.ready, event => {
+        if (event.senderFrame !== mainWindow.webContents.mainFrame || mainWindow.isVisible()) return;
+        rendererReady = true;
+        showWindow();
+    });
+    mainWindow.once("ready-to-show", () => {
+        windowReady = true;
+        showWindow();
     });
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         openExternal(url);
@@ -136,13 +180,9 @@ function createWindow(): void {
             command && (input.code === "KeyR" || input.code === "KeyW" || input.key.toLowerCase() === "q")
         );
 
-        if (input.code === "F11") {
-            event.preventDefault();
-            return;
-        }
         if (input.type !== "keyDown") return;
 
-        if (input.code === "F12") {
+        if (input.code === "F12" && !input.control && !input.meta && !input.alt && !input.shift) {
             event.preventDefault();
             if (!input.isAutoRepeat) {
                 if (!app.isPackaged && !mainWindow.webContents.isDevToolsOpened()) {
@@ -153,8 +193,9 @@ function createWindow(): void {
             return;
         }
 
+        const zoomCommand = !input.alt && (process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta);
         if (
-            (command && (input.code === "Minus" || (input.code === "Equal" && input.shift)))
+            (zoomCommand && (input.code === "Minus" || (input.code === "Equal" && input.shift)))
          || (app.isPackaged && input.code === "KeyI" && ((input.control && input.shift) || (input.meta && input.alt)))
         ) {
             event.preventDefault();

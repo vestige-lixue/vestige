@@ -10,24 +10,25 @@
         }
     }}
 >
-    <Dialog.Title class="modal-title">{i18n.t("dialogs.saveConfirm")}</Dialog.Title>
-    <Dialog.Description class="modal-description">{i18n.t("dialogs.unsavedChanges", { name: fileName ?? i18n.t("common.unsaved") })}</Dialog.Description>
+    <Dialog.Title class="modal-title">{i18n.t("project.saveConfirmation.title")}</Dialog.Title>
+    <Dialog.Description class="modal-description">{i18n.t("project.saveConfirmation.description", { name: fileName ?? i18n.t("project.unsaved.name") })}</Dialog.Description>
     {#snippet actions()}
-        <button class="activable focusable" onclick={() => choose("cancel")}>{i18n.t("common.cancel")}</button>
-        <button class="discard-btn hoverable activable focusable" onclick={() => choose("discard")}>{i18n.t("common.discard")}</button>
-        <button class="primary hoverable activable focusable" onclick={() => choose("save")}>{i18n.t("common.save")}</button>
+        <TextButton hoverable={false} onclick={() => choose("cancel")}>{i18n.t("common.cancel")}</TextButton>
+        <TextButton class="discard-btn" onclick={() => choose("discard")}>{i18n.t("project.saveConfirmation.discard")}</TextButton>
+        <TextButton class="primary" onclick={() => choose("save")}>{i18n.t("common.save")}</TextButton>
     {/snippet}
 </Modal>
 
 
 <style>
-    .discard-btn {
+    :global(.discard-btn) {
         margin-right: auto;
     }
 </style>
 
 
 <script lang="ts">
+    import TextButton from "../util/TextButton.svelte";
     import * as i18n from "../../i18n.svelte";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";

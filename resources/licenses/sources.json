@@ -1,0 +1,87 @@
+[
+    {
+        "file": "electron.txt",
+        "source": "node_modules/electron/dist/LICENSE",
+        "version": "44.4.5"
+    },
+    {
+        "file": "svelte.txt",
+        "source": "node_modules/svelte/LICENSE.md",
+        "version": "5.57.1"
+    },
+    {
+        "file": "bits-ui.txt",
+        "source": "node_modules/bits-ui/LICENSE",
+        "version": "2.19.3"
+    },
+    {
+        "file": "i18next.txt",
+        "source": "node_modules/i18next/LICENSE",
+        "version": "26.4.2"
+    },
+    {
+        "file": "typia.txt",
+        "source": "node_modules/typia/LICENSE",
+        "version": "12.1.1"
+    },
+    {
+        "file": "openai-whisper.txt",
+        "source": "resources/models/whisper-tiny/LICENSE"
+    },
+    {
+        "file": "alibaba-paraformer-zh.txt",
+        "source": "resources/models/sherpa-paraformer-zh/LICENSE"
+    },
+    {
+        "file": "alibaba-paraformer-zh-NOTICE.txt",
+        "source": "resources/models/sherpa-paraformer-zh/NOTICE"
+    },
+    {
+        "file": "lucide.txt",
+        "source": "resources/icons/lucide-LICENSE.txt"
+    },
+    {
+        "file": "sherpa-onnx.txt",
+        "source": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.8/LICENSE"
+    },
+    {
+        "file": "whisper.cpp.txt",
+        "source": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/b5130/LICENSE"
+    },
+    {
+        "file": "ggml.txt",
+        "source": "https://raw.githubusercontent.com/ggml-org/ggml/master/LICENSE"
+    },
+    {
+        "file": "carbon-icons.txt",
+        "source": "https://raw.githubusercontent.com/carbon-design-system/carbon/main/LICENSE"
+    },
+    {
+        "file": "coreui-icons.txt",
+        "source": "https://raw.githubusercontent.com/coreui/coreui-icons/master/LICENSE"
+    },
+    {
+        "file": "CC-BY-4.0.txt",
+        "source": "https://creativecommons.org/licenses/by/4.0/legalcode.txt"
+    },
+    {
+        "file": "dompurify.txt",
+        "source": "node_modules/dompurify/LICENSE",
+        "version": "3.4.16"
+    },
+    {
+        "file": "dompurify-MPL.txt",
+        "source": "node_modules/dompurify/LICENSE-MPL",
+        "version": "3.4.16"
+    },
+    {
+        "file": "marked.txt",
+        "source": "node_modules/marked/LICENSE",
+        "version": "18.1.0"
+    },
+    {
+        "file": "aria2.txt",
+        "source": "resources/bin/aria2/licenses/aria2-1.37.0-win-64bit-build1/COPYING",
+        "version": "1.37.0"
+    }
+]

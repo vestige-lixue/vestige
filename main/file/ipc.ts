@@ -1,20 +1,25 @@
 import { type FilePathResult } from "../../shared/util/file";
-import { FailureError, toFailure } from "../../shared/failure";
-import { selectMediaPath, selectMediaPaths } from "../ui/fileDialogs";
-import { type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { VestigeErrors, toFailureInfo } from "../../shared/failure";
+import { selectMediaPath, selectMediaPaths, selectDirectory } from "../ui/fileDialogs";
+import { shell, type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { dirname } from "node:path";
 import { fileChannels } from "../../shared/ipc";
+import { type DownloadKind } from "../../shared/downloads";
 import { type MediaReference, type MediaCheckResult, type MediaURLResult } from "../../shared/media/check";
 import { type AbsolutePath } from "../../shared/util/path";
 import { filePath } from "../util/file";
+import { findExecutable } from "../util/process";
 import { readMedia } from "./media";
 import { getMediaURL, releaseMediaURL, releaseMediaURLs } from "./source";
+import { listDirectories } from "./directories";
 
-export function registerFileIPCs(window: BrowserWindow, runtimeDirectory: AbsolutePath): void {
+export function registerFileIPCs(window: BrowserWindow, runtimeDirectory: AbsolutePath, modelDirectory: AbsolutePath, backendDirectory: AbsolutePath): void {
     const contents = window.webContents;
+    const directoryRoots = { backend: backendDirectory, model: modelDirectory };
     const checks = new Map<string, AbortController>();
     let generation = 0;
     const checkSender = (event: IpcMainEvent | IpcMainInvokeEvent): void => {
-        if (event.senderFrame !== contents.mainFrame) throw new FailureError({ kind: "ipc-not-main-frame" });
+        if (event.senderFrame !== contents.mainFrame) throw new VestigeErrors({ kind: "ipc-not-main-frame" });
     };
     const cancelAll = (): void => {
         generation++;
@@ -32,7 +37,7 @@ export function registerFileIPCs(window: BrowserWindow, runtimeDirectory: Absolu
             return { success: true, path: filePath(path) };
         }
         catch (error) {
-            return { success: false, error: toFailure(error) };
+            return { success: false, error: toFailureInfo(error) };
         }
     });
     contents.ipc.handle(fileChannels.readMedia, async (event, id: unknown, path: unknown, reference: MediaReference | null): Promise<MediaCheckResult> => {
@@ -73,4 +78,24 @@ export function registerFileIPCs(window: BrowserWindow, runtimeDirectory: Absolu
         checkSender(event);
         return selectMediaPaths(window);
     });
+    contents.ipc.handle(fileChannels.selectDirectory, (event, value: unknown) => {
+        checkSender(event);
+        const kind = directoryKind(value);
+        return selectDirectory(window, kind, directoryRoots[kind]);
+    });
+    contents.ipc.handle(fileChannels.listDirectories, (event, value: unknown) => {
+        checkSender(event);
+        return listDirectories(directoryRoots[directoryKind(value)]);
+    });
+    contents.ipc.handle(fileChannels.openFFmpegDirectory, async event => {
+        checkSender(event);
+        const executable = await findExecutable(runtimeDirectory, "ffmpeg", "ffmpeg");
+        const error = await shell.openPath(dirname(executable));
+        if (error) throw new Error(error);
+    });
+}
+
+function directoryKind(value: unknown): DownloadKind {
+    if (value !== "model" && value !== "backend") throw new Error("Unknown directory kind.");
+    return value;
 }

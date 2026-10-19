@@ -6,8 +6,8 @@ export type Media = {
     id: string;
     // Including the filename.
     path: AbsolutePath;
-    hash: string;
     size: number;
+    mtimeMs: number;
     kind: MediaKind;
     duration: number;
     // Display name, defaults to filename.

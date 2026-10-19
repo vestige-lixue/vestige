@@ -9,6 +9,9 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
     quietFrames = 0;
     gain = 1;
     limiterGain = 1;
+    maxGain = 7.9432823;
+    gatePower = 0.00001;
+    targetLevel = 0.1;
 
     /** @param {AudioWorkletNodeOptions} options */
     constructor(options) {
@@ -27,10 +30,22 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         this.gainRelease = 1 - Math.exp(-1 / (sampleRate * 0.8));
         this.limiterRelease = 1 - Math.exp(-1 / (sampleRate * 0.08));
         this.mixStep = 1 / (sampleRate * 0.02);
+        this.configure(options.processorOptions?.settings);
         this.port.onmessage = ({ data }) => {
             if (data?.type === "enabled" && typeof data.enabled === "boolean") this.enabled = data.enabled;
+            else if (data?.type === "settings") this.configure(data.settings);
             else if (data?.type === "reset") this.reset();
         };
+    }
+
+    /** @param {import("../../shared/settings/Settings").VolumeStabilizationSettings | undefined} settings */
+    configure(settings) {
+        if (!settings) return;
+        this.maxGain = 10 ** (settings.maxGainDb / 20);
+        this.gatePower = 10 ** (settings.gateThresholdDb / 10);
+        this.targetLevel = 10 ** (settings.targetLevelDb / 20);
+        this.gainAttack = 1 - Math.exp(-1 / (sampleRate * settings.gainAttackMs / 1000));
+        this.gainRelease = 1 - Math.exp(-1 / (sampleRate * settings.gainReleaseMs / 1000));
     }
 
     reset() {
@@ -72,13 +87,12 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         const levelTime = power > this.power ? 0.03 : 0.2;
         const levelBlend = 1 - Math.exp(-frames / (sampleRate * levelTime));
         let targetGain = this.gain;
-        // -50 dBFS is a level gate, not a noise-removal or speech-recognition step.
-        if (power >= 0.00001) {
+        // The level gate controls amplification, not noise removal or speech detection.
+        if (power >= this.gatePower) {
             this.power = this.power === 0 || this.quietFrames > sampleRate * 0.25
                 ? power : this.power + (power - this.power) * levelBlend;
             this.quietFrames = 0;
-            // Target -20 dBFS RMS with at most +18 dB of amplification.
-            targetGain = Math.max(0.0630957, Math.min(7.9432823, 0.1 / Math.sqrt(this.power)));
+            targetGain = Math.max(0.0630957, Math.min(this.maxGain, this.targetLevel / Math.sqrt(this.power)));
         }
         else {
             this.quietFrames += frames;

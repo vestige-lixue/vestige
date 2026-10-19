@@ -19,10 +19,11 @@ app.on("before-quit", event => {
     });
 });
 
-export function registerWindowLifecycle(window: BrowserWindow): void {
+export function registerWindowLifecycle(window: BrowserWindow, prepareClose: () => Promise<void> = async () => {}): void {
     const contents = window.webContents;
     let allowClose = false;
     let closing = false;
+    let closeCheck: Promise<boolean> | null = null;
     let pending: { id: string; result: Promise<boolean>; finish: (block: boolean) => void } | null = null;
 
     const beforeQuit = (): Promise<boolean> => {
@@ -46,7 +47,28 @@ export function registerWindowLifecycle(window: BrowserWindow): void {
         }
         return result;
     };
-    checkBeforeQuit = beforeQuit;
+    const checkClose = (): Promise<boolean> => {
+        if (closeCheck) return closeCheck;
+        closeCheck = beforeQuit().then(async blocked => {
+            if (!blocked && !window.isDestroyed()) {
+                // Closing has been accepted. Prevent new interaction while streams
+                // close and temporary files are removed, before destroying the app.
+                window.hide();
+                try {
+                    await prepareClose();
+                }
+                catch (error) {
+                    if (!window.isDestroyed()) window.show();
+                    throw error;
+                }
+            }
+            return blocked;
+        }).finally(() => {
+            closeCheck = null;
+        });
+        return closeCheck;
+    };
+    checkBeforeQuit = checkClose;
 
     contents.ipc.on(appChannels.beforeQuitResult, (event, id: unknown, block: unknown) => {
         if (event.senderFrame !== contents.mainFrame || id !== pending?.id) return;
@@ -67,7 +89,7 @@ export function registerWindowLifecycle(window: BrowserWindow): void {
         event.preventDefault();
         if (closing) return;
         closing = true;
-        beforeQuit().then(block => {
+        checkClose().then(block => {
             if (block || pendingQuit || window.isDestroyed()) return;
             allowClose = true;
             window.close();

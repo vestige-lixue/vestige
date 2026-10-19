@@ -1,7 +1,7 @@
-import { type Failure } from "../failure";
+import { type FailureInfo } from "../failure";
 import { type Media } from "../Media";
 
-export type MediaReference = Pick<Media, "size" | "hash">;
+export type MediaReference = Pick<Media, "size" | "mtimeMs">;
 
 export type MediaIssueStatus = "missing" | "changed" | "unreadable";
 
@@ -10,7 +10,7 @@ export type MediaCheckResult = ({
     media: Omit<Media, "id">;
 } | {
     status: MediaIssueStatus | "cancelled";
-    error: Failure;
+    error: FailureInfo;
 });
 
 export type MediaURLResult = ({
@@ -19,5 +19,5 @@ export type MediaURLResult = ({
     url: string;
 } | {
     status: "missing" | "unreadable";
-    error: Failure;
+    error: FailureInfo;
 });
