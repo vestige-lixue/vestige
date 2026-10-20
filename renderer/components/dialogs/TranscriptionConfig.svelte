@@ -10,7 +10,7 @@
                 const preset = presets.find(preset => preset.name === name);
                 if (preset) applyPreset(preset.name, preset.config);
             }} />
-            <Tooltip text={i18n.t("transcription.presets.actions.manage")} onclick={() => dialogs.showTranscriptionPresets(dialogId, applyPreset, selectedName)}>
+            <Tooltip text={i18n.t("transcription.presets.actions.manage")} onclick={() => dialogsAPI.showTranscriptionPresets(dialogId, applyPreset, selectedName)}>
                 {#snippet child({ props })}
                     <button {...props} class="edit icon-button hoverable activable focusable">
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -70,13 +70,15 @@
     import ConfigFields from "../transcription/ConfigFields.svelte";
     import * as project from "../../states/project.svelte";
     import * as settings from "../../states/settings.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
     import * as transcription from "../../states/transcription.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import { defaultConfig, type Config } from "../../../shared/transcription/Config";
     import { mergePresets } from "../../../shared/transcription/presets";
     import { validTranscriptionConfig } from "../../../shared/settings/validate";
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
+    import * as dialogsAPI from "../../states/dialogs";
+    import * as settingsAPI from "../../states/settings";
+    import * as transcriptionAPI from "../../states/transcription";
 
     type Props = { open: boolean; dialogId: string; mediaId: string; taskId?: string; onClosed: () => void };
     let { open = $bindable(), dialogId, mediaId, taskId, onClosed }: Props = $props();
@@ -87,7 +89,7 @@
     const presetItems = $derived(presets.map(preset => ({ value: preset.name, label: preset.name })));
 
     onMount(() => {
-        void settings.initialize();
+        void settingsAPI.initialize();
     });
     $effect(() => {
         if (selectedName && !presets.some(preset => preset.name === selectedName)) selectedName = "";
@@ -112,6 +114,6 @@
 
     function start(): void {
         if (validate?.(true) !== true || project.projectState.locked) return;
-        if (transcription.start(mediaId, config)) open = false;
+        if (transcriptionAPI.start(mediaId, config)) open = false;
     }
 </script>

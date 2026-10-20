@@ -15,7 +15,7 @@
     origin={width}
     min={minWidth}
     max={maxWidth}
-    changeCB={value => void settings.update({ layout: { sidebarWidth: value } })}
+    changeCB={value => void settingsAPI.update({ layout: { sidebarWidth: value } })}
     thickness={3}
 />
 
@@ -62,6 +62,7 @@
     import Resizer from "../util/Resizer.svelte";
     import * as settings from "../../states/settings.svelte";
     import { minSidebarWidth, maxSidebarWidth } from "../../../shared/constants";
+    import * as settingsAPI from "../../states/settings";
 
     const minWidth = minSidebarWidth;
     const maxWidth = `min(40vw, ${maxSidebarWidth}px)`;

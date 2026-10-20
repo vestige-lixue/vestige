@@ -5,6 +5,7 @@ export const defaultSettings = {
     version: settingsVersion,
     language: "zh-CN",
     compressProjectFiles: false,
+    mediaPathMode: "project",
     theme: {
         mode: "system",
         translucentSidebar: false,
@@ -26,7 +27,7 @@ export const defaultSettings = {
             "--c-audio-level": "#219653"
         }
     },
-    transcription: { concurrency: 1, presets: {} },
+    transcription: { concurrency: 2, presets: {} },
     editing: { spellcheck: false, fontSize: 16 },
     volumeStabilization: {
         maxGainDb: 30,
@@ -37,5 +38,5 @@ export const defaultSettings = {
     },
     window: { width: 800, height: 600, maximized: false },
     layout: { sidebarWidth: null, videoHeight: null },
-    playback: { volumeSliderMapping: "amplitude", volumeSliderMinDb: -60, mediaSwitchPlayback: "pause", wordSwitchPlayback: "keep", rememberPlaybackPosition: true, pauseOnOutputDeviceChange: true, showLevelMeter: true, levelMeterReadout: "monitor", volumeStabilization: false, volume: 1, speed: 1, savedSpeed: null }
+    playback: { volumeSliderMapping: "amplitude", volumeSliderMinDb: -60, mediaSwitchPlayback: "keep", wordSwitchPlayback: "keep", rememberPlaybackPosition: true, pauseOnOutputDeviceChange: true, showLevelMeter: true, levelMeterReadout: "source", volumeStabilization: false, volume: 1, speed: 1, savedSpeed: null }
 } as const satisfies Settings;

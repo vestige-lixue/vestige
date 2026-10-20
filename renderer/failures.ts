@@ -5,7 +5,7 @@ import { type FailureInfo } from "../shared/failure";
 const failureKeys = {
     "media-not-file": "errors.media.notFile",
     "media-size-changed": "errors.media.sizeChanged",
-    "media-mtime-changed": "errors.media.mtimeChanged",
+    "media-hash-changed": "errors.media.hashChanged",
     "media-changed-during-read": "errors.media.changedDuringRead",
     "media-missing": "errors.media.missing",
     "media-cancelled": "errors.media.cancelled",

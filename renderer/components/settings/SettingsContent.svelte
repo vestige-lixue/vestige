@@ -26,15 +26,29 @@
     }} />
 </div>
 
+<div class="item selectItem">
+    <label for="media-path-mode" class="text">
+        <div class="label">{i18n.t("settings.general.mediaPathMode.label")}</div>
+        <div class="description">{i18n.t(`settings.general.mediaPathMode.descriptions.${mediaPathMode}`)}</div>
+        <div class="description">{i18n.t("settings.general.mediaPathMode.description")}</div>
+    </label>
+    <DropdownSelector id="media-path-mode" class="settingsSelect" items={mediaPathModes} disabled={pending} align="end" bind:value={() => mediaPathMode, value => {
+        if (validMediaPathMode(value) && value !== mediaPathMode) {
+            mediaPathMode = value;
+            void apply({ mediaPathMode: value });
+        }
+    }} />
+</div>
+
 <h2 class="section-title">{i18n.t("settings.transcription.title")}</h2>
 <div class="transcriptionActions">
-    <TextButton disabled={pending} onclick={() => dialogs.show({ kind: "transcription-backends", parentId: dialogId, onClosed: () => {} })}>
+    <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-backends", parentId: dialogId, onClosed: () => {} })}>
         {i18n.t("transcription.backends.actions.manage")}
     </TextButton>
-    <TextButton disabled={pending} onclick={() => dialogs.show({ kind: "transcription-models", parentId: dialogId, onClosed: () => {} })}>
+    <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-models", parentId: dialogId, onClosed: () => {} })}>
         {i18n.t("transcription.models.actions.manage")}
     </TextButton>
-    <TextButton disabled={pending} onclick={() => dialogs.showTranscriptionPresets(dialogId)}>
+    <TextButton disabled={pending} onclick={() => dialogsAPI.showTranscriptionPresets(dialogId)}>
         {i18n.t("transcription.presets.actions.manage")}
     </TextButton>
 </div>
@@ -322,7 +336,7 @@
 
 {#if failure}
     <div class="saveError error-message">{i18n.t("settings.saveError", { error: describeFailure(failure) })}</div>
-    <TextButton disabled={pending} onclick={() => void settings.save()}>{i18n.t("common.retry")}</TextButton>
+    <TextButton disabled={pending} onclick={() => void settingsAPI.save()}>{i18n.t("common.retry")}</TextButton>
 {/if}
 
 
@@ -495,7 +509,6 @@
     import TextButton from "../util/TextButton.svelte";
     import * as i18n from "../../i18n.svelte";
     import * as settings from "../../states/settings.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
     import * as modal from "../../states/modal.svelte";
     import { flushSync, onMount } from "svelte";
     import { Popover, RadioGroup } from "bits-ui";
@@ -508,7 +521,7 @@
     import { type Locale } from "../../../shared/locale";
     import { type DownloadKind } from "../../../shared/downloads";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validConcurrency, validEditorFontSize, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout } from "../../../shared/settings/validate";
+    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { levelStages } from "../../audio/levels";
     import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits } from "../../../shared/constants";
@@ -522,11 +535,14 @@
         themeSchemes, themeColorKeys, resolveTheme, validThemeMode,
         type ThemeColorKey, type ThemeScheme, type ThemeSettings, type ThemeOverrides
     } from "../../../shared/theme";
+    import * as dialogsAPI from "../../states/dialogs";
+    import * as settingsAPI from "../../states/settings";
 
     let { dialogId, beforeClose = $bindable() }: { dialogId: string; beforeClose?: () => Promise<boolean> } = $props();
     const [current, micaSupported] = await Promise.all([load(), window.api.supportsMica()]);
     let language = $state<Locale>(current.language);
     let compressProjectFiles = $state(current.compressProjectFiles);
+    let mediaPathMode = $state(current.mediaPathMode);
     let spellcheck = $state(current.editing.spellcheck);
     let editorFontSize = $state<number | undefined>(current.editing.fontSize);
     let editorFontSizeInput = $state<HTMLInputElement>();
@@ -572,13 +588,14 @@
         { value: "zh-CN", label: i18n.t("settings.general.language.options.zh-CN") },
         { value: "en", label: i18n.t("settings.general.language.options.en") }
     ]);
+    const mediaPathModes = $derived((["absolute", "project", "relative"] as const).map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
     const volumeSliderMappings = $derived((["amplitude", "decibel"] as const).map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));
     const switchPlaybackOptions = $derived((["pause", "play", "keep", "invert"] as const).map(value => ({ value, label: i18n.t(`settings.playback.switchPlayback.options.${value}`) })));
     const levelReadouts = $derived(levelStages.map(value => ({ value, label: i18n.t(`settings.playback.levelMeterReadout.options.${value}`) })));
 
     onMount(() => {
         beforeClose = close;
-        const unsubscribe = settings.beforeSave(commit);
+        const unsubscribe = settingsAPI.beforeSave(commit);
         return () => {
             beforeClose = undefined;
             unsubscribe();
@@ -601,7 +618,7 @@
     }
 
     async function load(): Promise<Settings> {
-        const initialized = await settings.initialize();
+        const initialized = await settingsAPI.initialize();
         const current = settings.get();
         if (initialized && current) return current;
         const failure = settings.getError();
@@ -610,7 +627,7 @@
     }
 
     function apply(patch: SettingsPatch): Promise<boolean> {
-        updates = updates.then(() => settings.update(patch, { save: true }));
+        updates = updates.then(() => settingsAPI.update(patch, { save: true }));
         return updates;
     }
 
@@ -699,6 +716,7 @@
         const patch: SettingsPatch = {
             ...(language !== current?.language ? { language } : {}),
             ...(compressProjectFiles !== current?.compressProjectFiles ? { compressProjectFiles } : {}),
+            ...(mediaPathMode !== current?.mediaPathMode ? { mediaPathMode } : {}),
             ...(Object.keys(playback).length > 0 ? { playback } : {}),
             ...(Object.keys(theme).length > 0 ? { theme } : {}),
             ...(concurrency !== current?.transcription.concurrency ? { transcription: { concurrency } } : {}),
@@ -712,7 +730,7 @@
         if (pending) return false;
         pending = true;
         try {
-            return await settings.save();
+            return await settingsAPI.save();
         }
         finally {
             pending = false;

@@ -60,12 +60,13 @@
     import MediaImportError from "../dialogs/MediaImportError.svelte";
     import MediaRefImportError from "../dialogs/MediaRefImportError.svelte";
     import * as dialogs from "../../states/dialogs.svelte";
+    import * as dialogsAPI from "../../states/dialogs";
 
     const presented = new WeakSet<dialogs.ApplicationDialog>();
     $effect(() => {
         for (const current of [...dialogs.state.dialogs]) {
             if (current.parentId && !dialogs.state.dialogs.some(parent => parent.id === current.parentId)) {
-                untrack(() => dialogs.close(current.id));
+                untrack(() => dialogsAPI.close(current.id));
             }
             if (current.open) presented.add(current);
             // A dialog closed before its first render has no closing animation to report.
@@ -75,7 +76,7 @@
 
     function closed(current: dialogs.ApplicationDialog, next?: () => void): void {
         if (current.open || !dialogs.state.dialogs.includes(current)) return;
-        dialogs.remove(current.id);
+        dialogsAPI.remove(current.id);
         current.onClosed();
         next?.();
     }

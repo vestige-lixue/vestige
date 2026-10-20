@@ -7,7 +7,7 @@ export type FailureInfo = ({
     kind: "unexpected";
     diagnostic: string;
 } | {
-    kind: "media-not-file" | "media-size-changed" | "media-mtime-changed" | "media-changed-during-read"
+    kind: "media-not-file" | "media-size-changed" | "media-hash-changed" | "media-changed-during-read"
         | "media-missing" | "media-cancelled" | "media-source-invalidated" | "media-invalid-info"
         | "media-no-streams" | "media-no-duration" | "media-timeout" | "media-format"
         | "media-invalid-reference" | "media-invalid-check-id" | "media-invalid-concurrency" | "media-invalid-import"

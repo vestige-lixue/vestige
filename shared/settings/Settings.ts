@@ -4,6 +4,7 @@ import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
 import { type Presets } from "../transcription/Config";
+import { type MediaPathMode } from "../project/file";
 
 type StabilizationLimits = typeof volumeStabilizationLimits;
 type PlaybackSpeed = number & tags.Minimum<typeof minPlaybackSpeed> & tags.Maximum<typeof maxPlaybackSpeed>;
@@ -18,6 +19,7 @@ export type Settings = {
     readonly version: typeof settingsVersion;
     readonly language: Locale;
     readonly compressProjectFiles: boolean;
+    readonly mediaPathMode: MediaPathMode;
     readonly theme: ThemeSettings;
     readonly transcription: {
         readonly concurrency: number & tags.Type<"uint64"> & tags.Minimum<1> & tags.Maximum<9007199254740991>;
@@ -59,6 +61,7 @@ export type Settings = {
 export type SettingsPatch = {
     readonly language?: Settings["language"];
     readonly compressProjectFiles?: Settings["compressProjectFiles"];
+    readonly mediaPathMode?: Settings["mediaPathMode"];
     readonly theme?: Partial<ThemeSettings>;
     readonly transcription?: Partial<Settings["transcription"]>;
     readonly editing?: Partial<Settings["editing"]>;

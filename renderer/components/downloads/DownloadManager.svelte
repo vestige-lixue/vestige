@@ -1,7 +1,7 @@
 <div class="introduction">
     <div class="description">
         <LocalizedText text={i18n.t(kind === "model" ? "downloads.models.description" : "downloads.backends.description")} slots={{ guide: guideAction }} />
-        {#snippet guideAction()}<button class="link-button focusable" onclick={() => dialogs.show({ kind: "guide", parentId: dialogId, onClosed: () => {} })}>{i18n.t("guide.title")}</button>{/snippet}
+        {#snippet guideAction()}<button class="link-button focusable" onclick={() => dialogsAPI.show({ kind: "guide", parentId: dialogId, onClosed: () => {} })}>{i18n.t("guide.title")}</button>{/snippet}
     </div>
     <TextButton class="openDirectory" disabled={opening} onclick={() => void openDirectory()}>
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -56,13 +56,13 @@
     import { onMount } from "svelte";
     import { Accordion } from "bits-ui";
     import * as i18n from "../../i18n.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
     import { describeFailure } from "../../failures";
     import { toFailureInfo } from "../../../shared/failure";
     import { type Download as DownloadInfo, type DownloadKind } from "../../../shared/downloads";
     import LocalizedText from "../util/LocalizedText.svelte";
     import Download from "./Download.svelte";
     import externalLink from "../../../resources/icons/cil--external-link.svg?raw";
+    import * as dialogsAPI from "../../states/dialogs";
 
     type Row = { download: DownloadInfo; busy: boolean; focusCancel?: () => boolean };
     let { kind, dialogId, beforeClose = $bindable() }: {

@@ -4,9 +4,10 @@ import { open, readFile, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { type Project } from "../../shared/project/Project";
 import { type AbsolutePath } from "../../shared/util/path";
-import { type GetProjectResult, type SaveProjectResult } from "../../shared/project/file";
+import { type GetProjectResult, type SaveProjectResult, type MediaPathMode } from "../../shared/project/file";
 import { ProjectValidationFailure, validateProject } from "./validate";
 import { filePath, InvalidPathFailure, isSystemError } from "../util/file";
+import { serializeMediaPath } from "./path";
 
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
 
@@ -22,7 +23,7 @@ export async function getProject(path: unknown): Promise<GetProjectResult> {
             if (!(error instanceof SyntaxError)) throw error;
             throw new ProjectValidationFailure({ kind: "project-invalid-json", diagnostic: error.message }, { cause: error });
         }
-        validateProject(project);
+        validateProject(project, filePath(dirname(normalized)));
         return { success: true, project };
     }
     catch (error) {
@@ -58,13 +59,20 @@ async function writeProject(path: AbsolutePath, text: string): Promise<SaveProje
     }
 }
 
-export async function saveProject(path: unknown, project: Project, compress = false, rememberPlaybackPosition = true): Promise<SaveProjectResult> {
+export async function saveProject(path: unknown, project: Project, compress = false, rememberPlaybackPosition = true, mediaPathMode: MediaPathMode = "project"): Promise<SaveProjectResult> {
     try {
         const normalized = filePath(path);
         validateProject(project);
+        const directory = filePath(dirname(normalized));
         // Capture before waiting, so a queued write cannot observe later mutations.
-        const snapshot = rememberPlaybackPosition ? project : {
-            ...project, vestiges: project.vestiges.map(vestige => ({ ...vestige, playbackPosition: 0 }))
+        // Only the disk snapshot uses relative paths; runtime media keeps absolute paths.
+        const snapshot = {
+            ...project,
+            vestiges: project.vestiges.map(vestige => ({
+                ...vestige,
+                media: { ...vestige.media, path: serializeMediaPath(vestige.media.path, directory, mediaPathMode) },
+                playbackPosition: rememberPlaybackPosition ? vestige.playbackPosition : 0
+            }))
         };
         const text = JSON.stringify(snapshot, null, compress ? undefined : 4);
         // Case folding only serializes potentially aliasing writes; keep the actual path unchanged.

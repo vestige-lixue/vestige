@@ -1,16 +1,17 @@
 import { VestigeErrors, toFailureInfo } from "../../shared/failure";
 import { open } from "node:fs/promises";
-import { type MediaCheckResult, type MediaReference } from "../../shared/media/check";
+import { validMediaHash, type MediaCheckResult, type MediaReference } from "../../shared/media/check";
 import { getFileName, type AbsolutePath } from "../../shared/util/path";
 import { filePath, isSystemError } from "../util/file";
 import { probeMedia } from "./probe";
+import { hashMedia } from "./hash";
 
 export async function readMedia(
     input: unknown, reference: MediaReference | null, runtimeDirectory: AbsolutePath, signal: AbortSignal
 ): Promise<MediaCheckResult> {
     try {
         const path = filePath(input);
-        if (reference !== null && (!reference || !Number.isSafeInteger(reference.size) || reference.size < 0 || !Number.isFinite(reference.mtimeMs))) {
+        if (reference !== null && (!reference || !Number.isSafeInteger(reference.size) || reference.size < 0 || !validMediaHash(reference.hash))) {
             return { status: "unreadable", error: { kind: "media-invalid-reference" } };
         }
         signal.throwIfAborted();
@@ -20,9 +21,9 @@ export async function readMedia(
             const before = await file.stat();
             if (!before.isFile()) return { status: "unreadable", error: { kind: "media-not-file" } };
             if (reference && before.size !== reference.size) return { status: "changed", error: { kind: "media-size-changed" } };
-            if (reference && before.mtimeMs !== reference.mtimeMs) {
-                return { status: "changed", error: { kind: "media-mtime-changed" } };
-            }
+            const hash = await hashMedia(file, before.size, signal);
+            if (hash === null) return { status: "changed", error: { kind: "media-changed-during-read" } };
+            if (reference && hash !== reference.hash) return { status: "changed", error: { kind: "media-hash-changed" } };
             signal.throwIfAborted();
             const probe = await probeMedia(path, runtimeDirectory, signal);
             if (probe.status !== "ready") return probe;
@@ -37,7 +38,7 @@ export async function readMedia(
                     return { status: "changed", error: { kind: "media-changed-during-read" } };
                 }
                 signal.throwIfAborted();
-                return { status: "ready", media: { path, name: getFileName(path), size: before.size, mtimeMs: before.mtimeMs, ...probe.metadata } };
+                return { status: "ready", media: { path, name: getFileName(path), size: before.size, hash, ...probe.metadata } };
             }
             finally {
                 await currentFile.close();

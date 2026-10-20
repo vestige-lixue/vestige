@@ -56,6 +56,10 @@ Switching the displayed result may discard proofreading edits based on the previ
 
 Choose a project name and location the first time you save. Projects with a save location are saved automatically about every 10 seconds. Use Save as to save another copy. The Compress project files setting removes JSON whitespace to reduce file size.
 
+Media path storage offers absolute paths, relative paths within the project folder (the default), or relative paths whenever possible. Relative paths start from the project file's folder. Paths that cannot be relative, such as paths across Windows drives, stay absolute. This applies to saving, automatic saving and Save As without moving or copying media. Include the media when sharing and preserve its location relative to the project.
+
+When opening a project or locating media again, Vestige checks the file size and an XXH3-64 hash of the complete file. A change to the modification time alone does not invalidate the media; changed file contents are reported as a reference issue.
+
 When closing a project, opening another one or quitting, follow the prompts for unsaved content. If saving fails, retry or choose another location. Reopen the .vestige file to continue later; its original media must still be accessible.
 
 ## Common shortcuts

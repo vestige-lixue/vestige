@@ -4,52 +4,9 @@ import { type AbsolutePath } from "../../shared/util/path";
 import * as mediaImport from "./mediaImport.svelte";
 import * as transcription from "./transcription.svelte";
 import { type Config } from "../../shared/transcription/Config";
+import * as project from "./project.svelte";
 
 export type SaveChoice = "save" | "discard" | "cancel" | "memory" | "retry";
-
-type ProjectLifecycleOperation = {
-    kind: "new" | "close" | "quit";
-};
-
-type ProjectOpenOperation = {
-    kind: "open";
-    path: AbsolutePath | null;
-};
-
-type ProjectReadOperation = {
-    kind: "read";
-    path: AbsolutePath;
-};
-
-type ProjectSaveOperation = {
-    kind: "save";
-    path: AbsolutePath | null;
-    saveAs: boolean;
-};
-
-type ProjectWaitSaveOperation = {
-    kind: "wait-save";
-    fileName: string | null;
-};
-
-export type ProjectOperation = (
-    ProjectLifecycleOperation |
-    ProjectOpenOperation |
-    ProjectReadOperation |
-    ProjectSaveOperation |
-    ProjectWaitSaveOperation
-);
-
-export type ProjectError = ({
-    kind: "pending-imports" | "active-transcriptions";
-} | {
-    kind: "operation-failed";
-    failure: FailureInfo;
-} | {
-    kind: "read-failed";
-    path: AbsolutePath;
-    failure: FailureInfo;
-});
 
 export type MediaRefImportIssue = {
     status: MediaIssueStatus;
@@ -104,12 +61,12 @@ type SaveFailureDialog = {
 
 type ProjectBusyDialog = {
     kind: "project-busy";
-    getOperation: () => ProjectOperation;
+    getOperation: () => project.ProjectOperation;
 };
 
 type ProjectErrorDialog = {
     kind: "project-error";
-    error: ProjectError;
+    error: project.ProjectError;
 };
 
 type MediaImportErrorDialog = {
@@ -150,30 +107,3 @@ export type ApplicationDialog = DialogDescriptor & {
 export const state = $state<{ dialogs: ApplicationDialog[] }>({
     dialogs: []
 });
-
-export function show(descriptor: DialogDescriptor): string {
-    const id = crypto.randomUUID();
-    state.dialogs.push(Object.assign(descriptor, { id, open: true }));
-    return id;
-}
-
-export function close(id: string): void {
-    const dialog = state.dialogs.find(dialog => dialog.id === id);
-    if (dialog) dialog.open = false;
-}
-
-export function remove(id: string): void {
-    // Cascade only after the parent accepted closing; a form may reject the request.
-    for (const child of state.dialogs.filter(dialog => dialog.parentId === id)) {
-        remove(child.id);
-        child.onClosed();
-    }
-    const index = state.dialogs.findIndex(dialog => dialog.id === id);
-    if (index >= 0) state.dialogs.splice(index, 1);
-}
-
-export function showTranscriptionPresets(parentId?: string, onApply?: (name: string, config: Config) => void, selectedName?: string): string {
-    const existing = state.dialogs.find(dialog => dialog.kind === "transcription-presets");
-    if (existing) return existing.id;
-    return show({ kind: "transcription-presets", parentId, onApply, selectedName, onClosed: () => {} });
-}

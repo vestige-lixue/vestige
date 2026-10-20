@@ -1,6 +1,7 @@
 import * as settings from "./states/settings.svelte";
 import { defaultSettings } from "../shared/settings/defaults";
 import { resolveTheme, resolveThemeScheme, themeColorKeys } from "../shared/theme";
+import * as settingsAPI from "./states/settings";
 
 export async function initialize(): Promise<() => void> {
     const micaSupported = await window.api.supportsMica().catch(error => {
@@ -23,7 +24,7 @@ export async function initialize(): Promise<() => void> {
         if (mica) root.style.setProperty("--sidebar-transparency", `${theme.sidebarTransparency}%`);
         else root.style.removeProperty("--sidebar-transparency");
     };
-    const unsubscribe = settings.subscribe(apply);
+    const unsubscribe = settingsAPI.subscribe(apply);
     systemTheme.addEventListener("change", apply);
     return () => {
         unsubscribe();

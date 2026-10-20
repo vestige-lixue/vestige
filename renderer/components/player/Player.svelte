@@ -27,7 +27,7 @@
                 }}
                 onended={event => {
                     if (event.currentTarget !== element || element.currentSrc !== source || !element.ended || element.seeking || seekedToEnd || settledSeek !== player.getSeekVersion()) return;
-                    player.setPlaying(false);
+                    playerAPI.setPlaying(false);
                 }}
                 onerror={event => {
                     if (event.currentTarget === element && element.currentSrc === source) handlePlaybackError();
@@ -55,8 +55,8 @@
         min={Math.min(minimumVideoHeight, maxVideoHeight)}
         max={maxVideoHeight}
         thickness={resizerThickness}
-        changeCB={value => void settings.update({ layout: { videoHeight: value } })}
-        resetCB={() => void settings.update({ layout: { videoHeight: null } })}
+        changeCB={value => void settingsAPI.update({ layout: { videoHeight: value } })}
+        resetCB={() => void settingsAPI.update({ layout: { videoHeight: null } })}
     />
 {/if}
 
@@ -115,7 +115,6 @@
     import Controls from "./Controls.svelte";
     import Resizer from "../util/Resizer.svelte";
     import Tooltip from "../util/Tooltip.svelte";
-    import * as mediaImport from "../../states/mediaImport.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as player from "../../states/player.svelte";
     import * as settings from "../../states/settings.svelte";
@@ -124,6 +123,10 @@
     import { type AudioLevels } from "../../audio/levels";
 
     import * as project from "../../states/project.svelte";
+    import * as playerAPI from "../../states/player";
+    import * as settingsAPI from "../../states/settings";
+    import * as projectAPI from "../../states/project";
+    import * as mediaImportAPI from "../../states/mediaImport";
 
     const { availableHeight }: { availableHeight: number } = $props();
     const mediaId = $derived(mediaSelection.get());
@@ -165,7 +168,7 @@
     const expectedPauses = new WeakMap<HTMLMediaElement, number>();
 
     onMount(() => watchDefaultOutput(() => {
-        if (settings.getPlayback().pauseOnOutputDeviceChange) player.pauseForInterruption();
+        if (settings.getPlayback().pauseOnOutputDeviceChange) playerAPI.pauseForInterruption();
     }));
 
     $effect(() => {
@@ -196,12 +199,12 @@
         if (expected > 0 || !target.paused || !player.isPlaying() || recoveringSeek) return;
         // Natural completion is handled by ended; seeking to EOF retains playback intent.
         if (target.ended || (target.duration > 0 && target.currentTime >= target.duration)) return;
-        player.pauseForInterruption();
+        playerAPI.pauseForInterruption();
     }
 
     function observeTime(remember = false): void {
         if (mediaId && media && element?.currentSrc === source && settledSeek === player.getSeekVersion() && !element.seeking && pendingSeek === null && activeSeek === null && player.getSeekMode() !== "preview") {
-            project.observePlaybackTime(mediaId, element.ended ? media.duration : element.currentTime, remember);
+            projectAPI.observePlaybackTime(mediaId, element.ended ? media.duration : element.currentTime, remember);
         }
     }
 
@@ -220,7 +223,7 @@
         const { mode } = pendingSeek;
         const time = Number.isFinite(element.duration) ? Math.min(pendingSeek.time, element.duration) : pendingSeek.time;
         if (time !== pendingSeek.time) {
-            project.seekPlayback(time, mode);
+            projectAPI.seekPlayback(time, mode);
             appliedSeek = player.getSeekVersion();
         }
         if (activeSeek !== null || element.seeking) {
@@ -262,7 +265,7 @@
             element.load();
             return;
         }
-        mediaImport.reportPlaybackFailure(mediaId, "unreadable", { kind: "media-playback-failed", code: element.error?.code ?? null, diagnostic: element.error?.message || null });
+        mediaImportAPI.reportPlaybackFailure(mediaId, "unreadable", { kind: "media-playback-failed", code: element.error?.code ?? null, diagnostic: element.error?.message || null });
     }
 
     $effect(() => {
@@ -271,7 +274,7 @@
         const id = mediaId;
         if (!target || !url) return;
         let pipeline: playbackAudio.PlaybackAudio | null = null;
-        const unregister = player.registerProgressReader(() => {
+        const unregister = playerAPI.registerProgressReader(() => {
             if (element !== target || player.getURL() !== url || mediaSelection.get() !== id) return;
             if (!player.isPlaying()) {
                 pauseElement(target);
@@ -282,13 +285,13 @@
         const reportFailure = (error: unknown): void => {
             if (element !== target || player.getURL() !== url) return;
             console.error("Volume stabilization is unavailable; ordinary playback has been restored.", error);
-            if (player.isVolumeStabilizationEnabled()) player.setVolumeStabilization(false);
+            if (player.isVolumeStabilizationEnabled()) playerAPI.setVolumeStabilization(false);
         };
         try {
             pipeline = untrack(() => playbackAudio.create(target, player.getVolume(), player.isVolumeStabilizationEnabled(), reportFailure, settings.getVolumeStabilization(), value => {
                 if (element === target && player.getURL() === url) levels = value;
             }, () => {
-                if (element === target && player.getURL() === url && audio === pipeline) player.pauseForInterruption();
+                if (element === target && player.getURL() === url && audio === pipeline) playerAPI.pauseForInterruption();
             }));
         }
         catch (error) {
@@ -335,7 +338,7 @@
             void (pipeline ? playbackAudio.resume(pipeline) : Promise.resolve()).then(async () => {
                 if (!cancelled && element === target && player.getURL() === url && version === player.getPlayVersion() && player.isPlaying()) await target.play();
             }).catch(() => {
-                if (!cancelled && player.getURL() === url && version === player.getPlayVersion()) player.setPlaying(false);
+                if (!cancelled && player.getURL() === url && version === player.getPlayVersion()) playerAPI.setPlaying(false);
             });
         }
         else {
@@ -381,7 +384,7 @@
     $effect(() => {
         const enabled = player.isVolumeStabilizationEnabled();
         if (audio) playbackAudio.setEnabled(audio, enabled);
-        else if (element && source && enabled) player.setVolumeStabilization(false);
+        else if (element && source && enabled) playerAPI.setVolumeStabilization(false);
     });
 
     $effect(() => {

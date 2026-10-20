@@ -384,6 +384,7 @@
     import meterAltIcon from "../../../resources/icons/carbon--meter-alt.svg?raw";
     import previousOutlineIcon from "../../../resources/icons/carbon--previous-outline.svg?raw";
     import nextOutlineIcon from "../../../resources/icons/carbon--next-outline.svg?raw";
+    import * as playerAPI from "../../states/player";
 
     const { levels }: { levels: AudioLevels | null } = $props();
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
@@ -502,7 +503,7 @@
     function finishProgress(): void {
         progressInput = null;
         cancelProgressNavigation();
-        player.commitSeekPreview();
+        playerAPI.commitSeekPreview();
     }
 
     function seek(progress: number): void {

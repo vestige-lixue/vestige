@@ -1,6 +1,10 @@
-<section class="media-list">
+<section class="media-list" class:sorting={reorder !== null} use:mediaReorder={{
+    ids: mediaImport.getIds(), disabled: interfaceBlocked(),
+    onpreview: preview => reorder = preview,
+    onmove: (mediaId, beforeId) => runCommand({ kind: "moveMedia", mediaId, beforeId })
+}}>
     {#each mediaImport.getIds() as mediaId (mediaId)}
-        <MediaItem {mediaId} />
+        <MediaItem {mediaId} dragging={reorder?.mediaId === mediaId} />
     {:else}
         {#if project.projectState.project}
             <div class="empty-state">
@@ -10,11 +14,16 @@
             </div>
         {/if}
     {/each}
+    {#if reorder?.insertion}
+        <div class="insertion-line" style:top={`${reorder.insertion.top}px`} style:left={`${reorder.insertion.left}px`}
+            style:width={`${reorder.insertion.width}px`}></div>
+    {/if}
 </section>
 
 
 <style>
     .media-list {
+        position: relative;
         align-self: stretch;
         min-height: 0;
         padding: 0 8px;
@@ -30,9 +39,23 @@
         container-name: media-list;
     }
     @container scroll-state(scrollable: y) {
-        .media-list > :global(*) {
+        .media-list > :global(.media) {
             margin-right: -4px;
         }
+    }
+    .media-list.sorting, .media-list.sorting :global(*) {
+        cursor: grabbing;
+    }
+    :global(body:has(.media-list.sorting) .tooltip-content) {
+        visibility: hidden;
+    }
+    .insertion-line {
+        position: absolute;
+        height: 2px;
+        border-radius: 1px;
+        background: var(--c-accent);
+        pointer-events: none;
+        z-index: 1;
     }
     .empty-state {
         margin: auto 0;
@@ -57,8 +80,10 @@
     import LocalizedText from "../util/LocalizedText.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as project from "../../states/project.svelte";
-    import { runCommand } from "../../states/commands";
+    import { interfaceBlocked, runCommand } from "../../states/commands";
     import MediaItem from "./MediaItem.svelte";
+    import { mediaReorder, type MediaReorderPreview } from "./mediaReorder";
 
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
+    let reorder = $state<MediaReorderPreview | null>(null);
 </script>

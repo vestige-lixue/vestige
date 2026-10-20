@@ -286,6 +286,20 @@
                     "en": "English"
                 }
             },
+            "mediaPathMode": {
+                "label": "Media path storage mode",
+                "description": "Relative paths start from the project file. Applies to all future saves.",
+                "options": {
+                    "absolute": "Absolute",
+                    "project": "Relative when in project folder",
+                    "relative": "Relative whenever possible"
+                },
+                "descriptions": {
+                    "absolute": "Save every media with its absolute path.",
+                    "project": "Use relative paths for media beside the project file or in its subfolders, and absolute paths for other media.",
+                    "relative": "Save every media with its relative path when possible. Use absolute paths otherwise."
+                }
+            },
             "compressProjectFiles": {
                 "label": "Compress project files",
                 "description": "Remove whitespaces in JSON to reduce file size, but decreases readability."
@@ -524,7 +538,7 @@
         "media": {
             "notFile": "This path is not a regular file.",
             "sizeChanged": "The file size does not match the project record.",
-            "mtimeChanged": "The file modification time does not match the project record.",
+            "hashChanged": "The file contents do not match the project record.",
             "changedDuringRead": "The file changed during verification. Please retry.",
             "missing": "The media file was not found at this path. It may have been moved or renamed.",
             "cancelled": "Media reading was cancelled.",
@@ -580,7 +594,7 @@
             "version": "Unsupported project version: {{version}}.",
             "invalidUuid": "{{path}} must be a UUID.",
             "duplicateMedia": "{{path}} must be unique in the project.",
-            "invalidPath": "{{path}}: An absolute file path is required.",
+            "invalidPath": "{{path}} must be an absolute path or a valid path relative to the project folder.",
             "reversedRange": "{{path}} is reversed."
         },
         "ipc": {

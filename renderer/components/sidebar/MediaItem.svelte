@@ -1,5 +1,6 @@
 {#if item}
-    <div class="media hoverable focusable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored} bind:this={mediaElement}
+    <div class="media hoverable focusable" class:selected={mediaSelection.get() === mediaId} class:ignored={issue?.ignored} class:dragging
+        data-media-id={mediaId} bind:this={mediaElement}
         tabindex={tabStop === 0 ? 0 : -1}
         onfocus={event => {
             if (event.target === event.currentTarget) focusedTarget = 0;
@@ -109,6 +110,9 @@
     .media.selected {
         --bg: var(--c-selection-bg);
     }
+    .media.dragging {
+        opacity: 0.5;
+    }
     .media.ignored {
         --bg: color-mix(in srgb, var(--c-danger) 20%, var(--c-background));
     }
@@ -205,7 +209,7 @@
     import Tooltip from "../util/Tooltip.svelte";
 
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
-    const { mediaId }: { mediaId: string } = $props();
+    const { mediaId, dragging = false }: { mediaId: string; dragging?: boolean } = $props();
     const item = $derived(mediaImport.get(mediaId));
     const issue = $derived(item && mediaImport.isIssue(item) ? item : null);
     const vestige = $derived(project.getVestige(mediaId));

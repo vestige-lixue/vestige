@@ -41,6 +41,7 @@
         margin-bottom: 24px;
     }
     .toc-title {
+        font-size: 24px;
         font-weight: 600;
     }
     .toc ul {

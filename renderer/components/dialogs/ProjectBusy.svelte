@@ -27,11 +27,11 @@
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
     import Spinner from "../util/Spinner.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
+    import * as project from "../../states/project.svelte";
 
     let { open = $bindable(), operation, onClosed }: {
         open: boolean;
-        operation: dialogs.ProjectOperation;
+        operation: project.ProjectOperation;
         onClosed: () => void;
     } = $props();
 

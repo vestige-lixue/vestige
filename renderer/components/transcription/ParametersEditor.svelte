@@ -120,9 +120,9 @@
 <script lang="ts">
     import { flushSync, untrack } from "svelte";
     import * as i18n from "../../i18n.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
     import Tooltip from "../util/Tooltip.svelte";
     import closeIcon from "../../../resources/icons/carbon--close.svg?raw";
+    import * as dialogsAPI from "../../states/dialogs";
 
     type Row = { key: string; value: string };
     type Props = {
@@ -145,7 +145,7 @@
     });
 
     function showGuide(kind: "parameter-guide" | "guide"): void {
-        dialogs.show({ kind, parentId: dialogId, onClosed: () => {} });
+        dialogsAPI.show({ kind, parentId: dialogId, onClosed: () => {} });
     }
 
     function readRows(params: Readonly<Record<string, string>>): Row[] {

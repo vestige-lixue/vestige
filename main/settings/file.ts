@@ -17,11 +17,6 @@ export function readSettings(path: string): { settings: Settings; savedText: str
         // Reading never writes, creates backups or reports recovery warnings.
         value = null;
     }
-    // Settings saved before video resizing retain all their existing preferences.
-    if (value !== null && typeof value === "object" && "layout" in value
-        && value.layout !== null && typeof value.layout === "object" && !("videoHeight" in value.layout)) {
-        value = { ...value, layout: { ...value.layout, videoHeight: defaultSettings.layout.videoHeight } };
-    }
     if (validSettings(value)) return { settings: value, savedText };
     return { settings: structuredClone(defaultSettings), savedText: null };
 }

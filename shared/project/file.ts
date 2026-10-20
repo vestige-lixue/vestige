@@ -1,6 +1,8 @@
 import { type FailureInfo } from "../failure";
 import { type Project } from "./Project";
 
+export type MediaPathMode = "absolute" | "project" | "relative";
+
 export type GetProjectResult = ({
     success: true;
     project: Project;

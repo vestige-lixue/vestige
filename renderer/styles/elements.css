@@ -89,6 +89,10 @@ h6 { font-size: 14px; }
     flex-shrink: 0;
 }
 
+.text-button:disabled {
+    opacity: 0.5;
+}
+
 .icon-button {
     display: grid;
     place-items: center;

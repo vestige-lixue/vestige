@@ -4,7 +4,10 @@ import { type Project } from "../../shared/project/Project";
 import { type TextPosition } from "../../shared/util/range";
 import { createTextIndex, normalizeModifications, type TextIndex } from "../../shared/transcript/text";
 import { projectVersion } from "../../shared/project/constants";
-import { InvalidPathFailure, storedFilePath } from "../util/file";
+import { InvalidPathFailure } from "../util/file";
+import { type AbsolutePath } from "../../shared/util/path";
+import { validMediaHash } from "../../shared/media/check";
+import { resolveMediaPath } from "./path";
 
 export class ProjectValidationFailure extends VestigeErrors {}
 
@@ -30,7 +33,7 @@ function position(item: TextPosition, path: string, index: TextIndex): void {
     number(item.offset, `${path}.offset`, maximum, true);
 }
 
-export function validateProject(value: unknown): asserts value is Project {
+export function validateProject(value: unknown, directory?: AbsolutePath): asserts value is Project {
     // Typia generates the structural checks directly from the shared TS type.
     const project = typia.assertEquals<SerializedProject>(value, props => new ProjectValidationFailure({
         kind: "project-invalid-structure", path: props.path ?? "project", expected: props.expected
@@ -47,15 +50,15 @@ export function validateProject(value: unknown): asserts value is Project {
         if (mediaIds.has(media.id.toLowerCase())) throw new ProjectValidationFailure({ kind: "project-duplicate-media", path: `${path}.media.id` });
         mediaIds.add(media.id.toLowerCase());
         try {
-            media.path = storedFilePath(media.path);
+            media.path = resolveMediaPath(media.path, directory);
         }
         catch (error) {
             if (!(error instanceof InvalidPathFailure)) throw error;
             throw new ProjectValidationFailure({ kind: "project-invalid-path", path: `${path}.media.path` }, { cause: error });
         }
         number(media.size, `${path}.media.size`, Number.MAX_SAFE_INTEGER, true);
-        if (!Number.isFinite(media.mtimeMs)) {
-            throw new ProjectValidationFailure({ kind: "project-invalid-structure", path: `${path}.media.mtimeMs`, expected: "finite timestamp" });
+        if (!validMediaHash(media.hash)) {
+            throw new ProjectValidationFailure({ kind: "project-invalid-structure", path: `${path}.media.hash`, expected: "16 lowercase hexadecimal digits (XXH3-64)" });
         }
         const duration = number(media.duration, `${path}.media.duration`);
         number(vestige.playbackPosition, `${path}.playbackPosition`, duration);

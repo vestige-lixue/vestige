@@ -12,6 +12,9 @@
             <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html taskBlankIcon}
+                {#if taskCount > 0}
+                    <span class="taskCount">{taskCount}</span>
+                {/if}
             </button>
         {/snippet}
     </Tooltip>
@@ -37,16 +40,38 @@
         margin: 10px 0 8px;
     }
     nav button {
+        position: relative;
         height: 24px;
         width: 24px;
         padding: 12px;
         border-radius: 24px;
+    }
+    .taskCount {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        display: grid;
+        place-items: center;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        border-radius: 9px;
+        background: var(--c-accent);
+        color: var(--c-background);
+        box-shadow: 0 0 0 2px var(--bg);
+        font-size: 11px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        white-space: nowrap;
+        pointer-events: none;
     }
 </style>
 
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
+    import * as transcription from "../../states/transcription.svelte";
     import Tooltip from "../util/Tooltip.svelte";
     import { runCommand } from "../../states/commands";
     import bookIcon from "../../../resources/icons/carbon--book.svg?raw";
@@ -54,4 +79,5 @@
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
 
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
+    const taskCount = $derived(transcription.tasks.filter(transcription.isPending).length);
 </script>

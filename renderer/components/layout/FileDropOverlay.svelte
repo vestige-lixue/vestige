@@ -83,9 +83,10 @@
     import { Portal } from "bits-ui";
     import downloadIcon from "../../../resources/icons/carbon--download.svg?raw";
     import { interfaceBlocked } from "../../states/commands";
-    import * as project from "../../states/project.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as modal from "../../states/modal.svelte";
+    import * as mediaImportAPI from "../../states/mediaImport";
+    import * as projectAPI from "../../states/project";
 
     const disabled = $derived(interfaceBlocked());
     let dropArea: HTMLDivElement;
@@ -102,7 +103,7 @@
     onDestroy(() => {
         if (!collection) return;
         collection.abort();
-        mediaImport.endCollection(collection);
+        mediaImportAPI.endCollection(collection);
     });
 
     async function collectEntry(entry: FileSystemEntry, files: File[], failures: mediaImport.MediaImportFailure[], signal: AbortSignal): Promise<void> {
@@ -138,10 +139,10 @@
         const first = items[0];
         // Classify the original drop before flattening directories or discarding failures.
         if (items.length === 1 && !first.entry?.isDirectory && first.file && /\.vestige$/i.test(first.file.name)) {
-            void project.openFile(first.file);
+            void projectAPI.openFile(first.file);
             return;
         }
-        const current = mediaImport.beginCollection();
+        const current = mediaImportAPI.beginCollection();
         if (!current) return;
         collection = current;
         try {
@@ -154,11 +155,11 @@
                 else failures.push({ name: null, path: null, error: { kind: "drop-unreadable", entry: "file", diagnostic: null } });
             }
             if (current.signal.aborted) return;
-            project.importMedia(files);
-            for (const failure of failures) mediaImport.reportImportFailure(failure);
+            projectAPI.importMedia(files);
+            for (const failure of failures) mediaImportAPI.reportImportFailure(failure);
         }
         finally {
-            mediaImport.endCollection(current);
+            mediaImportAPI.endCollection(current);
             if (collection === current) collection = null;
         }
     }

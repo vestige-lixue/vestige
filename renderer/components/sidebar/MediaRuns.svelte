@@ -1,11 +1,12 @@
-<Popover.Root bind:open onOpenChange={value => {
-    if (value) runCommand({ kind: "selectMedia", mediaId });
-}}>
-    <Tooltip text={i18n.t("transcript.runs.title")} {disabled} {tabindex} {onfocus}>
+<Popover.Root bind:open>
+    <Tooltip text={i18n.t("transcript.runs.title")} {disabled} {tabindex} {onfocus} onclick={event => event.stopPropagation()}>
         {#snippet child({ props })}
             <Popover.Trigger {...props} bind:ref={trigger} class="runsTrigger icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html filesIcon}
+                {#if runCount > 0}
+                    <span class="runCount">{runCount}</span>
+                {/if}
             </Popover.Trigger>
         {/snippet}
     </Tooltip>
@@ -62,12 +63,33 @@
 
 <style>
     :global(.runsTrigger) {
+        position: relative;
         width: 18px;
         height: 18px;
         flex-shrink: 0;
     }
     :global(.runsTrigger:disabled) {
         opacity: 0.4;
+    }
+    .runCount {
+        position: absolute;
+        right: 1px;
+        bottom: 0;
+        display: grid;
+        place-items: center;
+        min-width: 13px;
+        height: 13px;
+        padding: 0 2px;
+        border-radius: 4px;
+        background: var(--c-border);
+        color: var(--c-text);
+        box-shadow: 0 0 0 1px var(--bg);
+        font-size: 11px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        white-space: nowrap;
+        pointer-events: none;
     }
     :global(.runsOverlay) {
         position: fixed;
@@ -136,6 +158,7 @@
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
     import filesIcon from "../../../resources/icons/lucide--files.svg?raw";
     import checkmarkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+    import * as projectAPI from "../../states/project";
 
     type Props = {
         mediaId: string;
@@ -147,6 +170,7 @@
 
     let { mediaId, anchor, disabled, tabindex, onfocus }: Props = $props();
     const vestige = $derived(project.getVestige(mediaId));
+    const runCount = $derived(vestige?.runs.length ?? 0);
     const hasDialog = $derived(dialogs.state.dialogs.length > 0);
     const menuOpen = $derived(menu.get() !== "");
     let open = $state(false);
@@ -191,7 +215,8 @@
 
     function selectRun(runId: string): void {
         if (disabled || hasDialog || !vestige) return;
-        project.displayRun(mediaId, vestige.runs.findIndex(run => run.id === runId));
+        runCommand({ kind: "selectMedia", mediaId });
+        projectAPI.displayRun(mediaId, vestige.runs.findIndex(run => run.id === runId));
     }
 
     function focusRun(index: number, showTooltip = true): void {
@@ -204,7 +229,7 @@
     async function removeRun(runId: string): Promise<void> {
         if (disabled || hasDialog || !vestige) return;
         const index = vestige.runs.findIndex(run => run.id === runId);
-        project.removeRun(mediaId, runId);
+        projectAPI.removeRun(mediaId, runId);
         await tick();
         if (open) focusRun(index);
     }

@@ -76,7 +76,7 @@
 </div>
 {#if failure}
     <div class="error-message">{i18n.t("transcription.presets.saveError", { error: describeFailure(failure) })}</div>
-    <TextButton class="presetsRetry" onclick={() => void settings.save()}>{i18n.t("common.retry")}</TextButton>
+    <TextButton class="presetsRetry" onclick={() => void settingsAPI.save()}>{i18n.t("common.retry")}</TextButton>
 {/if}
 
 
@@ -201,6 +201,7 @@
     import newIcon from "../../../resources/icons/carbon--add-large.svg?raw";
     import copyIcon from "../../../resources/icons/carbon--copy.svg?raw";
     import checkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+    import * as settingsAPI from "../../states/settings";
 
     type Draft = { name: string; config: Config; deletable: boolean };
     type Props = {
@@ -228,7 +229,7 @@
     $effect(() => nameInput?.setCustomValidity(nameError()));
     onMount(() => {
         beforeClose = commit;
-        const unsubscribe = settings.beforeSave(commit);
+        const unsubscribe = settingsAPI.beforeSave(commit);
         return () => {
             beforeClose = undefined;
             unsubscribe();
@@ -236,7 +237,7 @@
     });
 
     async function load(): Promise<Presets> {
-        if (await settings.initialize()) return settings.get()!.transcription.presets;
+        if (await settingsAPI.initialize()) return settings.get()!.transcription.presets;
         throw new VestigeErrors(settings.getError() ?? { kind: "unexpected", diagnostic: "Settings initialization was interrupted." });
     }
 
@@ -270,7 +271,7 @@
         const text = JSON.stringify(presets);
         if (text !== lastSubmitted) {
             lastSubmitted = text;
-            updates = settings.update({ transcription: { presets } }, { save: true }).then(success => {
+            updates = settingsAPI.update({ transcription: { presets } }, { save: true }).then(success => {
                 if (!success && lastSubmitted === text) lastSubmitted = "";
                 return success;
             });

@@ -23,11 +23,11 @@
     import { describeFailure } from "../../failures";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
+    import * as project from "../../states/project.svelte";
 
     let { open = $bindable(), error, onClosed }: {
         open: boolean;
-        error: dialogs.ProjectError;
+        error: project.ProjectError;
         onClosed: () => void;
     } = $props();
     const message = $derived.by(() => {

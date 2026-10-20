@@ -32,6 +32,7 @@
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
     import * as settings from "../../states/settings.svelte";
+    import * as projectAPI from "../../states/project";
 
     let { vestige, run }: { vestige: Vestige; run: Run } = $props();
     let element: HTMLDivElement;
@@ -41,7 +42,7 @@
         const current = vestige;
         const displayed = run;
         const instance = untrack(() => createTranscriptEditor(element, displayed, $state.snapshot(current.modifications), modifications => {
-            if (project.getVestige(current.media.id) === current) project.updateModifications(current.media.id, displayed.id, modifications);
+            if (project.getVestige(current.media.id) === current) projectAPI.updateModifications(current.media.id, displayed.id, modifications);
         }, () => !project.projectState.locked));
         editor = instance;
         return () => instance.destroy();

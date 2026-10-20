@@ -43,9 +43,11 @@
     import ApplicationDialogs from "./ApplicationDialogs.svelte";
     import Transcript from "../transcript/Transcript.svelte";
     import * as project from "../../states/project.svelte";
-    import * as settings from "../../states/settings.svelte";
-    import * as transcription from "../../states/transcription.svelte";
     import * as dialogs from "../../states/dialogs.svelte";
+    import * as settingsAPI from "../../states/settings";
+    import * as transcriptionAPI from "../../states/transcription";
+    import * as projectAPI from "../../states/project";
+    import * as dialogsAPI from "../../states/dialogs";
 
     let availableHeight = $state(0);
 
@@ -55,19 +57,19 @@
     });
 
     onMount(() => {
-        void settings.initialize();
-        const stopTranscription = transcription.startLifecycle();
-        const stopProject = project.startLifecycle(async () => {
-            if (await settings.save()) return true;
+        void settingsAPI.initialize();
+        const stopTranscription = transcriptionAPI.startLifecycle();
+        const stopProject = projectAPI.startLifecycle(async () => {
+            if (await settingsAPI.save()) return true;
             if (!dialogs.state.dialogs.some(dialog => dialog.kind === "settings" && dialog.open)) {
-                dialogs.show({ kind: "settings", onClosed: () => {} });
+                dialogsAPI.show({ kind: "settings", onClosed: () => {} });
             }
             return false;
         });
         return () => {
             stopTranscription();
             stopProject();
-            settings.dispose();
+            settingsAPI.dispose();
         };
     });
 </script>

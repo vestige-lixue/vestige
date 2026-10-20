@@ -4,10 +4,14 @@ import * as project from "./project.svelte";
 import * as mediaImport from "./mediaImport.svelte";
 import * as dialogs from "./dialogs.svelte";
 import * as transcription from "./transcription.svelte";
-import * as transcript from "./transcript.svelte";
 import * as player from "./player.svelte";
 import * as mediaSelection from "./mediaSelection.svelte";
 import * as settings from "./settings.svelte";
+import * as dialogsAPI from "./dialogs";
+import * as transcriptionAPI from "./transcription";
+import * as transcriptAPI from "./transcript";
+import * as projectAPI from "./project";
+import * as playerAPI from "./player";
 
 type ParameterlessCommand = {
     kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization";
@@ -61,6 +65,12 @@ type RenameMediaCommand = {
     name: string;
 };
 
+type MoveMediaCommand = {
+    kind: "moveMedia";
+    mediaId: string;
+    beforeId: string | null;
+};
+
 type AdjacentCommand = ({
     kind: "selectAdjacentMedia";
     direction: -1 | 1;
@@ -97,6 +107,7 @@ export type Command = (
     MediaCommand |
     RelocateMediaCommand |
     RenameMediaCommand |
+    MoveMediaCommand |
     AdjacentCommand |
     SeekSelectedMediaCommand |
     SetPlaybackSpeedCommand |
@@ -111,13 +122,13 @@ export function interfaceBlocked(): boolean {
 
 function openTranscriptionConfig(mediaId: string, taskId?: string): void {
     if (!mediaImport.isReady(mediaId) || transcription.isPending(transcription.getTask(mediaId))) return;
-    dialogs.show({ kind: "transcription", mediaId, taskId, onClosed: () => { } });
+    dialogsAPI.show({ kind: "transcription", mediaId, taskId, onClosed: () => { } });
 }
 
 function openTranscriptionTasks(focusTaskId?: string): void {
-    dialogs.show({
+    dialogsAPI.show({
         kind: "tasks", getTasks: transcription.getTasks, focusTaskId,
-        onStop: transcription.stopTask, onRemove: transcription.remove,
+        onStop: transcriptionAPI.stopTask, onRemove: transcriptionAPI.remove,
         onRetry: taskId => {
             const task = transcription.getTaskById(taskId);
             if (task) openTranscriptionConfig(task.mediaId, task.id);
@@ -128,12 +139,12 @@ function openTranscriptionTasks(focusTaskId?: string): void {
 
 function openPanel(panel: "transcription-backends" | "transcription-models" | "transcription-presets" | "vocabulary" | "tasks" | "settings" | "licenses" | "about" | "guide"): void {
     if (panel === "tasks") openTranscriptionTasks();
-    else if (panel === "transcription-presets") dialogs.showTranscriptionPresets();
-    else dialogs.show({ kind: panel, onClosed: () => { } });
+    else if (panel === "transcription-presets") dialogsAPI.showTranscriptionPresets();
+    else dialogsAPI.show({ kind: panel, onClosed: () => { } });
 }
 
 export function wordPosition(direction: -1 | 1, fromWordIndex?: number): number | null {
-    return transcript.getWordPosition(player.getCurrentTime(), direction, fromWordIndex);
+    return transcriptAPI.getWordPosition(player.getCurrentTime(), direction, fromWordIndex);
 }
 
 export function commandDisabled(command: Command): boolean {
@@ -161,45 +172,46 @@ export function commandDisabled(command: Command): boolean {
 export function runCommand(command: Command): void {
     if (interfaceBlocked() || commandDisabled(command)) return;
     switch (command.kind) {
-        case "newProject": void project.create(); break;
-        case "openProject": void project.open(); break;
-        case "saveProject": void project.save(); break;
-        case "saveProjectAs": void project.save(true); break;
-        case "closeProject": void project.close(); break;
-        case "quitApp": void project.close().then(closed => {
+        case "newProject": void projectAPI.create(); break;
+        case "openProject": void projectAPI.open(); break;
+        case "saveProject": void projectAPI.save(); break;
+        case "saveProjectAs": void projectAPI.save(true); break;
+        case "closeProject": void projectAPI.close(); break;
+        case "quitApp": void projectAPI.close().then(closed => {
             if (closed) window.api.quit();
         }); break;
-        case "importMedia": void project.selectMediaForImport(); break;
+        case "importMedia": void projectAPI.selectMediaForImport(); break;
         case "openPanel": openPanel(command.panel); break;
         case "openTranscriptionConfig": openTranscriptionConfig(command.mediaId!); break;
-        case "stopTranscription": transcription.stop(command.mediaId!); break;
+        case "stopTranscription": transcriptionAPI.stop(command.mediaId!); break;
         case "reviewTranscriptionError": openTranscriptionTasks(transcription.getTask(command.mediaId!)?.id); break;
         case "openTranscriptionTask": openTranscriptionTasks(transcription.getTask(command.mediaId!)?.id); break;
-        case "selectMedia": project.selectMedia(command.mediaId); break;
-        case "renameMedia": project.renameMedia(command.mediaId, command.name); break;
-        case "removeMedia": project.removeMedia(command.mediaId); break;
-        case "retryMediaImportError": project.retryMedia(command.mediaId); break;
-        case "relocateMedia": project.relinkMedia(command.mediaId); break;
-        case "ignoreMediaImportError": project.ignoreMedia(command.mediaId); break;
-        case "reviewMediaImportError": project.reviewMedia(command.mediaId); break;
-        case "playSelectedMedia": player.togglePlaying(); break;
+        case "selectMedia": projectAPI.selectMedia(command.mediaId); break;
+        case "renameMedia": projectAPI.renameMedia(command.mediaId, command.name); break;
+        case "moveMedia": projectAPI.moveMedia(command.mediaId, command.beforeId); break;
+        case "removeMedia": projectAPI.removeMedia(command.mediaId); break;
+        case "retryMediaImportError": projectAPI.retryMedia(command.mediaId); break;
+        case "relocateMedia": projectAPI.relinkMedia(command.mediaId); break;
+        case "ignoreMediaImportError": projectAPI.ignoreMedia(command.mediaId); break;
+        case "reviewMediaImportError": projectAPI.reviewMedia(command.mediaId); break;
+        case "playSelectedMedia": playerAPI.togglePlaying(); break;
         case "focus":
             // Closing menus must release focus before the target receives it.
             void tick().then(() => focus(command.target));
             break;
-        case "setPlaybackSpeed": player.setSpeed(command.speed); break;
-        case "savePlaybackSpeed": player.saveSpeed(); break;
-        case "restorePlaybackSpeed": player.restoreSpeed(); break;
-        case "setPlaybackVolume": player.setVolume(command.volume); break;
-        case "toggleVolumeStabilization": player.toggleVolumeStabilization(); break;
-        case "seekSelectedMedia": project.seekPlayback(command.time, command.mode); break;
-        case "selectAdjacentMedia": project.selectMedia(mediaSelection.adjacent(command.direction, true)); break;
+        case "setPlaybackSpeed": playerAPI.setSpeed(command.speed); break;
+        case "savePlaybackSpeed": playerAPI.saveSpeed(); break;
+        case "restorePlaybackSpeed": playerAPI.restoreSpeed(); break;
+        case "setPlaybackVolume": playerAPI.setVolume(command.volume); break;
+        case "toggleVolumeStabilization": playerAPI.toggleVolumeStabilization(); break;
+        case "seekSelectedMedia": projectAPI.seekPlayback(command.time, command.mode); break;
+        case "selectAdjacentMedia": projectAPI.selectMedia(mediaSelection.adjacent(command.direction, true)); break;
         case "seekAdjacentWord": {
             const time = wordPosition(command.direction, command.fromWordIndex);
             if (time !== null) {
                 const playing = player.isPlaying();
-                project.seekPlayback(time);
-                player.setPlaying({ pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback]);
+                projectAPI.seekPlayback(time);
+                playerAPI.setPlaying({ pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback]);
             }
             break;
         }

@@ -286,6 +286,20 @@
                     "en": "English"
                 }
             },
+            "mediaPathMode": {
+                "label": "媒体路径保存方式",
+                "description": "相对路径以项目文件为起点。此设置应用于以后的全部保存。",
+                "options": {
+                    "absolute": "绝对路径",
+                    "project": "项目文件夹内使用相对路径",
+                    "relative": "尽可能使用相对路径"
+                },
+                "descriptions": {
+                    "absolute": "所有媒体使用绝对路径。",
+                    "project": "项目所在文件夹及其子文件夹中的媒体使用相对路径，其他媒体使用绝对路径。",
+                    "relative": "所有媒体使用相对路径，无法表示相对路径时保留绝对路径。"
+                }
+            },
             "compressProjectFiles": {
                 "label": "压缩项目文件",
                 "description": "去除 JSON 空白符，可减少文件体积，但会降低可读性。"
@@ -524,7 +538,7 @@
         "media": {
             "notFile": "该路径不是普通文件。",
             "sizeChanged": "文件大小与项目记录不一致。",
-            "mtimeChanged": "文件修改时间与项目记录不一致。",
+            "hashChanged": "文件内容与项目记录不一致。",
             "changedDuringRead": "检查期间文件发生了变化，请重试。",
             "missing": "找不到此路径下的媒体文件，文件可能已移动或重命名。",
             "cancelled": "媒体读取已取消。",
@@ -580,7 +594,7 @@
             "version": "不支持的项目版本：{{version}}。",
             "invalidUuid": "{{path}} 必须是 UUID。",
             "duplicateMedia": "{{path}} 在项目中必须唯一。",
-            "invalidPath": "{{path}}：需要绝对文件路径。",
+            "invalidPath": "{{path}} 必须是绝对路径或相对于项目文件夹的有效路径。",
             "reversedRange": "{{path}} 的范围起止顺序相反。"
         },
         "ipc": {

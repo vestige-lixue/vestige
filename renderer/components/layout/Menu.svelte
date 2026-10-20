@@ -438,6 +438,7 @@
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as transcript from "../../states/transcript.svelte";
     import * as menu from "../../states/menu.svelte";
+    import * as transcriptAPI from "../../states/transcript";
 
     const transcriptionActionKeys = {
         start: "transcription.actions.new",
@@ -608,7 +609,7 @@
         // Only this held key's own seeks may continue from the saved word index.
         if (!repeat || !wordNavigation || wordNavigation.direction !== direction || wordNavigation.mediaId !== mediaId
             || wordNavigation.starts !== starts || wordNavigation.seekVersion !== seekVersion) {
-            wordNavigation = { direction, mediaId, starts, index: transcript.getWordIndex(player.getCurrentTime()), seekVersion };
+            wordNavigation = { direction, mediaId, starts, index: transcriptAPI.getWordIndex(player.getCurrentTime()), seekVersion };
         }
         const navigation = wordNavigation;
         runFileAction({ kind: "seekAdjacentWord", direction, fromWordIndex: navigation.index });

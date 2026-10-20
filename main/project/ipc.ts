@@ -17,8 +17,8 @@ export function registerProjectIPCs(window: BrowserWindow): void {
     });
     contents.ipc.handle(projectChannels.save, (event, path: unknown, project: Project) => {
         checkSender(event);
-        const { compressProjectFiles, playback } = settings.get().settings;
-        return saveProject(path, project, compressProjectFiles, playback.rememberPlaybackPosition);
+        const { compressProjectFiles, mediaPathMode, playback } = settings.get().settings;
+        return saveProject(path, project, compressProjectFiles, playback.rememberPlaybackPosition, mediaPathMode);
     });
     contents.ipc.handle(projectChannels.openDialog, event => {
         checkSender(event);
