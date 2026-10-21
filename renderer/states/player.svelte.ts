@@ -1,5 +1,6 @@
 import * as settings from "./settings.svelte";
 import { minPlaybackSpeed, maxPlaybackSpeed } from "../../shared/constants";
+import { type PlaybackMode } from "../../shared/settings/Settings";
 
 export const minSpeed = minPlaybackSpeed;
 export const maxSpeed = maxPlaybackSpeed;
@@ -31,6 +32,10 @@ export function getSeekVersion(): number {
 
 export function getSeekMode(): SeekMode {
     return state.seekMode;
+}
+
+export function getMode(): PlaybackMode {
+    return settings.getPlayback().mode;
 }
 
 export function getSpeed(): number {

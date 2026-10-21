@@ -6,6 +6,7 @@
 >
     {#snippet title()}
         {download.name}<span class="size">{i18n.t("downloads.estimatedSize", { size: Math.round(download.estimatedBytes / 1024 ** 2) })}</span>
+        {#if descriptionKey}<span class="model-description">{i18n.t(descriptionKey)}</span>{/if}
     {/snippet}
     {#snippet actions()}
         <TextButton bind:ref={actionButton} class={{ attention }}
@@ -24,6 +25,14 @@
 
 
 <style>
+    .model-description {
+        display: block;
+        margin-top: 4px;
+        color: var(--c-text-80p);
+        font-size: 14px;
+        font-weight: normal;
+        line-height: 1.5;
+    }
     .size {
         color: var(--c-text-80p);
         font-weight: normal;
@@ -39,12 +48,26 @@
 <script lang="ts">
     import TextButton from "../util/TextButton.svelte";
     import { untrack } from "svelte";
+    import { type ParseKeys } from "i18next";
     import * as i18n from "../../i18n.svelte";
     import { describeFailure } from "../../failures";
     import { toFailureInfo } from "../../../shared/failure";
     import { type Download as DownloadInfo } from "../../../shared/downloads";
     import * as taskOutput from "../../states/taskOutput.svelte";
     import TaskItem from "../util/TaskItem.svelte";
+
+    const modelDescriptions: Partial<Record<string, ParseKeys>> = {
+        "whisper-tiny": "downloads.models.details.whisperTiny",
+        "whisper-base": "downloads.models.details.whisperBase",
+        "whisper-small": "downloads.models.details.whisperSmall",
+        "whisper-large-v3": "downloads.models.details.whisperLargeV3",
+        "whisper-large-v3-turbo": "downloads.models.details.whisperLargeV3Turbo",
+        "sherpa-paraformer-zh": "downloads.models.details.paraformerZh",
+        "sherpa-sense-voice-small-int8": "downloads.models.details.senseVoiceSmall",
+        "sherpa-fire-red-asr2-ctc-int8": "downloads.models.details.fireRedAsr2Ctc",
+        "sherpa-qwen3-asr-0.6b-int8": "downloads.models.details.qwen3Asr06b",
+        "sherpa-qwen3-asr-1.7b-int8": "downloads.models.details.qwen3Asr17b"
+    };
 
     type Props = {
         download: DownloadInfo;
@@ -53,6 +76,7 @@
         focusCancel?: () => boolean;
     };
     let { download, expanded = $bindable(), busy = $bindable(false), focusCancel = $bindable() }: Props = $props();
+    const descriptionKey = $derived(download.kind === "model" ? modelDescriptions[download.id] : undefined);
     let taskId = $state(untrack(() => download.taskId));
     const output = taskOutput.observe(() => taskId);
     const snapshot = $derived(output.snapshot);

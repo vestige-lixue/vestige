@@ -177,6 +177,7 @@
     import paraformerNotice from "../../../resources/licenses/alibaba-paraformer-zh-NOTICE.txt?raw";
     import ggmlLicense from "../../../resources/licenses/ggml.txt?raw";
     import carbonLicense from "../../../resources/licenses/carbon-icons.txt?raw";
+    import remixLicense from "../../../resources/licenses/remix-icons.txt?raw";
     import coreUILicense from "../../../resources/licenses/coreui-icons.txt?raw";
     import ccByLicense from "../../../resources/licenses/CC-BY-4.0.txt?raw";
     import lucideLicense from "../../../resources/licenses/lucide.txt?raw";
@@ -202,6 +203,7 @@
         { name: "Alibaba Paraformer zh", license: "Apache-2.0", url: "https://www.modelscope.cn/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8358-tensorflow1", text: `${paraformerNotice}\n\n${paraformerLicense}` },
         { name: "GGML", license: "MIT", url: "https://github.com/ggml-org/ggml", text: ggmlLicense },
         { name: "Carbon Icons", license: "Apache-2.0", url: "https://github.com/carbon-design-system/carbon", text: carbonLicense },
+        { name: "Remix Icon", license: "Apache-2.0", url: "https://github.com/Remix-Design/RemixIcon/tree/v4.3.0", text: remixLicense },
         { name: "CoreUI Icons Free", license: "CC-BY-4.0", url: "https://github.com/coreui/coreui-icons", text: `${coreUILicense}\n\n${ccByLicense}` },
         { name: "Lucide Icons", license: "ISC", url: "https://lucide.dev/", text: lucideLicense }
     ];

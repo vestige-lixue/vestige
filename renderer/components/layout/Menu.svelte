@@ -17,7 +17,8 @@
                     {@html menuIcon}
                 </Menubar.Trigger>
                 <Menubar.Portal>
-                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents.all} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}>
+                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents.all} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}
+                        style={`z-index: ${layerIndex + 1};`} onInteractOutside={event => event.preventDefault()}>
                         {@render menuGroups()}
                     </Menubar.Content>
                 </Menubar.Portal>
@@ -34,6 +35,15 @@
     </div>
 </header>
 
+{#if menu.get()}
+    <Portal to="body">
+        <div class="menu-overlay" style:z-index={layerIndex} onclick={event => {
+            event.stopPropagation();
+            menu.set("");
+        }}></div>
+    </Portal>
+{/if}
+
 {#snippet menuGroups()}
     {#each menus as menu (menu.value)}
         {#if compact}
@@ -46,7 +56,7 @@
                     {@html chevronRight}
                 </Menubar.SubTrigger>
                 <Menubar.Portal>
-                    <Menubar.SubContent data-keyboard={keyboard.current} align="start" sideOffset={8}>
+                    <Menubar.SubContent data-keyboard={keyboard.current} align="start" sideOffset={8} style={`z-index: ${layerIndex + 1};`}>
                         {@render menu.items()}
                     </Menubar.SubContent>
                 </Menubar.Portal>
@@ -55,7 +65,8 @@
             <Menubar.Menu value={menu.value}>
                 <Menubar.Trigger class="menu-trigger hoverable activable focusable">{i18n.t(menu.label)}</Menubar.Trigger>
                 <Menubar.Portal>
-                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents[menu.value]} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}>
+                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents[menu.value]} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}
+                        style={`z-index: ${layerIndex + 1};`} onInteractOutside={event => event.preventDefault()}>
                         {@render menu.items()}
                     </Menubar.Content>
                 </Menubar.Portal>
@@ -127,18 +138,16 @@
     </Menubar.Item>
     <Menubar.Separator />
     <Menubar.Item class="activable focusable"
-        disabled={commandDisabled({ kind: "selectAdjacentMedia", direction: -1 })}
-        onSelect={() => runMenuCommand({ kind: "selectAdjacentMedia", direction: -1 })}
+        disabled={commandDisabled({ kind: "moveSelectedMedia", direction: -1 })}
+        onSelect={() => runMenuCommand({ kind: "moveSelectedMedia", direction: -1 })}
     >
-        <div>{i18n.t("player.actions.previousMedia")}</div>
-        <kbd>{modKeyText}+⇧+←</kbd>
+        <div>{i18n.t("media.actions.moveEarlier")}</div>
     </Menubar.Item>
     <Menubar.Item class="activable focusable"
-        disabled={commandDisabled({ kind: "selectAdjacentMedia", direction: 1 })}
-        onSelect={() => runMenuCommand({ kind: "selectAdjacentMedia", direction: 1 })}
+        disabled={commandDisabled({ kind: "moveSelectedMedia", direction: 1 })}
+        onSelect={() => runMenuCommand({ kind: "moveSelectedMedia", direction: 1 })}
     >
-        <div>{i18n.t("player.actions.nextMedia")}</div>
-        <kbd>{modKeyText}+⇧+→</kbd>
+        <div>{i18n.t("media.actions.moveLater")}</div>
     </Menubar.Item>
 {/snippet}
 
@@ -217,20 +226,27 @@
         <div>{player.isPlaying() ? i18n.t("player.actions.pause") : i18n.t("player.actions.play")}</div>
         <kbd>Space</kbd>
     </Menubar.Item>
+    <Menubar.Item class="activable focusable"
+        disabled={commandDisabled({ kind: "cyclePlaybackMode" })}
+        onSelect={() => runMenuCommand({ kind: "cyclePlaybackMode" })}
+    >
+        <div>{i18n.t(`player.modes.${player.getMode()}`)}</div>
+        <kbd>{modKeyText}+⇧+M</kbd>
+    </Menubar.Item>
     <Menubar.Separator />
     <Menubar.Item class="activable focusable"
-        disabled={commandDisabled({ kind: "toggleVolumeStabilization" })}
-        onSelect={() => runMenuCommand({ kind: "toggleVolumeStabilization" })}
+        disabled={commandDisabled({ kind: "selectAdjacentMedia", direction: -1 })}
+        onSelect={() => runMenuCommand({ kind: "selectAdjacentMedia", direction: -1 })}
     >
-        <div>{player.isVolumeStabilizationEnabled() ? i18n.t("player.actions.disableStabilization") : i18n.t("player.actions.enableStabilization")}</div>
-        <kbd>{modKeyText}+E</kbd>
+        <div>{i18n.t("player.actions.previousMedia")}</div>
+        <kbd>{modKeyText}+⇧+←</kbd>
     </Menubar.Item>
     <Menubar.Item class="activable focusable"
-        disabled={commandDisabled({ kind: "restorePlaybackSpeed" })}
-        onSelect={() => runMenuCommand({ kind: "restorePlaybackSpeed" })}
+        disabled={commandDisabled({ kind: "selectAdjacentMedia", direction: 1 })}
+        onSelect={() => runMenuCommand({ kind: "selectAdjacentMedia", direction: 1 })}
     >
-        <div>{i18n.t("player.actions.restoreSpeed")}</div>
-        <kbd>{modKeyText}+R</kbd>
+        <div>{i18n.t("player.actions.nextMedia")}</div>
+        <kbd>{modKeyText}+⇧+→</kbd>
     </Menubar.Item>
     <Menubar.Separator />
     <Menubar.Item class="activable focusable"
@@ -246,6 +262,21 @@
     >
         <div>{i18n.t("player.actions.nextWord")}</div>
         <kbd>{modKeyText}+→</kbd>
+    </Menubar.Item>
+    <Menubar.Separator />
+    <Menubar.Item class="activable focusable"
+        disabled={commandDisabled({ kind: "toggleVolumeStabilization" })}
+        onSelect={() => runMenuCommand({ kind: "toggleVolumeStabilization" })}
+    >
+        <div>{player.isVolumeStabilizationEnabled() ? i18n.t("player.actions.disableStabilization") : i18n.t("player.actions.enableStabilization")}</div>
+        <kbd>{modKeyText}+E</kbd>
+    </Menubar.Item>
+    <Menubar.Item class="activable focusable"
+        disabled={commandDisabled({ kind: "restorePlaybackSpeed" })}
+        onSelect={() => runMenuCommand({ kind: "restorePlaybackSpeed" })}
+    >
+        <div>{i18n.t("player.actions.restoreSpeed")}</div>
+        <kbd>{modKeyText}+R</kbd>
     </Menubar.Item>
 {/snippet}
 
@@ -306,6 +337,12 @@
     :global([data-menubar-root][data-keyboard="false"] .focusable:focus-visible),
     :global([data-menubar-content][data-keyboard="false"] .focusable:focus-visible) {
         outline: none;
+    }
+    .menu-overlay {
+        position: fixed;
+        inset: env(titlebar-area-height) 0 0;
+        background: transparent;
+        -webkit-app-region: no-drag;
     }
     .menu-bar {
         --menu-padding-inline: clamp(2px, calc(1.25vw - 6px), 8px);
@@ -425,7 +462,7 @@
     import * as i18n from "../../i18n.svelte";
     import { onDestroy, untrack } from "svelte";
     import { type ParseKeys } from "i18next";
-    import { IsUsingKeyboard, Menubar } from "bits-ui";
+    import { IsUsingKeyboard, Menubar, Portal } from "bits-ui";
     import ProjectStatus from "./ProjectStatus.svelte";
     import menuIcon from "../../../resources/icons/carbon--menu.svg?raw";
     import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
@@ -438,6 +475,7 @@
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as transcript from "../../states/transcript.svelte";
     import * as menu from "../../states/menu.svelte";
+    import * as modal from "../../states/modal.svelte";
     import * as transcriptAPI from "../../states/transcript";
 
     const transcriptionActionKeys = {
@@ -511,7 +549,17 @@
     let focusingControl = false;
     let removalConfirmation = $state<string | null>(null);
 
-    onDestroy(() => menu.set(""));
+    const layer = Symbol();
+    const layerIndex = $derived(modal.getLayerIndex(layer));
+
+    $effect.pre(() => {
+        if (menu.get()) untrack(() => modal.openLayer(layer));
+        else untrack(() => modal.closeLayer(layer));
+    });
+    onDestroy(() => {
+        menu.set("");
+        modal.closeLayer(layer);
+    });
 
     $effect(() => {
         const mediaMenuOpen = compact ? menu.get() === "all" && mediaSubmenuOpen : menu.get() === "media";
@@ -635,7 +683,8 @@
                 action = key === "s" ? { kind: "saveProjectAs" }
                     : key === "p" ? { kind: "focus", target: "playback-progress" }
                     : key === "r" ? { kind: "focus", target: "playback-speed" }
-                    : key === "e" ? { kind: "focus", target: "playback-volume" } : undefined;
+                    : key === "e" ? { kind: "focus", target: "playback-volume" }
+                    : key === "m" ? { kind: "cyclePlaybackMode" } : undefined;
             }
             else action = key === "b" ? { kind: "openTranscriptionConfig", mediaId: selectedMediaId } : shortcuts[key];
             if (!editing && (key === "arrowleft" || key === "arrowright")) {

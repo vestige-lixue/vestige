@@ -61,10 +61,12 @@
         white-space: nowrap;
     }
     .measure {
+        /* Reserve the extra space used by the menu padding and checkmark. */
+        padding-right: 10px;
         visibility: hidden;
     }
     :global(.dropdownOptions) {
-        min-width: var(--bits-select-anchor-width);
+        width: var(--bits-select-anchor-width);
         max-width: var(--bits-select-content-available-width);
         max-height: var(--bits-select-content-available-height);
         overflow-y: auto;

@@ -650,7 +650,8 @@
     function focusInvalidInput(input: HTMLInputElement | undefined): void {
         // A rejected close must re-enable the controls before moving focus.
         flushSync(() => pending = false);
-        input?.focus();
+        input?.focus({ preventScroll: true });
+        input?.scrollIntoView({ behavior: "instant", block: "center", inline: "nearest" });
     }
 
     async function commit(): Promise<boolean> {

@@ -1,21 +1,13 @@
 import { type Media } from "./Media";
-import { type TextPosition, type TextRange } from "./util/range";
+import { type TextRange } from "./util/range";
 import { type Run } from "./transcription/Run";
 
-export type Modification = ({
-    type: "insert";
-    pos: TextPosition;
-    text: string;
-} | {
-    type: "replace";
+export type Modification = {
+    // Original-text range; an empty range inserts at its position.
     range: TextRange;
+    // Empty text deletes the range.
     text: string;
-} | {
-    type: "delete";
-    range: TextRange;
-});
-
-export type Modificationkind = Modification["type"];
+};
 
 export type Vestige = {
     media: Media;

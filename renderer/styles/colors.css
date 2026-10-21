@@ -1,4 +1,11 @@
+@property --interaction-opacity {
+    syntax: "<number>";
+    inherits: false;
+    initial-value: 0;
+}
+
 :root {
+    --interaction-rgb: 0 0 0;
     --c-link: #2170bf;
     --c-selection: #cfe5fc;
     --c-selection-bg: #c8e1fb;
@@ -15,6 +22,7 @@
 }
 
 :root[data-theme="dark"] {
+    --interaction-rgb: 255 255 255;
     --c-link: #79b8ff;
     --c-selection: #264a70;
     --c-selection-bg: #223c58;
@@ -28,14 +36,14 @@
     --c-shadow-1: rgba(0, 0, 0, 0.18);
     --c-shadow-2: rgba(0, 0, 0, 0.28);
     --c-shadow-3: rgba(0, 0, 0, 0.4);
-    --hover-lightness: 0.92;
-    --active-lightness: 0.96;
+    --hover-opacity: 0.08;
+    --active-opacity: 0.04;
 }
 
 :root {
     --bg: var(--c-background);
-    --hover-lightness: 0.96;
-    --active-lightness: 0.9;
+    --hover-opacity: 0.04;
+    --active-opacity: 0.1;
     color: var(--c-text);
     background: var(--bg);
 }
@@ -44,23 +52,20 @@
     background: transparent;
 }
 
+:root :is(.hoverable, .activable, [data-menubar-item], [data-menubar-trigger]):not(:disabled):not([data-disabled]) {
+    background-image: linear-gradient(
+        rgb(var(--interaction-rgb) / var(--interaction-opacity)),
+        rgb(var(--interaction-rgb) / var(--interaction-opacity))
+    );
+    transition: background-color .2s ease, --interaction-opacity .08s ease;
+}
+
 .hoverable:hover:not(:disabled):not([data-disabled]),
 [data-menubar-item][data-highlighted]:not([data-disabled]),
 [data-menubar-trigger][data-state="open"]:not([data-disabled]) {
-    background-color: hsl(from var(--bg) h s calc(l * var(--hover-lightness)));
-    transition: background-color .08s ease;
+    --interaction-opacity: var(--hover-opacity);
 }
 
 .activable:active:not(:disabled):not([data-disabled]) {
-    background-color: hsl(from var(--bg) h s calc(l * var(--active-lightness)));
-}
-
-:root[data-theme="dark"] .hoverable:hover:not(:disabled):not([data-disabled]),
-:root[data-theme="dark"] [data-menubar-item][data-highlighted]:not([data-disabled]),
-:root[data-theme="dark"] [data-menubar-trigger][data-state="open"]:not([data-disabled]) {
-    background-color: hsl(from var(--bg) h s calc(100 - (100 - l) * var(--hover-lightness)));
-}
-
-:root[data-theme="dark"] .activable:active:not(:disabled):not([data-disabled]) {
-    background-color: hsl(from var(--bg) h s calc(100 - (100 - l) * var(--active-lightness)));
+    --interaction-opacity: var(--active-opacity);
 }

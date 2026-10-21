@@ -57,6 +57,11 @@
         "source": "https://raw.githubusercontent.com/carbon-design-system/carbon/main/LICENSE"
     },
     {
+        "file": "remix-icons.txt",
+        "source": "https://unpkg.com/remixicon@4.3.0/License",
+        "version": "4.3.0"
+    },
+    {
         "file": "coreui-icons.txt",
         "source": "https://raw.githubusercontent.com/coreui/coreui-icons/master/LICENSE"
     },

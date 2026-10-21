@@ -27,7 +27,7 @@
                 }}
                 onended={event => {
                     if (event.currentTarget !== element || element.currentSrc !== source || !element.ended || element.seeking || seekedToEnd || settledSeek !== player.getSeekVersion()) return;
-                    playerAPI.setPlaying(false);
+                    playerAPI.finishPlayback();
                 }}
                 onerror={event => {
                     if (event.currentTarget === element && element.currentSrc === source) handlePlaybackError();

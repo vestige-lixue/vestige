@@ -32,6 +32,7 @@ export function registerMediaProtocol(): void {
 }
 
 async function respond(source: MediaSource, request: Request, signal: AbortSignal): Promise<Response> {
+    const controller = new AbortController();
     try {
         const info = await stat(source.path);
         signal.throwIfAborted();
@@ -48,7 +49,11 @@ async function respond(source: MediaSource, request: Request, signal: AbortSigna
         }
         const headers = new Headers();
         if (range) headers.set("Range", `bytes=${start}-${end}`);
-        const response = await net.fetch(pathToFileURL(source.path).href, { method: request.method, headers, signal });
+        const response = await net.fetch(pathToFileURL(source.path).href, {
+            method: request.method,
+            headers,
+            signal: AbortSignal.any([signal, controller.signal])
+        });
         if (signal.aborted) {
             await response.body?.cancel();
             signal.throwIfAborted();
@@ -61,16 +66,20 @@ async function respond(source: MediaSource, request: Request, signal: AbortSigna
         responseHeaders.set("Accept-Ranges", "bytes");
         responseHeaders.set("Content-Length", String(end - start + 1));
         if (range) responseHeaders.set("Content-Range", `bytes ${start}-${end}/${info.size}`);
-        if (request.method === "HEAD") await response.body?.cancel();
-        const body = request.method === "HEAD" || !response.body ? null : trackBody(source, response.body, signal);
+        if (request.method === "HEAD" || !response.body) {
+            controller.abort();
+            await response.body?.cancel();
+        }
+        const body = request.method === "HEAD" || !response.body ? null : trackBody(source, response.body, signal, controller);
         return new Response(body, { status: range ? 206 : 200, headers: responseHeaders });
     }
     catch {
+        controller.abort();
         return new Response(null, { status: 404 });
     }
 }
 
-function trackBody(source: MediaSource, body: ReadableStream<Uint8Array>, signal: AbortSignal): ReadableStream<Uint8Array> {
+function trackBody(source: MediaSource, body: ReadableStream<Uint8Array>, signal: AbortSignal, requestController: AbortController): ReadableStream<Uint8Array> {
     const reader = body.getReader();
     let complete: () => void;
     const pending = new Promise<void>(resolve => {
@@ -81,10 +90,14 @@ function trackBody(source: MediaSource, body: ReadableStream<Uint8Array>, signal
     let cancelling: Promise<void> | null = null;
     const finish = (): void => {
         signal.removeEventListener("abort", abort);
+        requestController.abort();
+        reader.releaseLock();
         source.pending.delete(pending);
         complete();
     };
     const cancel = (reason: unknown): Promise<void> => {
+        // Canceling the response reader alone leaves Electron's native file loader alive.
+        requestController.abort(reason);
         cancelling ??= reader.cancel(reason).catch(() => {}).finally(finish);
         return cancelling;
     };

@@ -74,22 +74,18 @@ export function textPosition(index: TextIndex, offset: number): TextPosition {
 }
 
 function patchOf(index: TextIndex, modification: Modification): Patch {
-    if (modification.type === "insert") {
-        const from = textOffset(index, modification.pos);
-        return { from, to: from, text: modification.text };
-    }
     return {
         from: textOffset(index, modification.range.start),
         to: textOffset(index, modification.range.end),
-        text: modification.type === "delete" ? "" : modification.text
+        text: modification.text
     };
 }
 
 function modificationOf(index: TextIndex, patch: Patch): Modification {
-    const start = textPosition(index, patch.from);
-    if (patch.from === patch.to) return { type: "insert", pos: start, text: patch.text };
-    const range = { start, end: textPosition(index, patch.to) };
-    return patch.text ? { type: "replace", range, text: patch.text } : { type: "delete", range };
+    return {
+        range: { start: textPosition(index, patch.from), end: textPosition(index, patch.to) },
+        text: patch.text
+    };
 }
 
 export function normalizeModifications(index: TextIndex, modifications: readonly Modification[]): Modification[] {

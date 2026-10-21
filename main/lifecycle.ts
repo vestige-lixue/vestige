@@ -50,6 +50,12 @@ export function registerWindowLifecycle(window: BrowserWindow, prepareClose: () 
     const checkClose = (): Promise<boolean> => {
         if (closeCheck) return closeCheck;
         closeCheck = beforeQuit().then(async blocked => {
+            if (blocked && !window.isDestroyed()) {
+                // Native close controls can leave the renderer without window focus.
+                if (window.isMinimized()) window.restore();
+                window.show();
+                if (!contents.isDestroyed()) contents.focus();
+            }
             if (!blocked && !window.isDestroyed()) {
                 // Closing has been accepted. Prevent new interaction while streams
                 // close and temporary files are removed, before destroying the app.

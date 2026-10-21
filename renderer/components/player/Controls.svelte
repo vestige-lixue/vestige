@@ -1,5 +1,7 @@
 <svelte:window
+    onkeydown={handleWindowKeydown}
     onkeyupcapture={handleProgressKeyup}
+    onfocusin={cancelProgressNavigation}
     onpointerdowncapture={cancelProgressNavigation}
     onpointerup={finishProgress}
     onpointercancel={finishProgress}
@@ -14,7 +16,7 @@
     <div class="progress-row">
         <div class="progress-outer">
             <Slider.Root
-                class="slider progress"
+                class={["slider progress", { unavailable }]}
                 type="single"
                 thumbPositioning="exact"
                 min={0}
@@ -131,11 +133,30 @@
                 {/snippet}
             </Tooltip>
             <Tooltip
-                text={i18n.t("player.actions.previousWord")}
-                shortcut={`${modKeyText}+←`}
                 disabled={buttonDisabled[3]}
                 tabindex={tabStop === 3 ? 0 : -1}
                 onfocus={() => focusedButton = 3}
+                onclick={() => runCommand({ kind: "cyclePlaybackMode" })}
+            >
+                {#snippet text()}
+                    <div class="shortcuts">
+                        <div><b>{i18n.t(`player.modes.${player.getMode()}`)}</b></div>
+                        <div>{i18n.t("player.actions.cycleMode")} <kbd>{modKeyText}+⇧+M</kbd></div>
+                    </div>
+                {/snippet}
+                {#snippet child({ props })}
+                    <button {...props} class="playback-mode icon-button hoverable activable focusable" type="button">
+                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                        {@html modeIcons[player.getMode()]}
+                    </button>
+                {/snippet}
+            </Tooltip>
+            <Tooltip
+                text={i18n.t("player.actions.previousWord")}
+                shortcut={`${modKeyText}+←`}
+                disabled={buttonDisabled[4]}
+                tabindex={tabStop === 4 ? 0 : -1}
+                onfocus={() => focusedButton = 4}
                 onclick={() => runCommand({ kind: "seekAdjacentWord", direction: -1 })}
             >
                 {#snippet child({ props })}
@@ -148,9 +169,9 @@
             <Tooltip
                 text={i18n.t("player.actions.nextWord")}
                 shortcut={`${modKeyText}+→`}
-                disabled={buttonDisabled[4]}
-                tabindex={tabStop === 4 ? 0 : -1}
-                onfocus={() => focusedButton = 4}
+                disabled={buttonDisabled[5]}
+                tabindex={tabStop === 5 ? 0 : -1}
+                onfocus={() => focusedButton = 5}
                 onclick={() => runCommand({ kind: "seekAdjacentWord", direction: 1 })}
             >
                 {#snippet child({ props })}
@@ -236,6 +257,10 @@
     .controls button:disabled {
         opacity: 0.5;
     }
+    .playback-mode :global(svg) {
+        width: 92%;
+        height: 92%;
+    }
     .adjustment {
         display: flex;
         align-items: center;
@@ -287,6 +312,9 @@
     }
     .controls :global(.slider[data-disabled]) {
         cursor: default;
+    }
+    .controls :global(.slider[data-disabled]:not(.progress)),
+    .controls :global(.progress.unavailable) {
         opacity: 0.5;
     }
     .track {
@@ -371,10 +399,12 @@
     import Tooltip from "../util/Tooltip.svelte";
     import * as player from "../../states/player.svelte";
     import * as settings from "../../states/settings.svelte";
+    import * as mediaImport from "../../states/mediaImport.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as project from "../../states/project.svelte";
+    import * as menu from "../../states/menu.svelte";
 
-    import { commandDisabled, runCommand } from "../../states/commands";
+    import { commandDisabled, interfaceBlocked, runCommand } from "../../states/commands";
     import skipBackIcon from "../../../resources/icons/carbon--skip-back.svg?raw";
     import playIcon from "../../../resources/icons/carbon--play.svg?raw";
     import pauseIcon from "../../../resources/icons/carbon--pause.svg?raw";
@@ -384,9 +414,14 @@
     import meterAltIcon from "../../../resources/icons/carbon--meter-alt.svg?raw";
     import previousOutlineIcon from "../../../resources/icons/carbon--previous-outline.svg?raw";
     import nextOutlineIcon from "../../../resources/icons/carbon--next-outline.svg?raw";
+    import playOnceIcon from "../../../resources/icons/play-once.svg?raw";
+    import orderPlayIcon from "../../../resources/icons/ri--order-play-line.svg?raw";
+    import repeatIcon from "../../../resources/icons/carbon--repeat.svg?raw";
+    import repeatOneIcon from "../../../resources/icons/carbon--repeat-one.svg?raw";
     import * as playerAPI from "../../states/player";
 
     const { levels }: { levels: AudioLevels | null } = $props();
+    const modeIcons = { single: playOnceIcon, sequential: orderPlayIcon, "repeat-all": repeatIcon, "repeat-one": repeatOneIcon };
     const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
     const keyboard = new IsUsingKeyboard();
     let keyboardFocus = $state(false);
@@ -410,9 +445,11 @@
     // Keep the slider's step rounding from writing back to the precise playback time.
     const progressSteps = 1000;
     const volumePosition = $derived(volumeToSlider(player.getVolume(), settings.getPlayback()));
-    const duration = $derived(project.getMedia(mediaSelection.get())?.duration ?? 0);
-    const disabled = $derived(!player.getURL() || !Number.isFinite(duration) || duration <= 0);
-    const progress = $derived(disabled || !Number.isFinite(player.getCurrentTime())
+    const media = $derived(project.getMedia(mediaSelection.get()));
+    const duration = $derived(media?.duration ?? 0);
+    const unavailable = $derived(!media || !mediaImport.isReady(media.id) || !Number.isFinite(duration) || duration <= 0);
+    const disabled = $derived(unavailable || !player.getURL());
+    const progress = $derived(unavailable || !Number.isFinite(player.getCurrentTime())
         ? 0
         : Math.round(Math.min(1, Math.max(0, player.getCurrentTime() / duration)) * progressSteps));
 
@@ -447,6 +484,7 @@
         commandDisabled({ kind: "selectAdjacentMedia", direction: -1 }),
         disabled,
         commandDisabled({ kind: "selectAdjacentMedia", direction: 1 }),
+        commandDisabled({ kind: "cyclePlaybackMode" }),
         commandDisabled({ kind: "seekAdjacentWord", direction: -1 }),
         commandDisabled({ kind: "seekAdjacentWord", direction: 1 })
     ]);
@@ -462,6 +500,17 @@
         event.preventDefault();
         const direction = event.key === "ArrowRight" ? 1 : -1;
         buttons[(index + direction + buttons.length) % buttons.length]?.focus();
+    }
+
+    function handleWindowKeydown(event: KeyboardEvent): void {
+        const target = event.target;
+        if (target === progressThumb) return;
+        if (interfaceBlocked() || menu.get() || !(target instanceof HTMLElement) || target.isContentEditable
+            || target.closest("input, textarea, select, [data-slider-root]")) {
+            cancelProgressNavigation();
+            return;
+        }
+        handleProgressKeydown(event);
     }
 
     function handleProgressKeydown(event: KeyboardEvent): void {

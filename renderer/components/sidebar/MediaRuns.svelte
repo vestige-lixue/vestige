@@ -31,7 +31,7 @@
             {#each vestige?.runs ?? [] as run, index (run.id)}
                 {@const displayed = index === vestige?.displayedRunIdx}
                 <div class="runRow activable" bind:this={rowElements[run.id]} onclick={() => selectRun(run.id)}>
-                    <Tooltip side="right" sideOffset={24} customAnchor={rowElements[run.id] ?? null} disabled={disabled || hasDialog} tabindex={0} disableCloseOnTriggerClick>
+                    <Tooltip side="right" sideOffset={24} customAnchor={rowElements[run.id] ?? null} disabled={disabled || hasDialog} tabindex={0}>
                         {#snippet text()}
                             <div class="runDetails">
                                 <div><b>{i18n.t("transcription.config.executer.label")}</b><span>{run.config.executer}</span></div>

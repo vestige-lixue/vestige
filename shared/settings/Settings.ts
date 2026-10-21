@@ -3,13 +3,14 @@ import { type settingsVersion, type minWindowWidth, type minWindowHeight, type m
 import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
-import { type Presets } from "../transcription/Config";
+import { type Config, type Presets } from "../transcription/Config";
 import { type MediaPathMode } from "../project/file";
 
 type StabilizationLimits = typeof volumeStabilizationLimits;
 type PlaybackSpeed = number & tags.Minimum<typeof minPlaybackSpeed> & tags.Maximum<typeof maxPlaybackSpeed>;
 
 export type AudioLevelStage = "source" | "project" | "monitor";
+export type PlaybackMode = "single" | "sequential" | "repeat-all" | "repeat-one";
 
 export type VolumeStabilizationSettings = {
     readonly [Key in keyof StabilizationLimits]: number & tags.Minimum<StabilizationLimits[Key]["min"]> & tags.Maximum<StabilizationLimits[Key]["max"]>;
@@ -24,6 +25,10 @@ export type Settings = {
     readonly transcription: {
         readonly concurrency: number & tags.Type<"uint64"> & tags.Minimum<1> & tags.Maximum<9007199254740991>;
         readonly presets: Presets;
+        readonly lastConfig: {
+            readonly config: Config;
+            readonly presetName: string;
+        } | null;
     };
     readonly editing: {
         readonly spellcheck: boolean;
@@ -42,6 +47,7 @@ export type Settings = {
         readonly videoHeight: (number & tags.Minimum<0> & tags.Maximum<2147483647>) | null;
     };
     readonly playback: {
+        readonly mode: PlaybackMode;
         readonly volumeSliderMapping: "amplitude" | "decibel";
         readonly volumeSliderMinDb: number & tags.Maximum<typeof maxVolumeSliderMinDb>;
         readonly mediaSwitchPlayback: "pause" | "play" | "keep" | "invert";

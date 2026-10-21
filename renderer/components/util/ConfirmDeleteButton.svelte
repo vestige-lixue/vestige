@@ -1,4 +1,4 @@
-<Tooltip text={confirming ? i18n.t("common.confirmAgain") : text} bind:open={tooltipOpen} disableCloseOnTriggerClick
+<Tooltip text={confirming ? i18n.t("common.confirmAgain") : text} bind:open={tooltipOpen}
     {disabled} {tabindex} {onfocus} onclick={activate}>
     {#snippet child({ props })}
         <button {...props} class="deleteButton icon-button hoverable activable focusable danger" bind:this={button} style={`--delete-size: ${size};`}>

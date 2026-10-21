@@ -1,18 +1,21 @@
-<Modal bind:open width="min(90%, 800px)" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
-    if (!open) onClosed();
+<Modal bind:open={() => visible, value => {
+    if (value) visible = true;
+    else void close();
+}} width="min(90%, 800px)" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={value => {
+    if (!value && !visible) onClosed();
 }}>
     <Dialog.Title class="modal-title">{i18n.t("transcription.config.title")}</Dialog.Title>
     <Dialog.Description class="modal-description">{project.getMedia(mediaId)?.name ?? ""}</Dialog.Description>
     <div class="presetRow">
         <label for="transcription-preset">{i18n.t("transcription.config.preset.label")}</label>
         <div class="presetControl">
-            <DropdownSelector id="transcription-preset" items={presetItems} value={selectedName} placeholder={i18n.t("transcription.config.preset.custom")} onValueChange={name => {
+            <DropdownSelector id="transcription-preset" items={presetItems} value={selectedName} {disabled} placeholder={i18n.t("transcription.config.preset.custom")} onValueChange={name => {
                 const preset = presets.find(preset => preset.name === name);
                 if (preset) applyPreset(preset.name, preset.config);
             }} />
-            <Tooltip text={i18n.t("transcription.presets.actions.manage")} onclick={() => dialogsAPI.showTranscriptionPresets(dialogId, applyPreset, selectedName)}>
+            <Tooltip text={i18n.t("transcription.presets.actions.manage")} {disabled} onclick={() => dialogsAPI.showTranscriptionPresets(dialogId, applyPreset, selectedName)}>
                 {#snippet child({ props })}
-                    <button {...props} class="edit icon-button hoverable activable focusable">
+                    <button {...props} class="edit icon-button hoverable activable focusable" {disabled}>
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html settingsIcon}
                     </button>
@@ -20,11 +23,15 @@
             </Tooltip>
         </div>
     </div>
-    <ConfigFields {dialogId} {config} onchange={value => {
+    <ConfigFields {dialogId} {config} {disabled} onchange={value => {
         config = value; selectedName = "";
     }} bind:validate />
+    {#if failure}
+        <div class="error-message">{i18n.t("settings.saveError", { error: describeFailure(failure) })}</div>
+        <TextButton disabled={pending} onclick={() => void (initialized ? commit() : initialize())}>{i18n.t("common.retry")}</TextButton>
+    {/if}
     {#snippet actions()}
-        <TextButton class="primary" disabled={!settings.isReady() || project.projectState.locked || !mediaImport.isReady(mediaId)} onclick={start}>
+        <TextButton class="primary" disabled={disabled || project.projectState.locked || !mediaImport.isReady(mediaId)} onclick={() => void close(true)}>
             {i18n.t("transcription.config.submit")}
         </TextButton>
     {/snippet}
@@ -70,40 +77,59 @@
     import ConfigFields from "../transcription/ConfigFields.svelte";
     import * as project from "../../states/project.svelte";
     import * as settings from "../../states/settings.svelte";
-    import * as transcription from "../../states/transcription.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
-    import { defaultConfig, type Config } from "../../../shared/transcription/Config";
+    import { defaultConfig, configsEqual, type Config } from "../../../shared/transcription/Config";
     import { mergePresets } from "../../../shared/transcription/presets";
     import { validTranscriptionConfig } from "../../../shared/settings/validate";
+    import { describeFailure } from "../../failures";
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
     import * as dialogsAPI from "../../states/dialogs";
     import * as settingsAPI from "../../states/settings";
     import * as transcriptionAPI from "../../states/transcription";
 
-    type Props = { open: boolean; dialogId: string; mediaId: string; taskId?: string; onClosed: () => void };
-    let { open = $bindable(), dialogId, mediaId, taskId, onClosed }: Props = $props();
-    let config = $state<Config>(untrack(previousConfig));
+    type Props = { open: boolean; dialogId: string; mediaId: string; onClosed: () => void };
+    let { open = $bindable(), dialogId, mediaId, onClosed }: Props = $props();
+    let visible = $state(untrack(() => open));
+    let config = $state<Config>(defaultConfig());
     let selectedName = $state("");
+    let initialized = $state(false);
+    let pending = $state(false);
+    let closing = false;
+    let alive = true;
+    let commitTask: Promise<boolean> | null = null;
     let validate = $state<(requireDirectory?: boolean, report?: boolean) => boolean>();
+    const disabled = $derived(!initialized || pending);
+    const failure = $derived(settings.getError());
     const presets = $derived(mergePresets(settings.get()?.transcription.presets ?? {}));
     const presetItems = $derived(presets.map(preset => ({ value: preset.name, label: preset.name })));
 
     onMount(() => {
-        void settingsAPI.initialize();
+        void initialize();
+        const unsubscribe = settingsAPI.beforeSave(commit);
+        return () => {
+            alive = false;
+            unsubscribe();
+        };
     });
     $effect(() => {
-        if (selectedName && !presets.some(preset => preset.name === selectedName)) selectedName = "";
+        if (open) visible = true;
+        else if (visible && !pending) untrack(() => void close());
+    });
+    $effect(() => {
+        if (selectedName && !presets.some(preset => preset.name === selectedName && configsEqual(preset.config, config))) selectedName = "";
     });
 
-    function previousConfig(): Config {
-        const request = (taskId ? transcription.getTaskById(taskId) : transcription.getTask(mediaId))?.request;
-        if (!request) return defaultConfig();
+    async function initialize(): Promise<void> {
+        if (initialized || pending) return;
+        pending = true;
         try {
-            const config = { executer: request.executer, backendDirectory: request.backendDirectory, modelDirectory: request.modelDirectory, params: JSON.parse(request.params) };
-            return validTranscriptionConfig(config) ? config : defaultConfig();
+            if (!await settingsAPI.initialize() || !alive) return;
+            const previous = settings.get()!.transcription.lastConfig;
+            if (previous) applyPreset(previous.presetName, previous.config);
+            initialized = true;
         }
-        catch {
-            return defaultConfig();
+        finally {
+            pending = false;
         }
     }
 
@@ -112,8 +138,36 @@
         selectedName = name;
     }
 
-    function start(): void {
-        if (validate?.(true) !== true || project.projectState.locked) return;
-        if (transcriptionAPI.start(mediaId, config)) open = false;
+    function commit(): Promise<boolean> {
+        if (!initialized) return Promise.resolve(true);
+        if (commitTask) return commitTask;
+        if (validate?.() !== true || !validTranscriptionConfig(config)) return Promise.resolve(false);
+        const lastConfig = {
+            config: { ...config, params: { ...config.params } },
+            presetName: presets.some(preset => preset.name === selectedName && configsEqual(preset.config, config)) ? selectedName : ""
+        };
+        pending = true;
+        const operation = settingsAPI.update({ transcription: { lastConfig } }, { save: true }).finally(() => {
+            commitTask = null;
+            pending = false;
+        });
+        commitTask = operation;
+        return operation;
+    }
+
+    async function close(startTranscription = false): Promise<void> {
+        if (closing || pending || !visible) return;
+        if (startTranscription && (validate?.(true) !== true || project.projectState.locked)) return;
+        closing = true;
+        try {
+            if (await commit() && (!startTranscription || transcriptionAPI.start(mediaId, config))) {
+                visible = false;
+                open = false;
+            }
+            else open = true;
+        }
+        finally {
+            closing = false;
+        }
     }
 </script>

@@ -15,6 +15,7 @@ import {
 const patchesAttribute = "vestigeModifications";
 const bridgeKey = new PluginKey("vestigeTranscript");
 const playbackKey = new PluginKey<number>("vestigePlayback");
+const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new WeakMap<HTMLElement, Editor>();
 
 const Document = Node.create({
@@ -249,6 +250,14 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true): Extensions {
+    const source = Source.extend({
+        renderHTML({ mark }) {
+            if (mark.attrs.kind !== "segment") return ["span", 0];
+            const probability = index.transcript[mark.attrs.index].token.prob;
+            const level = probabilityThresholds.findIndex(threshold => probability < threshold);
+            return ["span", { class: `token-prob-${level}` }, 0];
+        }
+    });
     const bridge = Extension.create({
         name: "vestigeTranscript", priority: 1000,
         addProseMirrorPlugins() {
@@ -267,7 +276,7 @@ export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = 
             };
         }
     });
-    return [Document, Paragraph, Text, HardBreak, Source, bridge];
+    return [Document, Paragraph, Text, HardBreak, source, bridge];
 }
 
 export function createTranscriptEditor(element: HTMLElement, run: Run, modifications: readonly Modification[], onChange: (modifications: Modification[]) => void, canEdit: () => boolean = () => true): Editor {

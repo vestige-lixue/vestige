@@ -50,6 +50,7 @@
         "actions": {
             "play": "Play",
             "pause": "Pause",
+            "cycleMode": "Switch",
             "enableStabilization": "Enable volume stabilization",
             "disableStabilization": "Disable volume stabilization",
             "restoreSpeed": "Restore playback speed",
@@ -58,6 +59,12 @@
             "nextMedia": "Next media",
             "previousWord": "Previous word",
             "nextWord": "Next word"
+        },
+        "modes": {
+            "single": "Play one",
+            "sequential": "Play in order",
+            "repeat-all": "Repeat all",
+            "repeat-one": "Repeat one"
         },
         "noMedia": "No media selected"
     },
@@ -93,7 +100,9 @@
             "video": "Video"
         },
         "actions": {
-            "remove": "Remove from project"
+            "remove": "Remove from project",
+            "moveEarlier": "Move earlier",
+            "moveLater": "Move later"
         },
         "import": {
             "actions": {
@@ -445,7 +454,19 @@
                 "openDirectory": "Open model folder"
             },
             "description": "Download a built-in model below, or download one yourself and arrange its files as described in the <guide/>.",
-            "title": "Built-in models"
+            "title": "Built-in models",
+            "details": {
+                "whisperTiny": "For whisper.cpp. Fast multilingual transcription with the lowest resource use, suited to modest hardware with limited accuracy. CPU supported; GPU weights use about 0.1 GiB.",
+                "whisperBase": "For whisper.cpp. Lightweight multilingual transcription, more accurate than Tiny and suited to clear speech. CPU supported; GPU weights use about 0.1 GiB.",
+                "whisperSmall": "For whisper.cpp. Multilingual transcription balancing accuracy and speed with moderate resource use. CPU supported; GPU weights use about 0.5 GiB.",
+                "whisperLargeV3": "For whisper.cpp. Multilingual transcription focused on accuracy, with slower processing and high resource use. CPU supported; GPU weights use about 2.9 GiB.",
+                "whisperLargeV3Turbo": "For whisper.cpp. Faster than Large v3 with a small accuracy tradeoff; repetition and hallucinations remain possible. CPU supported; GPU weights use about 1.5 GiB.",
+                "paraformerZh": "For sherpa-onnx. Fast, non-autoregressive recognition focused on Chinese, including mixed Chinese and English speech. Moderate resource use; runs on CPU with no dedicated GPU memory required.",
+                "senseVoiceSmall": "For sherpa-onnx. Fast recognition of Mandarin, Cantonese, English, Japanese and Korean, with text timestamps. Low resource use with INT8; CPU preferred, no dedicated GPU memory required.",
+                "fireRedAsr2Ctc": "For sherpa-onnx. CTC recognition for Chinese, English, mixed speech and Chinese dialects, with text timestamps. Moderate resource use with INT8; CPU preferred, no dedicated GPU memory required.",
+                "qwen3Asr06b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on efficiency, with moderate INT8 memory use and CPU support; text timestamps are currently unavailable.",
+                "qwen3Asr17b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on accuracy, with higher INT8 memory use, slower processing and CPU support; text timestamps are currently unavailable."
+            }
         },
         "loading": "Loading downloads…",
         "backends": {

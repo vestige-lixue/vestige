@@ -42,8 +42,8 @@
         min-width: 0;
         border-radius: 6px;
         background: var(--bg);
-        --hover-lightness: 0.985;
-        --active-lightness: 0.97;
+        --hover-opacity: 0.015;
+        --active-opacity: 0.03;
     }
     :root[data-theme="dark"] :global(.task-item) {
         --bg: var(--c-surface);

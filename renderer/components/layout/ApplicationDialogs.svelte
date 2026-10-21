@@ -18,7 +18,7 @@
     {:else if current.kind === "tasks"}
         <TranscriptionTasks bind:open={current.open} tasks={current.getTasks()} focusTaskId={current.focusTaskId} onStop={current.onStop} onRetry={current.onRetry} onRemove={current.onRemove} onClosed={next => closed(current, next)} />
     {:else if current.kind === "transcription"}
-        <TranscriptionConfig bind:open={current.open} dialogId={current.id} mediaId={current.mediaId} taskId={current.taskId} onClosed={() => closed(current)} />
+        <TranscriptionConfig bind:open={current.open} dialogId={current.id} mediaId={current.mediaId} onClosed={() => closed(current)} />
     {:else if current.kind === "switch-displayed-run"}
         <SwitchDisplayedRun bind:open={current.open} onConfirm={current.onConfirm} onClosed={() => closed(current)} />
     {:else if current.kind === "transcription-presets"}

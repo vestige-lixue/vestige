@@ -50,6 +50,7 @@
         "actions": {
             "play": "播放",
             "pause": "暂停",
+            "cycleMode": "切换",
             "enableStabilization": "开启稳定音量",
             "disableStabilization": "关闭稳定音量",
             "restoreSpeed": "还原播放速度",
@@ -58,6 +59,12 @@
             "nextMedia": "下一媒体",
             "previousWord": "上一词",
             "nextWord": "下一词"
+        },
+        "modes": {
+            "single": "单项播放",
+            "sequential": "顺序播放",
+            "repeat-all": "列表循环",
+            "repeat-one": "单项循环"
         },
         "noMedia": "未选择媒体"
     },
@@ -93,7 +100,9 @@
             "video": "视频"
         },
         "actions": {
-            "remove": "从项目中移除"
+            "remove": "从项目中移除",
+            "moveEarlier": "向前移动一位",
+            "moveLater": "向后移动一位"
         },
         "import": {
             "actions": {
@@ -445,7 +454,19 @@
                 "openDirectory": "打开模型文件夹"
             },
             "description": "选择下方的内置模型进行下载，或自行下载并按<guide/>整理。",
-            "title": "内置模型"
+            "title": "内置模型",
+            "details": {
+                "whisperTiny": "适用 whisper.cpp。多语言转录，速度快、资源占用最低，适合低配置设备，准确率有限。可用 CPU；GPU 权重约 0.1 GiB。",
+                "whisperBase": "适用 whisper.cpp。多语言转录，轻量快速，比 Tiny 更准确，适合清晰语音。可用 CPU；GPU 权重约 0.1 GiB。",
+                "whisperSmall": "适用 whisper.cpp。多语言转录，兼顾准确率与速度，资源占用中等。可用 CPU；GPU 权重约 0.5 GiB。",
+                "whisperLargeV3": "适用 whisper.cpp。多语言转录，侧重准确率，速度较慢、资源占用高。可用 CPU；GPU 权重约 2.9 GiB。",
+                "whisperLargeV3Turbo": "适用 whisper.cpp。多语言转录，比 Large v3 更快，准确率略有取舍，仍可能重复或幻觉。可用 CPU；GPU 权重约 1.5 GiB。",
+                "paraformerZh": "适用 sherpa-onnx。侧重中文，支持中英混合语音，非自回归识别，转录速度快。资源占用中等，CPU 可运行，无独立显存要求。",
+                "senseVoiceSmall": "适用 sherpa-onnx。支持普通话、粤语、英语、日语和韩语，识别快速并提供文字时间戳。INT8 资源占用低，优先使用 CPU，无独立显存要求。",
+                "fireRedAsr2Ctc": "适用 sherpa-onnx。支持中英混合及多种中文方言，采用 CTC 识别并提供文字时间戳。INT8 资源占用中等，优先使用 CPU，无独立显存要求。",
+                "qwen3Asr06b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重效率。INT8 内存占用中等，CPU 可运行；当前不提供文字时间戳。",
+                "qwen3Asr17b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重准确率。INT8 内存占用较高、速度较慢，CPU 可运行；当前不提供文字时间戳。"
+            }
         },
         "loading": "正在读取下载列表…",
         "backends": {

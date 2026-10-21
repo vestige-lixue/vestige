@@ -9,7 +9,7 @@
             text={project.projectState.path ?? i18n.t("project.unsaved.hint")}
             shortcut={project.projectState.path === null ? `${modKeyText}+S` : undefined}
             side="bottom"
-            sideOffset={13}
+            sideOffset={15}
             onclick={project.projectState.path === null ? () => runCommand({ kind: "saveProject" }) : undefined}
         >
             {#snippet child({ props })}

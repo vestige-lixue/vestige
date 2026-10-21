@@ -394,13 +394,18 @@ export async function selectMediaForImport(): Promise<void> {
     }
 }
 
-export function selectMedia(id: string | null): void {
+export function selectMedia(id: string | null, playFromStart = false): void {
     const previous = mediaSelection.get();
     if (previous === id || (id !== null && !mediaImport.isReady(id))) return;
     playerAPI.commitSeekPreview();
     playerAPI.captureProgress();
     if (!mediaSelection.select(id)) return;
-    void (previous !== null && id !== null ? playerAPI.switchMedia() : playerAPI.synchronize()).catch(reportUnexpected);
+    if (playFromStart) {
+        const vestige = project.getVestige(id);
+        if (vestige) vestige.playbackPosition = 0;
+        void playerAPI.synchronize(true).catch(reportUnexpected);
+    }
+    else void (previous !== null && id !== null ? playerAPI.switchMedia() : playerAPI.synchronize()).catch(reportUnexpected);
 }
 
 export function restorePlayback(): void {
@@ -495,9 +500,11 @@ export function startLifecycle(saveSettingsBeforeQuit: () => Promise<boolean>): 
             while (activeTransition) if (!await activeTransition) return true;
             while (saveTask) if (!await saveTask) return true;
             return !await invokeWithLock(async () => {
+                // Validate settings before progress dialogs can capture or restore focus.
+                if (!await saveSettingsBeforeQuit()) return false;
                 if (!await prepareToLeave()) return false;
                 setOperation({ kind: "quit" });
-                return saveSettingsBeforeQuit();
+                return true;
             });
         })().finally(() => {
             checking = null;

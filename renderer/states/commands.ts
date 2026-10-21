@@ -14,7 +14,7 @@ import * as projectAPI from "./project";
 import * as playerAPI from "./player";
 
 type ParameterlessCommand = {
-    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization";
+    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode";
 };
 
 // Select a project file, read it, and handle saving the current project before switching.
@@ -72,7 +72,7 @@ type MoveMediaCommand = {
 };
 
 type AdjacentCommand = ({
-    kind: "selectAdjacentMedia";
+    kind: "selectAdjacentMedia" | "moveSelectedMedia";
     direction: -1 | 1;
 } | {
     kind: "seekAdjacentWord";
@@ -120,9 +120,9 @@ export function interfaceBlocked(): boolean {
         || mediaImport.getIssue() !== null || mediaImport.getImportFailures().length > 0 || mediaImport.isRelocating();
 }
 
-function openTranscriptionConfig(mediaId: string, taskId?: string): void {
+function openTranscriptionConfig(mediaId: string): void {
     if (!mediaImport.isReady(mediaId) || transcription.isPending(transcription.getTask(mediaId))) return;
-    dialogsAPI.show({ kind: "transcription", mediaId, taskId, onClosed: () => { } });
+    dialogsAPI.show({ kind: "transcription", mediaId, onClosed: () => { } });
 }
 
 function openTranscriptionTasks(focusTaskId?: string): void {
@@ -131,7 +131,7 @@ function openTranscriptionTasks(focusTaskId?: string): void {
         onStop: transcriptionAPI.stopTask, onRemove: transcriptionAPI.remove,
         onRetry: taskId => {
             const task = transcription.getTaskById(taskId);
-            if (task) openTranscriptionConfig(task.mediaId, task.id);
+            if (task) openTranscriptionConfig(task.mediaId);
         },
         onClosed: () => { }
     });
@@ -145,6 +145,16 @@ function openPanel(panel: "transcription-backends" | "transcription-models" | "t
 
 export function wordPosition(direction: -1 | 1, fromWordIndex?: number): number | null {
     return transcriptAPI.getWordPosition(player.getCurrentTime(), direction, fromWordIndex);
+}
+
+function adjacentMediaMove(direction: -1 | 1): MoveMediaCommand | null {
+    const mediaId = mediaSelection.get();
+    if (mediaId === null) return null;
+    const ids = mediaImport.getIds();
+    const index = ids.indexOf(mediaId);
+    if (index < 0 || ids[index + direction] === undefined) return null;
+    const beforeId = direction === -1 ? ids[index - 1] : ids[index + 2] ?? null;
+    return { kind: "moveMedia", mediaId, beforeId };
 }
 
 export function commandDisabled(command: Command): boolean {
@@ -164,6 +174,7 @@ export function commandDisabled(command: Command): boolean {
         case "selectMedia": return !mediaImport.isReady(command.mediaId);
         case "playSelectedMedia": case "seekSelectedMedia": return !player.getURL();
         case "selectAdjacentMedia": return mediaSelection.adjacent(command.direction, true) === null;
+        case "moveSelectedMedia": return adjacentMediaMove(command.direction) === null;
         case "seekAdjacentWord": return !player.getURL() || wordPosition(command.direction, command.fromWordIndex) === null;
         default: return false;
     }
@@ -195,6 +206,7 @@ export function runCommand(command: Command): void {
         case "ignoreMediaImportError": projectAPI.ignoreMedia(command.mediaId); break;
         case "reviewMediaImportError": projectAPI.reviewMedia(command.mediaId); break;
         case "playSelectedMedia": playerAPI.togglePlaying(); break;
+        case "cyclePlaybackMode": playerAPI.cycleMode(); break;
         case "focus":
             // Closing menus must release focus before the target receives it.
             void tick().then(() => focus(command.target));
@@ -206,6 +218,11 @@ export function runCommand(command: Command): void {
         case "toggleVolumeStabilization": playerAPI.toggleVolumeStabilization(); break;
         case "seekSelectedMedia": projectAPI.seekPlayback(command.time, command.mode); break;
         case "selectAdjacentMedia": projectAPI.selectMedia(mediaSelection.adjacent(command.direction, true)); break;
+        case "moveSelectedMedia": {
+            const move = adjacentMediaMove(command.direction);
+            if (move) projectAPI.moveMedia(move.mediaId, move.beforeId);
+            break;
+        }
         case "seekAdjacentWord": {
             const time = wordPosition(command.direction, command.fromWordIndex);
             if (time !== null) {

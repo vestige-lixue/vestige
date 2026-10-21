@@ -33,6 +33,12 @@ function accept(next: SettingsSnapshot, current: number): void {
         Object.freeze(preset);
     }
     Object.freeze(next.settings.transcription.presets);
+    const lastConfig = next.settings.transcription.lastConfig;
+    if (lastConfig) {
+        Object.freeze(lastConfig.config.params);
+        Object.freeze(lastConfig.config);
+        Object.freeze(lastConfig);
+    }
     Object.freeze(next.settings.transcription);
     Object.freeze(next.settings.editing);
     Object.freeze(next.settings.volumeStabilization);

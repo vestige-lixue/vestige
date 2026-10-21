@@ -94,18 +94,13 @@
         cursor: pointer;
     }
     .media.hoverable:active:not(:has(:global(:active))) {
-        background-color: hsl(from var(--bg) h s calc(l * var(--active-lightness)));
-    }
-    :root[data-theme="dark"] .media.hoverable:active:not(:has(:global(:active))) {
-        background-color: hsl(from var(--bg) h s calc(100 - (100 - l) * var(--active-lightness)));
+        --interaction-opacity: var(--active-opacity);
     }
     .media.selected :global(*)::selection {
         background-color: hsl(from var(--c-selection) h s calc(l * 0.85));
     }
     :where(.media *) {
         cursor: default;
-        --hover-lightness: 0.94;
-        --active-lightness: 0.88;
     }
     .media.selected {
         --bg: var(--c-selection-bg);
@@ -160,14 +155,6 @@
         height: 18px;
         width: 18px;
         flex-shrink: 0;
-    }
-    .media-actions :global(button) {
-        --hover-lightness: 0.92;
-        --active-lightness: 0.88;
-    }
-    :root[data-theme="dark"] .media-actions :global(button) {
-        --hover-lightness: 0.9;
-        --active-lightness: 0.94;
     }
     button.media-issue {
         padding: 0;

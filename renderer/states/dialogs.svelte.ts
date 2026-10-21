@@ -31,7 +31,6 @@ type TranscriptionTasksDialog = {
 type TranscriptionConfigDialog = {
     kind: "transcription";
     mediaId: string;
-    taskId?: string;
 };
 
 type SwitchDisplayedRunDialog = {

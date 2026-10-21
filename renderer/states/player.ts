@@ -55,6 +55,39 @@ export function setPlaying(playing: boolean): void {
     if (!player.state.playing) captureProgress();
 }
 
+export function cycleMode(): void {
+    const mode = ({
+        single: "sequential",
+        sequential: "repeat-all",
+        "repeat-all": "repeat-one",
+        "repeat-one": "single"
+    } as const)[player.getMode()];
+    void settingsAPI.update({ playback: { mode } });
+}
+
+export function finishPlayback(): void {
+    if (!player.isPlaying() || !player.getURL()) return;
+    const mode = player.getMode();
+    if (mode === "single") {
+        setPlaying(false);
+        return;
+    }
+    if (mode !== "repeat-one") {
+        const next = mediaSelection.adjacent(1, mode === "repeat-all");
+        if (next !== null) {
+            projectAPI.selectMedia(next, true);
+            return;
+        }
+        if (mode === "sequential") {
+            setPlaying(false);
+            return;
+        }
+    }
+    // Repeating the only ready item in a list uses the same path as repeat-one.
+    projectAPI.seekPlayback(0);
+    setPlaying(true);
+}
+
 export function pauseForInterruption(): void {
     interruptionVersion++;
     pendingPlaying = false;

@@ -80,16 +80,11 @@ export function validateProject(value: unknown, directory?: AbsolutePath): asser
         const textIndex = createTextIndex(runs[displayed]?.transcript ?? []);
         vestige.modifications.forEach((modification, index) => {
             const modificationPath = `${path}.modifications[${index}]`;
-            if (modification.type === "insert") {
-                position(modification.pos, `${modificationPath}.pos`, textIndex);
-            }
-            else {
-                const { start, end } = modification.range;
-                position(start, `${modificationPath}.range.start`, textIndex);
-                position(end, `${modificationPath}.range.end`, textIndex);
-                if (end.segmentIdx < start.segmentIdx || (end.segmentIdx === start.segmentIdx && end.offset < start.offset)) {
-                    throw new ProjectValidationFailure({ kind: "project-reversed-range", path: `${modificationPath}.range` });
-                }
+            const { start, end } = modification.range;
+            position(start, `${modificationPath}.range.start`, textIndex);
+            position(end, `${modificationPath}.range.end`, textIndex);
+            if (end.segmentIdx < start.segmentIdx || (end.segmentIdx === start.segmentIdx && end.offset < start.offset)) {
+                throw new ProjectValidationFailure({ kind: "project-reversed-range", path: `${modificationPath}.range` });
             }
         });
         try {
