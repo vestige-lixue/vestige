@@ -31,7 +31,7 @@
         <div class="media-secondary-wrapper">
             <div class="media-info">
                 {#if vestige}
-                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.types.audio" : "media.types.video"), duration: getSemanticDuration(vestige.media.duration) })}
+                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.types.audio" : "media.types.video"), duration: formatDuration(vestige.media.duration) })}
                 {/if}
                 {#if mediaImport.isIssue(item)}
                     <button class="media-issue import-error focusable" disabled={project.projectState.locked}
@@ -185,6 +185,7 @@
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as project from "../../states/project.svelte";
     import * as transcription from "../../states/transcription.svelte";
+    import { formatDuration } from "../../format";
     import { commandDisabled, runCommand, type Command } from "../../states/commands";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import Spinner from "../util/Spinner.svelte";
@@ -248,12 +249,4 @@
         targets[(index + direction + targets.length) % targets.length]?.focus();
     }
 
-    function getSemanticDuration(duration: number): string {
-        if (duration < 60)
-            return `00:${Math.round(duration).toString().padStart(2, "0")}`;
-        else if (duration < 3600)
-            return `${Math.floor(duration / 60).toString().padStart(2, "0")}:${Math.round(duration % 60).toString().padStart(2, "0")}`;
-        else
-            return `${Math.floor(duration / 3600)}:${Math.floor((duration % 3600) / 60).toString().padStart(2, "0")}:${Math.round(duration % 60).toString().padStart(2, "0")}`;
-    }
 </script>

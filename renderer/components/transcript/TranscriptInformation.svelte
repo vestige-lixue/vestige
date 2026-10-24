@@ -30,7 +30,7 @@
         {/if}
         <div class="range">
             {#if information?.range}
-                {formatTime(information.range.start)}–{formatTime(information.range.end)} ({(information.range.end - information.range.start).toFixed(2)}s)
+                {formatDuration(information.range.start, { precision: 2 })}–{formatDuration(information.range.end, { precision: 2 })} ({(information.range.end - information.range.start).toFixed(2)}s)
             {:else}—{/if}
         </div>
     </div>
@@ -144,18 +144,11 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
+    import { formatDuration } from "../../format";
     import { type TranscriptInformation } from "../../editor/informationModel";
     import { type InspectionInformation } from "../../editor/information";
 
     let { information, compact = false }: { information: InspectionInformation | null; compact?: boolean } = $props();
-
-    function formatTime(seconds: number): string {
-        const centiseconds = Math.round(seconds * 100);
-        const hours = Math.floor(centiseconds / 360000);
-        const minutes = Math.floor(centiseconds / 6000) % 60;
-        const remaining = ((centiseconds % 6000) / 100).toFixed(2).padStart(5, "0");
-        return `${hours ? `${hours}:` : ""}${String(minutes).padStart(2, "0")}:${remaining}`;
-    }
 
     function formatProbability(value: number | null | undefined): string {
         return value == null ? "—" : `${(value * 100).toFixed(1).replace(/\.0$/, "")}%`;

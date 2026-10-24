@@ -53,7 +53,7 @@
         </div>
         <Tooltip text={i18n.t("player.actions.focusSlider")} shortcut={`${modKeyText}+⇧+P`} tabindex={-1} bind:open={progressTooltipOpen}>
             {#snippet child({ props })}
-                <div {...props} class="time">{formatTime(player.getCurrentTime())} / {formatTime(duration)}</div>
+                <div {...props} class="time">{formatDuration(player.getCurrentTime(), { rounding: "floor" })} / {formatDuration(duration, { rounding: "floor" })}</div>
             {/snippet}
         </Tooltip>
     </div>
@@ -404,6 +404,7 @@
     import LevelMeter from "./LevelMeter.svelte";
     import { type AudioLevels } from "../../audio/levels";
     import { sliderToVolume, volumeToSlider } from "../../audio/volume";
+    import { formatDuration } from "../../format";
 
     import * as i18n from "../../i18n.svelte";
     import { onDestroy, onMount } from "svelte";
@@ -575,11 +576,4 @@
         runCommand({ kind: "seekSelectedMedia", time: progress / progressSteps * duration, mode: progressInput === "pointer" ? "preview" : "commit" });
     }
 
-    function formatTime(time: number): string {
-        const seconds = Number.isFinite(time) ? Math.max(0, Math.floor(time)) : 0;
-        const minutes = Math.floor(seconds / 60);
-        const remainder = String(seconds % 60).padStart(2, "0");
-        if (minutes < 60) return `${String(minutes).padStart(2, "0")}:${remainder}`;
-        return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}:${remainder}`;
-    }
 </script>
