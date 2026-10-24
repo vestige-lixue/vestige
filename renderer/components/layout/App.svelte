@@ -1,5 +1,5 @@
 <svelte:head>
-    <title>{project.projectState.project ? `${(project.getFileName() ?? i18n.t("project.unsaved.name")).replace(/\.vestige$/i, "")} - ` : ""}Vestige</title>
+    <title>{project.projectState.project ? `${projectTitle(project.getFileName())} - ` : ""}Vestige</title>
 </svelte:head>
 
 <Tooltip.Provider delayDuration={300}>
@@ -34,6 +34,7 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
+    import { projectTitle } from "../../projectTitle";
     import { onMount } from "svelte";
     import * as keybindings from "../../keybindings";
     import { Tooltip } from "bits-ui";

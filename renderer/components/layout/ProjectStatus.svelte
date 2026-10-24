@@ -85,6 +85,7 @@
 <script lang="ts">
     import { shortcut } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
+    import { projectTitle } from "../../projectTitle";
     import * as project from "../../states/project.svelte";
     import { runCommand } from "../../states/commands";
     import NiceLabel from "../util/NiceLabel.svelte";
@@ -96,7 +97,7 @@
 
     let { reservedWidth = $bindable(0) }: Props = $props();
 
-    const title = $derived((project.getFileName() ?? i18n.t("project.unsaved.name")).replace(/\.vestige$/i, ""));
+    const title = $derived(projectTitle(project.getFileName()));
 
     $effect(() => {
         if (!project.projectState.project) reservedWidth = 0;

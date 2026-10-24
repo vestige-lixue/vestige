@@ -443,10 +443,7 @@
     } satisfies Record<keyof VolumeStabilizationSettings, string>;
     let updates = Promise.resolve(true);
     const failure = $derived(settings.getError());
-    const languages = $derived([
-        { value: "zh-CN", label: i18n.t("settings.general.language.options.zh-CN") },
-        { value: "en", label: i18n.t("settings.general.language.options.en") }
-    ]);
+    const languages = $derived(i18n.languageItems());
     const mediaPathModes = $derived(mediaPathModeValues.map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
     const informationDisplays = $derived(informationDisplayValues.map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
     const volumeSliderMappings = $derived(volumeSliderMappingValues.map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));

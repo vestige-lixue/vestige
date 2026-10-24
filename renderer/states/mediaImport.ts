@@ -6,6 +6,7 @@ import { type FailureInfo, VestigeErrors, toFailureInfo } from "../../shared/fai
 import { type MediaIssueStatus } from "../../shared/media/check";
 import { type InputSource } from "../../shared/util/file";
 import { getFileName, type AbsolutePath } from "../../shared/util/path";
+import { isProjectFile } from "../../shared/project/file";
 import * as project from "./project.svelte";
 import * as mediaSelection from "./mediaSelection.svelte";
 import * as mediaImport from "./mediaImport.svelte";
@@ -282,7 +283,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
             path = result.path;
         }
         if (!tasks.isCurrent(task)) return;
-        if (task.value.kind === "import" && /\.vestige$/i.test(path)) {
+        if (task.value.kind === "import" && isProjectFile(path)) {
             reportFailure(id, "unreadable", { kind: "media-format" }, path);
             return;
         }

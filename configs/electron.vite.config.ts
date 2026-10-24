@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { defineConfig } from "electron-vite";
 import UnpluginTypia from "@typia/unplugin/vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { version } from "../package.json";
 
 export default defineConfig({
     main: {
@@ -30,6 +31,7 @@ export default defineConfig({
         }
     },
     renderer: {
+        define: { __APP_VERSION__: JSON.stringify(version) },
         root: "renderer",
         publicDir: "../static",
         base: "./",

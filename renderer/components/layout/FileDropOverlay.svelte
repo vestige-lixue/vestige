@@ -79,6 +79,7 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
+    import { isProjectFile } from "../../../shared/project/file";
     import { onDestroy } from "svelte";
     import { Portal } from "bits-ui";
     import downloadIcon from "../../../resources/icons/carbon--download.svg?raw";
@@ -138,7 +139,7 @@
         if (!items.length) return;
         const first = items[0];
         // Classify the original drop before flattening directories or discarding failures.
-        if (items.length === 1 && !first.entry?.isDirectory && first.file && /\.vestige$/i.test(first.file.name)) {
+        if (items.length === 1 && !first.entry?.isDirectory && first.file && isProjectFile(first.file.name)) {
             void projectAPI.openFile(first.file);
             return;
         }

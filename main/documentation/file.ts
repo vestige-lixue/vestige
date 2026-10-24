@@ -1,13 +1,19 @@
 import { mkdir, open, realpath } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
-import { type Documentation, parseDocumentLink } from "../../shared/documentation";
+import { type Documentation, type DocumentationKind, parseDocumentLink } from "../../shared/documentation";
+import { localeDefinitions, locales, type Locale } from "../../shared/locale";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, parseAbsolutePath, isSystemError } from "../util/file";
 import { errorCode, writeFileAtomic } from "../util/fs";
 import { VestigeErrors } from "../../shared/failure";
 
-const documentNames = ["README.en.md", "README.zh-cn.md", "params.en.md", "params.zh-cn.md"] as const;
+const documentStems: Record<DocumentationKind, string> = { guide: "README", params: "params" };
+const documentNames = (Object.keys(documentStems) as DocumentationKind[]).flatMap(kind => locales.map(locale => documentName(kind, locale)));
 const maximumBytes = 1024 * 1024;
+
+function documentName(kind: DocumentationKind, locale: Locale): string {
+    return `${documentStems[kind]}.${localeDefinitions[locale].documentSuffix}.md`;
+}
 
 async function readBounded(path: string): Promise<Buffer> {
     const file = await open(path, "r");
@@ -62,9 +68,9 @@ async function readFile(root: AbsolutePath, path: string): Promise<Documentation
 
 export async function readDocumentation(root: AbsolutePath, kind: unknown, language: unknown): Promise<Documentation> {
     if (kind !== "guide" && kind !== "params") throw new VestigeErrors({ kind: "documentation-invalid-request", reason: "kind" });
-    const locale = typeof language === "string" ? language.toLowerCase() : "";
-    if (locale !== "en" && locale !== "zh-cn") throw new VestigeErrors({ kind: "documentation-invalid-request", reason: "language" });
-    return readFile(root, join(root, `${kind === "guide" ? "README" : "params"}.${locale}.md`));
+    const locale = typeof language === "string" ? locales.find(locale => locale.toLowerCase() === language.toLowerCase()) : undefined;
+    if (locale === undefined) throw new VestigeErrors({ kind: "documentation-invalid-request", reason: "language" });
+    return readFile(root, join(root, documentName(kind, locale)));
 }
 
 export async function readDocumentationLink(root: AbsolutePath, from: unknown, href: unknown): Promise<Documentation> {

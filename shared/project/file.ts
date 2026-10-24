@@ -1,6 +1,12 @@
 import { type FailureInfo } from "../failure";
 import { type Project } from "./Project";
 
+export const projectExtensionPattern = /\.vestige$/i;
+
+export function isProjectFile(pathOrName: string): boolean {
+    return projectExtensionPattern.test(pathOrName);
+}
+
 export const mediaPathModes = ["absolute", "project", "relative"] as const;
 export type MediaPathMode = typeof mediaPathModes[number];
 
