@@ -1,5 +1,5 @@
 import * as fc from "fast-check";
-import { type TextProjection } from "../../shared/transcript/text";
+import { textPieces, type TextProjection, type TextIndex } from "../../shared/transcript/text";
 import { modification, transcript } from "./fixtures";
 
 export const textArbitrary = fc.array(fc.constantFrom("a", "b", " ", "\n", "中", "𝄞", "e\u0301", "👩‍🔬"), { maxLength: 8 })
@@ -33,16 +33,16 @@ export const editingArbitrary = fc.record({
 });
 
 // Boundary-biased choices use the candidate positions only; expected text is a plain array splice.
-export function editRange(projection: TextProjection, edit: EditSample): { from: number; to: number } {
+export function editRange(index: TextIndex, projection: TextProjection, edit: EditSample): { from: number; to: number } {
     let left = edit.first % (projection.length + 1);
     let right = edit.second % (projection.length + 1);
     if (edit.focus === "boundary") {
-        const boundaries = [0, projection.length, ...projection.pieces.flatMap(piece => [piece.from, piece.to])];
+        const boundaries = [0, projection.length, ...textPieces(index, projection).flatMap(piece => [piece.from, piece.to])];
         left = boundaries[edit.first % boundaries.length];
         right = boundaries[edit.second % boundaries.length];
     }
     if (edit.focus === "inserted") {
-        const added = projection.pieces.filter(piece => piece.source.kind === "modification" && piece.from < piece.to);
+        const added = textPieces(index, projection).filter(piece => piece.source.kind === "modification" && piece.from < piece.to);
         const piece = added[edit.first % added.length];
         if (piece) {
             left = piece.from + edit.first % (piece.to - piece.from + 1);
@@ -50,7 +50,7 @@ export function editRange(projection: TextProjection, edit: EditSample): { from:
         }
     }
     if (edit.focus === "deletion") {
-        const deleted = projection.pieces.filter(piece => piece.from === piece.to);
+        const deleted = textPieces(index, projection).filter(piece => piece.from === piece.to);
         const piece = deleted[edit.first % deleted.length];
         if (piece) left = right = piece.from;
     }

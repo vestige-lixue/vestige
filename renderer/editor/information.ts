@@ -1,7 +1,7 @@
 import { type Node as PMNode } from "@tiptap/pm/model";
-import { Plugin } from "@tiptap/pm/state";
+import { Plugin, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
-import { transcriptInformation, type TranscriptInformation } from "./informationModel";
+import { transcriptEvents, transcriptTokens, transcriptTokenGroup, type TranscriptInformation } from "./informationModel";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { textRectangles } from "./geometry";
 
@@ -27,22 +27,14 @@ export type InspectionOptions = {
     onSeek: (time: number) => void;
 };
 
-export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) => TextProjection, options: InspectionOptions): Plugin {
+export function informationPlugin(index: TextIndex, projectionOf: (state: EditorState) => TextProjection, options: InspectionOptions): Plugin {
     function build(doc: PMNode, projection: TextProjection): {
-        spans: TranscriptInformation[];
-        groups: Map<string, TranscriptInformation[]>;
         byKey: Map<string, InspectionInformation>;
         decorations: DecorationSet;
     } {
-        const items = transcriptInformation(index, projection, options.duration);
-        const groups = new Map<string, TranscriptInformation[]>();
+        const items = transcriptEvents(index, projection, options.duration);
         const markers = new Map<number, TranscriptInformation[]>();
         for (const item of items) {
-            if (item.kind === "token") {
-                const group = groups.get(item.key) ?? [];
-                group.push(item);
-                groups.set(item.key, group);
-            }
             if (item.kind !== "deletion" && item.kind !== "gap") continue;
             const group = markers.get(item.from) ?? [];
             group.push(item);
@@ -95,18 +87,16 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
             }, { key, side, relaxedSide: true, marks: [], ignoreSelection: true, stopEvent: () => true });
         });
         return {
-            spans: items.filter(item => item.from < item.to),
-            groups,
             byKey,
             decorations: DecorationSet.create(doc, decorations)
         };
     }
     const cache = new WeakMap<TextProjection, ReturnType<typeof build>>();
-    function informationOf(doc: PMNode): ReturnType<typeof build> {
-        const projection = projectionOf(doc);
+    function informationOf(state: EditorState): ReturnType<typeof build> {
+        const projection = projectionOf(state);
         let value = cache.get(projection);
         if (!value) {
-            value = build(doc, projection);
+            value = build(state.doc, projection);
             cache.set(projection, value);
         }
         return value;
@@ -135,7 +125,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
     }
 
     function tokenRectangles(view: EditorView, item: TranscriptInformation): DOMRect[][] {
-        return (informationOf(view.state.doc).groups.get(item.key) ?? []).map(part => rectangles(view, part));
+        return transcriptTokenGroup(index, projectionOf(view.state), item).map(part => rectangles(view, part));
     }
 
     function distanceTo(rect: DOMRect, x: number, y: number): number {
@@ -145,9 +135,9 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
     let composing = false;
     const plugin: Plugin<DecorationSet> = new Plugin({
         state: {
-            init: (_, state) => informationOf(state.doc).decorations,
-            apply: (transaction, decorations) => composing ? decorations.map(transaction.mapping, transaction.doc)
-                : informationOf(transaction.doc).decorations
+            init: (_, state) => informationOf(state).decorations,
+            apply: (transaction, decorations, _oldState, state) => composing ? decorations.map(transaction.mapping, transaction.doc)
+                : informationOf(state).decorations
         },
         props: { decorations: state => plugin.getState(state) ?? DecorationSet.empty },
         view(view) {
@@ -182,7 +172,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
                 const { x, y, pressed } = pointer;
                 const element = document.elementFromPoint(x, y);
                 if (!element || !view.dom.contains(element)) return null;
-                const data = informationOf(view.state.doc);
+                const data = informationOf(view.state);
                 const button = eventMarker(element);
                 if (button) {
                     const item = data.byKey.get(button.dataset.inspection!);
@@ -191,14 +181,9 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
                 const position = view.posAtCoords({ left: x, top: y });
                 if (!position) return null;
                 const offset = position.pos - 1;
-                let low = 0;
-                let high = data.spans.length;
-                while (low < high) {
-                    const middle = Math.floor((low + high) / 2);
-                    if (data.spans[middle].to <= offset) low = middle + 1;
-                    else high = middle;
-                }
-                for (const item of [data.spans[low], data.spans[low - 1]]) {
+                const candidates = transcriptTokens(index, projectionOf(view.state), offset);
+                // At a boundary try the following token first, then the preceding token's spacing.
+                for (const item of candidates.reverse()) {
                     if (!item || offset < item.from || offset > item.to) continue;
                     const boxes = !measure && hovered?.information === item ? hovered.rectangles : tokenRectangles(view, item);
                     const rects = boxes.flat();
@@ -215,22 +200,14 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
                 if (view.composing || !document.hasFocus()) return null;
                 const button = eventMarker(element);
                 if (button && view.dom.contains(button) && button.matches(":focus-visible")) {
-                    const item = informationOf(view.state.doc).byKey.get(button.dataset.inspection!);
+                    const item = informationOf(view.state).byKey.get(button.dataset.inspection!);
                     if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: true, pressed: false };
                 }
                 if (!control || element !== view.dom) return null;
-                const { selection, doc } = view.state;
+                const { selection } = view.state;
                 if (!selection.empty) return null;
                 const offset = selection.head - 1;
-                const spans = informationOf(doc).spans;
-                let low = 0;
-                let high = spans.length;
-                while (low < high) {
-                    const middle = Math.floor((low + high) / 2);
-                    if (spans[middle].to <= offset) low = middle + 1;
-                    else high = middle;
-                }
-                const item = spans[low];
+                const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);
                 // A caret at a boundary belongs to the following character; the document end has none.
                 if (!item || offset < item.from) return null;
                 const boxes = tokenRectangles(view, item);

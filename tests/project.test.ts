@@ -46,7 +46,7 @@ describe("project validation contract through the real typia transform", () => {
             const index = createTextIndex(spans);
             let projection = projectText(index, []);
             for (const edit of edits) {
-                const { from, to } = editRange(projection, edit);
+                const { from, to } = editRange(index, projection, edit);
                 projection = editText(index, projection, from, to, edit.text);
                 for (const item of projection.modifications) {
                     const start = sourceOffset(spans, item.type === "insert" ? item.pos : item.range.start);

@@ -1,7 +1,7 @@
 import { Editor, Extension, Mark, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type Mark as PMMark, type Schema } from "@tiptap/pm/model";
-import { Plugin, PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
-import { DocAttrStep } from "@tiptap/pm/transform";
+import { Plugin, PluginKey, TextSelection, type Transaction, type EditorState } from "@tiptap/pm/state";
+import { ProjectionStep } from "./projectionStep";
 import { history, undo, redo } from "@tiptap/pm/history";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
@@ -9,26 +9,19 @@ import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
 import { informationPlugin, type InspectionOptions } from "./information";
 import {
-    createTextIndex, projectText, editText, utf16ToCodepoint,
+    createTextIndex, projectText, editText, textPieces, sourceTextPieces, projectionOffset,
     type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
-const patchesAttribute = "vestigeModifications";
-const bridgeKey = new PluginKey("vestigeTranscript");
+type DirtyRange = { from: number; to: number };
+type BridgeState = { projection: TextProjection; saved: TextProjection; dirty: DirtyRange[] };
+const bridgeKey = new PluginKey<BridgeState>("vestigeTranscript");
 const playbackKey = new PluginKey<number>("vestigePlayback");
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new WeakMap<HTMLElement, Editor>();
-const projections = new WeakMap<PMNode, TextProjection>();
 const texts = new WeakMap<PMNode, string>();
-// Keep one canonical input per Run, rather than retaining a full projection for every history snapshot.
-const projectionInputs = new WeakMap<TextIndex, { modifications: readonly Modification[]; projection: TextProjection }>();
 
-const Document = Node.create({
-    name: "doc", topNode: true, content: "paragraph",
-    addAttributes() {
-        return { [patchesAttribute]: { default: [], rendered: false } };
-    }
-});
+const Document = Node.create({ name: "doc", topNode: true, content: "paragraph" });
 
 const Paragraph = Node.create({
     name: "paragraph", group: "block", content: "(text | hardBreak)*", whitespace: "pre",
@@ -87,13 +80,20 @@ function inlineContent(text: string, marks?: JSONContent["marks"]): JSONContent[
     return content;
 }
 
-export function transcriptContent(index: TextIndex, modifications: readonly Modification[]): JSONContent {
-    const projection = projectText(index, modifications);
-    projectionInputs.set(index, { modifications: projection.modifications, projection });
+function contentOf(index: TextIndex, projection: TextProjection): JSONContent {
     return {
-        type: "doc", attrs: { [patchesAttribute]: projection.modifications },
-        content: [{ type: "paragraph", content: projection.pieces.flatMap(piece => inlineContent(piece.text, [{ type: "source", attrs: piece.source }])) }]
+        type: "doc",
+        content: [{ type: "paragraph", content: textPieces(index, projection).flatMap(piece => inlineContent(piece.text, [{ type: "source", attrs: markSource(piece.source) }])) }]
     };
+}
+
+export function transcriptContent(index: TextIndex, modifications: readonly Modification[]): JSONContent {
+    return contentOf(index, projectText(index, modifications));
+}
+
+function markSource(source: { kind: string; index: number }): { kind: string; index: number } {
+    // Added text shares one visual style; its exact provenance belongs to the projection, not a DOM mark.
+    return source.kind === "segment" ? source : { kind: "modification", index: 0 };
 }
 
 function plainSlice(schema: Schema, text: string): Slice {
@@ -150,97 +150,104 @@ function applyTextSteps(index: TextIndex, projection: TextProjection, transactio
             else merged.push(change);
         }
         for (const change of merged.reverse()) {
-            projection = editText(index, projection, utf16ToCodepoint(before, change.from), utf16ToCodepoint(before, change.to), after.slice(change.start, change.end));
+            projection = editText(index, projection, projectionOffset(projection, change.from, false), projectionOffset(projection, change.to, false), after.slice(change.start, change.end));
         }
         if (projection.text !== after) throw new Error("Transcript transaction did not preserve rendered text.");
     }
     return projection;
 }
 
-function synchronizeMarks(transaction: Transaction, projection: TextProjection): void {
-    let position = 1;
-    const spans: { from: number; to: number; mark: PMMark }[] = [];
-    for (const piece of projection.pieces) {
-        const from = position;
-        const to = from + piece.text.length;
-        position = to;
-        if (from === to) continue;
-        spans.push({ from, to, mark: transaction.doc.type.schema.marks.source.create(piece.source) });
-    }
-    const changes: typeof spans = [];
-    let first = 0;
-    // Walk the inline nodes once. Searching the whole paragraph separately for each token is quadratic.
-    transaction.doc.descendants((node, from) => {
-        if (!node.isInline) return;
-        const to = from + node.nodeSize;
-        while (first < spans.length && spans[first].to <= from) first++;
-        for (let i = first; i < spans.length && spans[i].from < to; i++) {
-            const span = spans[i];
-            if (!span.mark.isInSet(node.marks)) {
-                const start = Math.max(from, span.from);
-                const end = Math.min(to, span.to);
+function synchronizeMarks(index: TextIndex, transaction: Transaction, projection: TextProjection, ranges: DirtyRange[]): void {
+    const changes: { from: number; to: number; mark: PMMark }[] = [];
+    for (const dirty of ranges) {
+        // DOM diffs may replace one UTF-16 half of a character; provenance marks follow whole codepoints.
+        const range = { ...dirty };
+        if (splitsCodepoint(projection.text, range.from - 1)) range.from--;
+        if (splitsCodepoint(projection.text, range.to - 1)) range.to++;
+        const spans = textPieces(index, projection, range.from - 1, range.to - 1, true)
+            .filter(piece => piece.utf16From < piece.utf16To && piece.utf16From < range.to - 1 && piece.utf16To > range.from - 1)
+            .map(piece => ({ from: piece.utf16From + 1, to: piece.utf16To + 1, mark: transaction.doc.type.schema.marks.source.create(markSource(piece.source)) }));
+        let first = 0;
+        transaction.doc.nodesBetween(range.from, range.to, (node, from) => {
+            if (!node.isInline) return;
+            const to = from + node.nodeSize;
+            while (first < spans.length && spans[first].to <= from) first++;
+            for (let i = first; i < spans.length && spans[i].from < to; i++) {
+                const span = spans[i];
+                if (span.mark.isInSet(node.marks)) continue;
+                const start = Math.max(from, span.from, range.from);
+                const end = Math.min(to, span.to, range.to);
+                if (start >= end) continue;
                 const previous = changes.at(-1);
-                // A pasted piece can span many text and hardBreak nodes with the same source mark.
                 if (previous && previous.to === start && previous.mark.eq(span.mark)) previous.to = end;
                 else changes.push({ from: start, to: end, mark: span.mark });
             }
-        }
-    });
+        });
+    }
     for (const change of changes) {
         transaction.removeMark(change.from, change.to, change.mark.type);
         transaction.addMark(change.from, change.to, change.mark);
     }
 }
 
-function rememberProjection(index: TextIndex, doc: PMNode, projection: TextProjection): void {
-    projections.set(doc, projection);
-    // During composition the document can still carry the previous persisted snapshot.
-    if (doc.attrs[patchesAttribute] === projection.modifications) {
-        projectionInputs.set(index, { modifications: projection.modifications, projection });
+function dirtyRanges(previous: DirtyRange[], transaction: Transaction): DirtyRange[] {
+    const ranges = previous.map(range => ({ from: transaction.mapping.map(range.from, -1), to: transaction.mapping.map(range.to, 1) }));
+    transaction.mapping.maps.forEach((map, index) => {
+        const after = transaction.mapping.slice(index + 1);
+        map.forEach((_from, _to, from, to) => ranges.push({ from: after.map(from, -1), to: after.map(to, 1) }));
+    });
+    const merged: DirtyRange[] = [];
+    const end = transaction.doc.content.size - 1;
+    for (const range of ranges.sort((left, right) => left.from - right.from)) {
+        range.from = Math.max(1, Math.min(end, range.from));
+        range.to = Math.max(range.from, Math.min(end, range.to));
+        const previous = merged.at(-1);
+        if (previous && previous.to >= range.from) previous.to = Math.max(previous.to, range.to);
+        else merged.push(range);
     }
+    return merged;
 }
 
-function projectionOf(index: TextIndex, doc: PMNode): TextProjection {
-    let projection = projections.get(doc);
-    if (!projection) {
-        const modifications = doc.attrs[patchesAttribute] as Modification[];
-        const previous = projectionInputs.get(index);
-        projection = previous?.modifications === modifications ? previous.projection : projectText(index, modifications);
-        projections.set(doc, projection);
-        projectionInputs.set(index, { modifications, projection });
-    }
-    return projection;
+export function transcriptProjection(state: EditorState): TextProjection {
+    return bridgeKey.getState(state)!.projection;
 }
 
-export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () => true): Plugin[] {
+export function transcriptModifications(state: EditorState): Modification[] {
+    return bridgeKey.getState(state)!.saved.modifications;
+}
+
+export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Plugin[] {
     let composing = false;
     let compositionTimer: ReturnType<typeof setTimeout> | undefined;
-    const bridge = new Plugin({
+    const bridge = new Plugin<BridgeState>({
         key: bridgeKey,
+        state: {
+            init: () => ({ projection: initial, saved: initial, dirty: [] }),
+            apply(transaction, previous) {
+                const snapshot = transaction.steps.findLast(step => step instanceof ProjectionStep);
+                const projection = snapshot instanceof ProjectionStep ? snapshot.afterProjection ?? projectText(index, snapshot.after)
+                    : transaction.getMeta(bridgeKey) ? previous.projection : applyTextSteps(index, previous.projection, transaction);
+                return {
+                    projection,
+                    saved: snapshot ? projection : previous.saved,
+                    dirty: transaction.getMeta(bridgeKey) === true ? [] : dirtyRanges(previous.dirty, transaction)
+                };
+            }
+        },
         filterTransaction(transaction) {
             return (!transaction.docChanged || canEdit()) && transaction.doc.childCount === 1 && transaction.doc.firstChild?.type.name === "paragraph";
         },
-        appendTransaction(transactions, oldState, newState) {
+        appendTransaction(transactions, _oldState, newState) {
             if (!transactions.some(transaction => transaction.getMeta(bridgeKey) === "compositionend"
                 || transaction.docChanged && !transaction.getMeta(bridgeKey))) return null;
-            let projection = projectionOf(index, oldState.doc);
-            for (const transaction of transactions) {
-                if (transaction.steps.some(step => step instanceof DocAttrStep && step.attr === patchesAttribute)) {
-                    // History restores the exact patch snapshot, rather than interpreting undo as a new edit.
-                    projection = projectionOf(index, transaction.doc);
-                }
-                else if (!transaction.getMeta(bridgeKey)) projection = applyTextSteps(index, projection, transaction);
-            }
+            const { projection, saved, dirty } = bridgeKey.getState(newState)!;
             if (projection.text !== documentText(newState.doc)) throw new Error("Transcript and modifications diverged.");
-            rememberProjection(index, newState.doc, projection);
-            // Updating document attributes redraws the editor; changing marks also replaces IME-owned DOM.
+            // ProseMirror owns the composition DOM until the final input has been consumed.
             if (composing) return null;
             const transaction = newState.tr.setMeta(bridgeKey, true);
-            const current = newState.doc.attrs[patchesAttribute] as Modification[];
-            if (JSON.stringify(current) !== JSON.stringify(projection.modifications)) transaction.setDocAttribute(patchesAttribute, projection.modifications);
-            synchronizeMarks(transaction, projection);
-            rememberProjection(index, transaction.doc, projection);
-            return transaction.steps.length ? transaction : null;
+            if (projection !== saved) transaction.step(new ProjectionStep(saved.modifications, projection.modifications, saved, projection));
+            synchronizeMarks(index, transaction, projection, dirty);
+            return transaction.steps.length || dirty.length ? transaction : null;
         },
         view() {
             return { destroy: () => clearTimeout(compositionTimer) };
@@ -309,6 +316,10 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             }
         }
     });
+    const intervals = index.transcript.map((segment, segmentIdx) => ({ ...segment.range, segmentIdx }))
+        .sort((left, right) => left.start - right.start);
+    const latestEnd: number[] = [];
+    for (const interval of intervals) latestEnd.push(Math.max(latestEnd.at(-1) ?? -Infinity, interval.end));
     let previousProjection: TextProjection | undefined;
     let previousTime = NaN;
     let previousRanges: number[] = [];
@@ -319,17 +330,21 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         props: {
             decorations(state) {
                 const time = playbackKey.getState(state) ?? -1;
-                const projection = projectionOf(index, state.doc);
+                const projection = transcriptProjection(state);
                 if (projection === previousProjection && time === previousTime) return previousDecorations;
                 const ranges: number[] = [];
-                let position = 1;
-                for (const piece of projection.pieces) {
-                    const from = position;
-                    position += piece.text.length;
-                    if (!piece.text) continue;
-                    if (piece.source.kind === "segment") {
-                        const range = index.transcript[piece.source.index].range;
-                        if (time >= range.start && time < range.end) ranges.push(from, position);
+                let low = 0;
+                let high = intervals.length;
+                while (low < high) {
+                    const middle = (low + high) >>> 1;
+                    if (intervals[middle].start <= time) low = middle + 1;
+                    else high = middle;
+                }
+                for (let i = low - 1; i >= 0 && latestEnd[i] > time; i--) {
+                    const { segmentIdx, end } = intervals[i];
+                    if (end <= time) continue;
+                    for (const piece of sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])) {
+                        if (piece.source.kind === "segment" && piece.source.index === segmentIdx) ranges.push(piece.utf16From + 1, piece.utf16To + 1);
                     }
                 }
                 previousTime = time;
@@ -347,7 +362,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
     return [bridge, playback, history()];
 }
 
-export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true): Extensions {
+export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {
     const source = Source.extend({
         renderHTML({ mark }) {
             if (mark.attrs.kind !== "segment") return ["span", { class: "transcript-text transcript-added" }, 0];
@@ -359,7 +374,7 @@ export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = 
     const bridge = Extension.create({
         name: "vestigeTranscript", priority: 1000,
         addProseMirrorPlugins() {
-            return transcriptPlugins(index, canEdit);
+            return transcriptPlugins(index, canEdit, initial);
         },
         addKeyboardShortcuts() {
             const lineBreak = (): boolean => this.editor.commands.command(({ tr, dispatch }) => {
@@ -379,19 +394,19 @@ export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = 
 
 export function createTranscriptEditor(element: HTMLElement, run: Run, modifications: readonly Modification[], onChange: (modifications: Modification[]) => void, canEdit: () => boolean = () => true, inspection?: InspectionOptions): Editor {
     const index = createTextIndex(run.transcript);
-    let previous: Modification[];
+    const initial = projectText(index, modifications);
+    let previous = initial.modifications;
     const editor = new Editor({
-        element, extensions: transcriptExtensions(index, canEdit), content: transcriptContent(index, modifications),
+        element, extensions: transcriptExtensions(index, canEdit, initial), content: contentOf(index, initial),
         injectCSS: false, enableInputRules: false, enablePasteRules: false,
         onTransaction({ editor }) {
-            const next = editor.state.doc.attrs[patchesAttribute] as Modification[];
+            const next = transcriptModifications(editor.state);
             if (next === previous) return;
             previous = next;
             onChange(next);
         }
     });
-    previous = editor.state.doc.attrs[patchesAttribute];
-    if (inspection) editor.registerPlugin(informationPlugin(index, doc => projectionOf(index, doc), inspection));
+    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, inspection));
     editors.set(editor.view.dom, editor);
     return editor;
 }

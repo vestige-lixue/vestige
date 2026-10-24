@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
-    createTextIndex, projectText, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications
+    createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary } from "./support/generators";
@@ -14,9 +14,9 @@ describe("text projection and editing", () => {
             const index = createTextIndex(spans);
             const projection = projectText(index, modifications);
             expect(projection.text).toBe(referenceText(spans, modifications));
-            expect(projection.pieces.map(piece => piece.text).join("")).toBe(projection.text);
+            expect(textPieces(index, projection).map(piece => piece.text).join("")).toBe(projection.text);
             let offset = 0;
-            for (const piece of projection.pieces) {
+            for (const piece of textPieces(index, projection)) {
                 expect(piece.from).toBe(offset);
                 offset += [...piece.text].length;
                 expect(piece.to).toBe(offset);
@@ -35,13 +35,32 @@ describe("text projection and editing", () => {
             const original = structuredClone(index);
             let projection = projectText(index, []);
             const expected = [...projection.text];
+            const provenance = expected.map((text, source) => ({ text, source: source as number | null }));
             for (const edit of edits) {
-                const range = editRange(projection, edit);
+                const range = editRange(index, projection, edit);
                 const before = structuredClone(projection);
                 const next = editText(index, projection, range.from, range.to, edit.text);
+                if (expected.slice(range.from, range.to).join("") !== edit.text) {
+                    provenance.splice(range.from, range.to - range.from, ...[...edit.text].map(text => ({ text, source: null })));
+                }
                 expected.splice(range.from, range.to - range.from, ...edit.text);
                 expect(next.text).toBe(expected.join(""));
                 expect(next.length).toBe(expected.length);
+                const pieces = textPieces(index, next);
+                expect(pieces.flatMap(piece => [...piece.text].map((text, offset) => ({
+                    text, source: piece.source.kind === "segment" ? piece.sourceFrom + offset : null
+                })))).toEqual(provenance);
+                for (let offset = 0, utf16 = 0; offset <= expected.length; offset++) {
+                    expect(projectionOffset(next, offset, true)).toBe(utf16);
+                    expect(projectionOffset(next, utf16, false)).toBe(offset);
+                    utf16 += expected[offset]?.length ?? 0;
+                }
+                for (let source = 0; source <= index.characters.length; source++) {
+                    const piece = pieces.find(piece => piece.sourceTo > source);
+                    const expectedPosition = !piece ? next.text.length : piece.utf16From + (piece.source.kind === "segment"
+                        ? [...piece.text].slice(0, source - piece.sourceFrom).join("").length : 0);
+                    expect(projectedOffset(next, source)).toBe(expectedPosition);
+                }
                 expect(projection).toEqual(before);
                 projection = next;
             }
@@ -179,7 +198,7 @@ describe("text projection and editing", () => {
             { type: "insert", pos: sourcePosition(spans, 2), text: "a" },
             { type: "delete", range: { start: sourcePosition(spans, 2), end: sourcePosition(spans, 4) } }
         ]);
-        expect(value.pieces.find(piece => piece.sourceFrom === 2 && piece.sourceTo === 4)).toMatchObject({ from: 3, to: 3, text: "" });
+        expect(textPieces(index, value).find(piece => piece.sourceFrom === 2 && piece.sourceTo === 4)).toMatchObject({ from: 3, to: 3, text: "" });
         expect(editText(index, value, 3, 3, "tr").text).toBe("Ouatro");
     });
 
@@ -210,7 +229,7 @@ describe("text projection and editing", () => {
         const last = editText(index, projectText(index, []), 1, 2, "");
         expect(first.text).toBe(last.text);
         expect(first.modifications).not.toEqual(last.modifications);
-        expect(first.pieces.find(piece => piece.text === "a")?.sourceFrom).toBe(1);
-        expect(last.pieces.find(piece => piece.text === "a")?.sourceFrom).toBe(0);
+        expect(textPieces(index, first).find(piece => piece.text === "a")?.sourceFrom).toBe(1);
+        expect(textPieces(index, last).find(piece => piece.text === "a")?.sourceFrom).toBe(0);
     });
 });

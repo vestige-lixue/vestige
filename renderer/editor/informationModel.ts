@@ -1,5 +1,5 @@
 import { type Range } from "../../shared/util/range";
-import { codepointToUtf16, textPosition, type TextIndex, type TextProjection } from "../../shared/transcript/text";
+import { textPosition, textPieces, sourceTextPieces, projectedOffset, type TextPiece, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 
 export type TranscriptInformation = {
     key: string;
@@ -29,66 +29,101 @@ function intervalsOf(index: TextIndex, duration: number): SpeechInterval[] {
     return intervals;
 }
 
-export function transcriptInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
+const tokenCache = new WeakMap<TextProjection, Map<string, TranscriptInformation>>();
+function pieceInformation(index: TextIndex, piece: TextPiece): TranscriptInformation {
+    const segment = piece.source.kind === "segment" ? index.transcript[piece.source.index] : null;
+    let range: Range | null = segment?.range ?? null;
+    if (!segment && piece.sourceFrom < piece.sourceTo) {
+        const first = textPosition(index, piece.sourceFrom).segmentIdx;
+        const last = textPosition(index, piece.sourceTo - 1).segmentIdx;
+        range = { ...index.transcript[first].range };
+        for (let segmentIdx = first + 1; segmentIdx <= last; segmentIdx++) {
+            range.start = Math.min(range.start, index.transcript[segmentIdx].range.start);
+            range.end = Math.max(range.end, index.transcript[segmentIdx].range.end);
+        }
+    }
+    return {
+        key: `${piece.source.kind}-${piece.source.index}`,
+        kind: segment ? "token" : "deletion",
+        from: piece.utf16From, to: piece.utf16To, range,
+        original: segment ? null : index.characters.slice(piece.sourceFrom, piece.sourceTo).join(""),
+        probability: segment?.token.prob ?? null,
+        blankProbability: segment?.blankProb ?? null
+    };
+}
+
+function tokens(index: TextIndex, projection: TextProjection, pieces: TextPiece[]): TranscriptInformation[] {
+    let cache = tokenCache.get(projection);
+    if (!cache) tokenCache.set(projection, cache = new Map());
+    return pieces.filter(piece => piece.source.kind === "segment").map(piece => {
+        const key = `${piece.source.index}/${piece.sourceFrom}/${piece.sourceTo}`;
+        let item = cache.get(key);
+        if (!item) {
+            item = pieceInformation(index, piece); cache.set(key, item);
+        }
+        return item;
+    });
+}
+
+export function transcriptTokens(index: TextIndex, projection: TextProjection, from: number, to = from): TranscriptInformation[] {
+    return tokens(index, projection, textPieces(index, projection, from, to, true));
+}
+
+export function transcriptTokenGroup(index: TextIndex, projection: TextProjection, token: TranscriptInformation): TranscriptInformation[] {
+    // Token keys refer to immutable Run indices, including when edits split one token into pieces.
+    const segmentIdx = Number(token.key.slice("segment-".length));
+    return tokens(index, projection, sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])
+        .filter(piece => piece.source.kind === "segment" && piece.source.index === segmentIdx));
+}
+
+type Gap = { start: number; end: number; offset: number };
+const gaps = new WeakMap<TextIndex, { duration: number; values: Gap[] }>();
+function gapsOf(index: TextIndex, duration: number): Gap[] {
+    const previous = gaps.get(index);
+    if (previous?.duration === duration) return previous.values;
+    const values: Gap[] = [];
+    if (Number.isFinite(duration) && duration > 0) {
+        let end = 0;
+        for (const interval of intervalsOf(index, duration)) {
+            if (interval.start > end) values.push({ start: end, end: interval.start, offset: interval.offset });
+            end = Math.max(end, interval.end);
+        }
+        if (end < duration) values.push({ start: end, end: duration, offset: index.characters.length });
+    }
+    gaps.set(index, { duration, values });
+    return values;
+}
+
+function gapInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
+    return gapsOf(index, duration).map(gap => {
+        const from = projectedOffset(projection, gap.offset);
+        return {
+            key: `gap-${gap.start}-${gap.end}`, kind: "gap", from, to: from,
+            range: { start: gap.start, end: gap.end }, original: null, probability: null, blankProbability: null
+        };
+    });
+}
+
+export function transcriptEvents(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
     const result: TranscriptInformation[] = [];
-    const positions: number[] = [];
-    let position = 0;
-    for (const piece of projection.pieces) {
-        positions.push(position);
-        const from = position;
-        position += piece.text.length;
-        const segment = piece.source.kind === "segment" ? index.transcript[piece.source.index] : null;
-        // Insertions have no source audio; their separate deletion piece keeps the original marker.
-        if (piece.source.kind === "modification" && projection.modifications[piece.source.index].type === "insert") continue;
-        let range: Range | null = segment?.range ?? null;
-        if (!segment && piece.sourceFrom < piece.sourceTo) {
-            const first = textPosition(index, piece.sourceFrom).segmentIdx;
-            const last = textPosition(index, piece.sourceTo - 1).segmentIdx;
-            range = { ...index.transcript[first].range };
-            for (let segmentIdx = first + 1; segmentIdx <= last; segmentIdx++) {
-                range.start = Math.min(range.start, index.transcript[segmentIdx].range.start);
-                range.end = Math.max(range.end, index.transcript[segmentIdx].range.end);
-            }
-        }
-        result.push({
-            key: `${piece.source.kind}-${piece.source.index}`,
-            kind: segment ? "token" : "deletion",
-            from, to: position, range,
-            original: segment ? null : index.characters.slice(piece.sourceFrom, piece.sourceTo).join(""),
-            probability: segment?.token.prob ?? null,
-            blankProbability: segment?.blankProb ?? null
-        });
-    }
+    projection.modifications.forEach((modification, modificationIdx) => {
+        if (modification.type !== "delete") return;
+        const sourceFrom = index.starts[modification.range.start.segmentIdx] + modification.range.start.offset;
+        const sourceTo = index.starts[modification.range.end.segmentIdx] + modification.range.end.offset;
+        const position = projectedOffset(projection, sourceFrom);
+        result.push(pieceInformation(index, {
+            source: { kind: "modification", index: modificationIdx }, sourceFrom, sourceTo,
+            from: 0, to: 0, utf16From: position, utf16To: position, text: ""
+        }));
+    });
+    return [...result, ...gapInformation(index, projection, duration)];
+}
 
-    function projectedPosition(offset: number): number {
-        let low = 0;
-        let high = projection.pieces.length;
-        while (low < high) {
-            const middle = Math.floor((low + high) / 2);
-            if (projection.pieces[middle].sourceTo <= offset) low = middle + 1;
-            else high = middle;
-        }
-        const piece = projection.pieces[low];
-        if (!piece) return position;
-        // A deleted source boundary stays at the deletion marker, after additions at its anchor.
-        const characters = piece.source.kind === "segment" ? offset - piece.sourceFrom : 0;
-        return positions[low] + codepointToUtf16(piece.text, characters);
-    }
-
-    if (!Number.isFinite(duration) || duration <= 0) return result;
-    const intervals = intervalsOf(index, duration);
-    let end = 0;
-    function gap(start: number, end: number, offset: number): void {
-        const from = projectedPosition(offset);
-        result.push({
-            key: `gap-${start}-${end}`, kind: "gap", from, to: from,
-            range: { start, end }, original: null, probability: null, blankProbability: null
-        });
-    }
-    for (const interval of intervals) {
-        if (interval.start > end) gap(end, interval.start, interval.offset);
-        end = Math.max(end, interval.end);
-    }
-    if (end < duration) gap(end, duration, index.characters.length);
-    return result;
+export function transcriptInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
+    return [
+        ...textPieces(index, projection)
+            .filter(piece => piece.source.kind === "segment" || projection.modifications[piece.source.index].type === "delete")
+            .map(piece => pieceInformation(index, piece)),
+        ...gapInformation(index, projection, duration)
+    ];
 }
