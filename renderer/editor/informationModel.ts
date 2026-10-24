@@ -13,6 +13,22 @@ export type TranscriptInformation = {
     blankProbability: number | null;
 };
 
+type SpeechInterval = { start: number; end: number; offset: number };
+const speechIntervals = new WeakMap<TextIndex, { duration: number; intervals: SpeechInterval[] }>();
+
+function intervalsOf(index: TextIndex, duration: number): SpeechInterval[] {
+    const previous = speechIntervals.get(index);
+    if (previous?.duration === duration) return previous.intervals;
+    // A TextIndex describes one immutable Run; text edits only change its projection.
+    const intervals = index.transcript.flatMap((segment, segmentIdx) => {
+        const start = Math.max(0, segment.range.start);
+        const end = Math.min(duration, segment.range.end);
+        return segment.token.text && start < end ? [{ start, end, offset: index.starts[segmentIdx] }] : [];
+    }).sort((a, b) => a.start - b.start || a.end - b.end);
+    speechIntervals.set(index, { duration, intervals });
+    return intervals;
+}
+
 export function transcriptInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
     const result: TranscriptInformation[] = [];
     const positions: number[] = [];
@@ -60,11 +76,7 @@ export function transcriptInformation(index: TextIndex, projection: TextProjecti
     }
 
     if (!Number.isFinite(duration) || duration <= 0) return result;
-    const intervals = index.transcript.flatMap((segment, segmentIdx) => {
-        const start = Math.max(0, segment.range.start);
-        const end = Math.min(duration, segment.range.end);
-        return segment.token.text && start < end ? [{ start, end, offset: index.starts[segmentIdx] }] : [];
-    }).sort((a, b) => a.start - b.start || a.end - b.end);
+    const intervals = intervalsOf(index, duration);
     let end = 0;
     function gap(start: number, end: number, offset: number): void {
         const from = projectedPosition(offset);

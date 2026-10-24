@@ -19,6 +19,9 @@ const playbackKey = new PluginKey<number>("vestigePlayback");
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new WeakMap<HTMLElement, Editor>();
 const projections = new WeakMap<PMNode, TextProjection>();
+const texts = new WeakMap<PMNode, string>();
+// Keep one canonical input per Run, rather than retaining a full projection for every history snapshot.
+const projectionInputs = new WeakMap<TextIndex, { modifications: readonly Modification[]; projection: TextProjection }>();
 
 const Document = Node.create({
     name: "doc", topNode: true, content: "paragraph",
@@ -66,7 +69,12 @@ const Source = Mark.create({
 });
 
 export function documentText(doc: PMNode): string {
-    return doc.firstChild!.textBetween(0, doc.firstChild!.content.size, "", "\n");
+    let text = texts.get(doc);
+    if (text === undefined) {
+        text = doc.firstChild!.textBetween(0, doc.firstChild!.content.size, "", "\n");
+        texts.set(doc, text);
+    }
+    return text;
 }
 
 function inlineContent(text: string, marks?: JSONContent["marks"]): JSONContent[] {
@@ -81,6 +89,7 @@ function inlineContent(text: string, marks?: JSONContent["marks"]): JSONContent[
 
 export function transcriptContent(index: TextIndex, modifications: readonly Modification[]): JSONContent {
     const projection = projectText(index, modifications);
+    projectionInputs.set(index, { modifications: projection.modifications, projection });
     return {
         type: "doc", attrs: { [patchesAttribute]: projection.modifications },
         content: [{ type: "paragraph", content: projection.pieces.flatMap(piece => inlineContent(piece.text, [{ type: "source", attrs: piece.source }])) }]
@@ -98,7 +107,7 @@ function splitsCodepoint(text: string, offset: number): boolean {
 
 function applyTextSteps(index: TextIndex, projection: TextProjection, transaction: Transaction): TextProjection {
     for (let i = 0; i < transaction.steps.length; i++) {
-        const before = documentText(transaction.docs[i]);
+        const before = projection.text;
         const after = documentText(transaction.docs[i + 1] ?? transaction.doc);
         if (before === after) continue;
         const changes: { from: number; to: number; start: number; end: number }[] = [];
@@ -167,7 +176,14 @@ function synchronizeMarks(transaction: Transaction, projection: TextProjection):
         while (first < spans.length && spans[first].to <= from) first++;
         for (let i = first; i < spans.length && spans[i].from < to; i++) {
             const span = spans[i];
-            if (!span.mark.isInSet(node.marks)) changes.push({ from: Math.max(from, span.from), to: Math.min(to, span.to), mark: span.mark });
+            if (!span.mark.isInSet(node.marks)) {
+                const start = Math.max(from, span.from);
+                const end = Math.min(to, span.to);
+                const previous = changes.at(-1);
+                // A pasted piece can span many text and hardBreak nodes with the same source mark.
+                if (previous && previous.to === start && previous.mark.eq(span.mark)) previous.to = end;
+                else changes.push({ from: start, to: end, mark: span.mark });
+            }
         }
     });
     for (const change of changes) {
@@ -176,11 +192,22 @@ function synchronizeMarks(transaction: Transaction, projection: TextProjection):
     }
 }
 
+function rememberProjection(index: TextIndex, doc: PMNode, projection: TextProjection): void {
+    projections.set(doc, projection);
+    // During composition the document can still carry the previous persisted snapshot.
+    if (doc.attrs[patchesAttribute] === projection.modifications) {
+        projectionInputs.set(index, { modifications: projection.modifications, projection });
+    }
+}
+
 function projectionOf(index: TextIndex, doc: PMNode): TextProjection {
     let projection = projections.get(doc);
     if (!projection) {
-        projection = projectText(index, doc.attrs[patchesAttribute]);
+        const modifications = doc.attrs[patchesAttribute] as Modification[];
+        const previous = projectionInputs.get(index);
+        projection = previous?.modifications === modifications ? previous.projection : projectText(index, modifications);
         projections.set(doc, projection);
+        projectionInputs.set(index, { modifications, projection });
     }
     return projection;
 }
@@ -205,14 +232,14 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 else if (!transaction.getMeta(bridgeKey)) projection = applyTextSteps(index, projection, transaction);
             }
             if (projection.text !== documentText(newState.doc)) throw new Error("Transcript and modifications diverged.");
-            projections.set(newState.doc, projection);
+            rememberProjection(index, newState.doc, projection);
             // Updating document attributes redraws the editor; changing marks also replaces IME-owned DOM.
             if (composing) return null;
             const transaction = newState.tr.setMeta(bridgeKey, true);
             const current = newState.doc.attrs[patchesAttribute] as Modification[];
             if (JSON.stringify(current) !== JSON.stringify(projection.modifications)) transaction.setDocAttribute(patchesAttribute, projection.modifications);
             synchronizeMarks(transaction, projection);
-            projections.set(transaction.doc, projection);
+            rememberProjection(index, transaction.doc, projection);
             return transaction.steps.length ? transaction : null;
         },
         view() {
@@ -282,6 +309,10 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             }
         }
     });
+    let previousProjection: TextProjection | undefined;
+    let previousTime = NaN;
+    let previousRanges: number[] = [];
+    let previousDecorations = DecorationSet.empty;
     const playback = new Plugin<number>({
         key: playbackKey,
         state: { init: () => -1, apply: (transaction, time) => transaction.getMeta(playbackKey) ?? time },
@@ -289,7 +320,8 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             decorations(state) {
                 const time = playbackKey.getState(state) ?? -1;
                 const projection = projectionOf(index, state.doc);
-                const decorations: Decoration[] = [];
+                if (projection === previousProjection && time === previousTime) return previousDecorations;
+                const ranges: number[] = [];
                 let position = 1;
                 for (const piece of projection.pieces) {
                     const from = position;
@@ -297,10 +329,18 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                     if (!piece.text) continue;
                     if (piece.source.kind === "segment") {
                         const range = index.transcript[piece.source.index].range;
-                        if (time >= range.start && time < range.end) decorations.push(Decoration.inline(from, position, { class: "current" }));
+                        if (time >= range.start && time < range.end) ranges.push(from, position);
                     }
                 }
-                return DecorationSet.create(state.doc, decorations);
+                previousTime = time;
+                if (projection === previousProjection && ranges.length === previousRanges.length
+                    && ranges.every((position, index) => position === previousRanges[index])) return previousDecorations;
+                const decorations: Decoration[] = [];
+                for (let i = 0; i < ranges.length; i += 2) decorations.push(Decoration.inline(ranges[i], ranges[i + 1], { class: "current" }));
+                previousProjection = projection;
+                previousRanges = ranges;
+                previousDecorations = DecorationSet.create(state.doc, decorations);
+                return previousDecorations;
             }
         }
     });

@@ -28,13 +28,13 @@ export type InspectionOptions = {
 };
 
 export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) => TextProjection, options: InspectionOptions): Plugin {
-    function build(doc: PMNode): {
+    function build(doc: PMNode, projection: TextProjection): {
         spans: TranscriptInformation[];
         groups: Map<string, TranscriptInformation[]>;
         byKey: Map<string, InspectionInformation>;
         decorations: DecorationSet;
     } {
-        const items = transcriptInformation(index, projectionOf(doc), options.duration);
+        const items = transcriptInformation(index, projection, options.duration);
         const groups = new Map<string, TranscriptInformation[]>();
         const markers = new Map<number, TranscriptInformation[]>();
         for (const item of items) {
@@ -101,12 +101,13 @@ export function informationPlugin(index: TextIndex, projectionOf: (doc: PMNode) 
             decorations: DecorationSet.create(doc, decorations)
         };
     }
-    const cache = new WeakMap<PMNode, ReturnType<typeof build>>();
+    const cache = new WeakMap<TextProjection, ReturnType<typeof build>>();
     function informationOf(doc: PMNode): ReturnType<typeof build> {
-        let value = cache.get(doc);
+        const projection = projectionOf(doc);
+        let value = cache.get(projection);
         if (!value) {
-            value = build(doc);
-            cache.set(doc, value);
+            value = build(doc, projection);
+            cache.set(projection, value);
         }
         return value;
     }
