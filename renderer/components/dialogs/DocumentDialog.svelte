@@ -37,7 +37,7 @@
 <script lang="ts">
     import { onDestroy, tick, untrack } from "svelte";
     import { Dialog } from "bits-ui";
-    import { type Documentation, type DocumentationKind } from "../../../shared/documentation";
+    import { type Documentation, type DocumentationKind, type DocumentationResult } from "../../../shared/documentation";
     import { toFailureInfo } from "../../../shared/failure";
     import { type Locale } from "../../../shared/locale";
     import * as i18n from "../../i18n.svelte";
@@ -74,13 +74,18 @@
         await load(() => window.api.documentation.readLink(from, href), href, anchor);
     }
 
-    async function load(read: () => Promise<Documentation>, title: string, anchor = ""): Promise<void> {
+    async function load(read: () => Promise<DocumentationResult>, title: string, anchor = ""): Promise<void> {
         const current = ++generation;
         page = { document: null, title, failure: "", scroll: 0 };
         loading = true;
         try {
-            const document = await read();
+            const result = await read();
             if (current !== generation) return;
+            if (!result.success) {
+                page.failure = describeFailure(result.error);
+                return;
+            }
+            const document = result.document;
             page.document = document;
             page.title = documentTitle(document.path);
             loading = false;

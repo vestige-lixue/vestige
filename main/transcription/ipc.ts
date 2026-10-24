@@ -2,11 +2,12 @@ import { type WebContents } from "electron";
 import { type TranscriptionResult, executorChannel, cancelExecutorChannel } from "../../shared/transcription/executor";
 import { type ExecutionPaths, transcribe } from "./execute";
 import { type TaskOutputStore } from "../task/store";
+import { handle, listen } from "../util/ipc";
+import { toFailureInfo } from "../../shared/failure";
 
 export function registerTranscriptionIPCs(contents: WebContents, paths: ExecutionPaths, tasks: TaskOutputStore): void {
     const running = new Map<string, AbortController>();
-    contents.ipc.handle(executorChannel, async (event, id: unknown, request: unknown): Promise<TranscriptionResult> => {
-        if (event.senderFrame !== contents.mainFrame) return { success: false, error: { kind: "ipc-not-main-frame" } };
+    handle(contents, executorChannel, async (id: unknown, request: unknown): Promise<TranscriptionResult> => {
         if (typeof id !== "string" || !id || id.length > 128 || running.has(id) || tasks.get(id)?.status === "running") return { success: false, error: { kind: "transcription-invalid-id" } };
         const controller = new AbortController();
         tasks.start(id, "transcription");
@@ -19,20 +20,20 @@ export function registerTranscriptionIPCs(contents: WebContents, paths: Executio
             });
             if (result.success) tasks.record(id, "Run", JSON.stringify(result.run));
             if (!result.success) tasks.append(id, `\n${JSON.stringify(result.error)}\n`);
-            tasks.finish(id, result.success ? "succeeded" : result.error.kind === "transcription-cancelled" ? "cancelled" : "failed");
+            tasks.finish(id, result.success ? "succeeded" : result.error.kind === "transcription-cancelled" ? "cancelled" : "failed", result.success ? null : result.error);
             return result;
         }
         catch (error) {
             tasks.append(id, `\n${error instanceof Error ? error.message : String(error)}\n`);
-            tasks.finish(id, "failed");
+            tasks.finish(id, "failed", toFailureInfo(error));
             throw error;
         }
         finally {
             running.delete(id);
         }
     });
-    contents.ipc.on(cancelExecutorChannel, (event, id: unknown) => {
-        if (event.senderFrame === contents.mainFrame && typeof id === "string") running.get(id)?.abort();
+    listen(contents, cancelExecutorChannel, (id: unknown) => {
+        if (typeof id === "string") running.get(id)?.abort();
     });
     const cancelAll = (): void => {
         for (const controller of running.values()) controller.abort();

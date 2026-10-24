@@ -6,8 +6,6 @@ import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { parseAbsolutePath, isSystemError } from "./file";
 
-export class NativeProcessFailure extends VestigeErrors {}
-
 export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string, name: string): Promise<AbsolutePath> {
     const filename = name + (process.platform === "win32" ? ".exe" : "");
     const candidates = [join(runtimeRoot, runtime, filename)];
@@ -26,7 +24,7 @@ export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string,
             if (!isSystemError(error)) throw error;
         }
     }
-    throw new NativeProcessFailure({ kind: "native-not-found", executable: filename, directory: parseAbsolutePath(join(runtimeRoot, runtime)) });
+    throw new VestigeErrors({ kind: "native-not-found", executable: filename, directory: parseAbsolutePath(join(runtimeRoot, runtime)) });
 }
 
 export type ProcessOutput = { stdout: string; stderr: string };
@@ -64,7 +62,7 @@ export function runProcess(
             stdout += data;
             onOutput?.("stdout", data);
             if (stdout.length > 64 * 1024 * 1024) {
-                failure = new NativeProcessFailure({ kind: "native-output-limit", limitMiB: 64 });
+                failure = new VestigeErrors({ kind: "native-output-limit", limitMiB: 64 });
                 abort();
             }
         });
@@ -73,14 +71,14 @@ export function runProcess(
             onOutput?.("stderr", data);
         });
         child.on("error", error => {
-            failure = new NativeProcessFailure({ kind: "native-spawn-failed", diagnostic: error.message }, { cause: error });
+            failure = new VestigeErrors({ kind: "native-spawn-failed", diagnostic: error.message }, { cause: error });
         });
         // Wait for close, including on cancellation, before deleting task files.
         child.on("close", (code, terminationSignal) => {
             signal?.removeEventListener("abort", abort);
             if (signal?.aborted) reject(signal.reason);
             else if (failure) reject(failure);
-            else if (code !== 0) reject(new NativeProcessFailure({ kind: "native-failed", diagnostic: stderr || stdout || null, exitCode: code, signal: terminationSignal }));
+            else if (code !== 0) reject(new VestigeErrors({ kind: "native-failed", diagnostic: stderr || stdout || null, exitCode: code, signal: terminationSignal }));
             else accept({ stdout, stderr });
         });
     });

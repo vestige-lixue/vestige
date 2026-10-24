@@ -1,12 +1,13 @@
 import { posix, win32 } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type MediaPathMode } from "../../shared/project/file";
-import { InvalidPathFailure, resolveFilePath, storedFilePath } from "../util/file";
+import { resolveFilePath, storedFilePath } from "../util/file";
+import { VestigeErrors } from "../../shared/failure";
 
 export function resolveMediaPath(path: string, directory?: AbsolutePath): AbsolutePath {
     if (path.startsWith("/") || win32.isAbsolute(path)) return storedFilePath(path);
     if (!directory || !path || path.includes("\0") || win32.parse(path).root) {
-        throw new InvalidPathFailure({ kind: "path-not-absolute" });
+        throw new VestigeErrors({ kind: "path-not-absolute" });
     }
     return resolveFilePath(directory, path, directory.startsWith("/") ? "linux" : "win32");
 }

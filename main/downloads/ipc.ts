@@ -1,11 +1,13 @@
-import { shell, type WebContents, type IpcMainInvokeEvent } from "electron";
+import { shell, type WebContents } from "electron";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { downloadChannels, type Download, type DownloadKind } from "../../shared/downloads";
-import { toFailureInfo } from "../../shared/failure";
+import { downloadChannels, type DownloadKind, type DownloadListResult, type DownloadStartResult } from "../../shared/downloads";
+import { isExpectedFailure, toFailureInfo, VestigeErrors, type OperationResult } from "../../shared/failure";
 import { type AppPaths } from "../paths";
-import { lstatOrNull } from "../util/fs";
+import { fileOperationFailure, lstatOrNull } from "../util/fs";
+import { isSystemError } from "../util/file";
+import { handle } from "../util/ipc";
 import { type TaskOutputStore } from "../task/store";
 import { modelDownloads } from "../models/catalog";
 import { backendDownloads } from "../backends/catalog";
@@ -28,20 +30,30 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
     const sources: DownloadSource[] = [
         ...modelDownloads.map(model => ({ kind: "model" as const, id: model.id, name: model.name, estimatedBytes: model.estimatedBytes, resolve: async () => model })),
         ...backendDownloads(async (url, signal) => {
-            const response = await contents.session.fetch(url, {
-                headers: { Accept: "application/vnd.github+json", "User-Agent": "Vestige" },
-                signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)])
-            });
-            if (!response.ok) throw new Error(`Backend metadata HTTP ${response.status}: ${url}`);
-            return response.json();
+            let response: Response;
+            try {
+                response = await contents.session.fetch(url, {
+                    headers: { Accept: "application/vnd.github+json", "User-Agent": "Vestige" },
+                    signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)])
+                });
+            }
+            catch (error) {
+                signal.throwIfAborted();
+                throw new VestigeErrors({ kind: "download-http", stage: "metadata", reason: "request", resource: url, status: null, diagnostic: error instanceof Error ? error.message : String(error) }, { cause: error });
+            }
+            if (!response.ok) throw new VestigeErrors({ kind: "download-http", stage: "metadata", reason: "http", resource: url, status: response.status });
+            try {
+                return await response.json();
+            }
+            catch (error) {
+                signal.throwIfAborted();
+                throw new VestigeErrors({ kind: "download-http", stage: "metadata", reason: "metadata", resource: url, status: response.status, diagnostic: error instanceof Error ? error.message : String(error) }, { cause: error });
+            }
         })
     ];
     const active = new Map<string, ActiveDownload>();
     const latest = new Map<string, string>();
     let closing = false;
-    const checkSender = (event: IpcMainInvokeEvent): void => {
-        if (event.senderFrame !== contents.mainFrame) throw new Error("Invalid IPC frame.");
-    };
     const key = (kind: DownloadKind, id: string): string => `${kind}:${id}`;
     const cancel = (resourceKey: string, task: ActiveDownload): Promise<void> => {
         if (task.cancellation) return task.cancellation;
@@ -57,28 +69,33 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
         })().finally(() => task.cancellation = null);
         return task.cancellation;
     };
-    contents.ipc.handle(downloadChannels.list, async (event): Promise<Download[]> => {
-        checkSender(event);
-        return Promise.all(sources.map(async ({ kind, id, name, estimatedBytes, requiredFiles }) => {
-            const taskId = latest.get(key(kind, id));
-            const task = taskId ? tasks.get(taskId) : null;
-            const directory = await lstatOrNull(join(roots[kind], id));
-            const installed = !!directory?.isDirectory() && (await Promise.all((requiredFiles ?? []).map(async name => {
-                const file = await lstatOrNull(join(roots[kind], id, name));
-                return !!file?.isFile() && file.size > 0;
-            }))).every(Boolean);
-            // A previous success must not prevent downloading a package the user has moved or deleted.
-            return { kind, id, name, estimatedBytes, installed, taskId: task && (installed || task.status !== "succeeded") ? task.id : null };
-        }));
+    handle(contents, downloadChannels.list, async (): Promise<DownloadListResult> => {
+        try {
+            const downloads = await Promise.all(sources.map(async ({ kind, id, name, estimatedBytes, requiredFiles }) => {
+                const taskId = latest.get(key(kind, id));
+                const task = taskId ? tasks.get(taskId) : null;
+                const directory = await lstatOrNull(join(roots[kind], id));
+                const installed = !!directory?.isDirectory() && (await Promise.all((requiredFiles ?? []).map(async name => {
+                    const file = await lstatOrNull(join(roots[kind], id, name));
+                    return !!file?.isFile() && file.size > 0;
+                }))).every(Boolean);
+                // A previous success must not prevent downloading a package the user has moved or deleted.
+                return { kind, id, name, estimatedBytes, installed, taskId: task && (installed || task.status !== "succeeded") ? task.id : null };
+            }));
+            return { success: true, downloads };
+        }
+        catch (error) {
+            if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "inspect", error.path ?? null) };
+            throw error;
+        }
     });
-    contents.ipc.handle(downloadChannels.start, (event, kind: unknown, id: unknown): string => {
-        checkSender(event);
-        if (closing) throw new Error("The application is closing.");
+    handle(contents, downloadChannels.start, (kind: unknown, id: unknown): DownloadStartResult => {
+        if (closing) return { success: false, error: { kind: "download-closing" } };
         const source = sources.find(source => source.kind === kind && source.id === id);
-        if (!source) throw new Error("Unknown download.");
+        if (!source) return { success: false, error: { kind: "download-invalid-request" } };
         const resourceKey = key(source.kind, source.id);
         const previous = active.get(resourceKey);
-        if (previous) return previous.taskId;
+        if (previous) return { success: true, taskId: previous.taskId };
         const root = roots[source.kind];
         const taskId = `download-${randomUUID()}`;
         const controller = new AbortController();
@@ -101,19 +118,37 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
         }).finally(() => {
             if (!task.cleanup) active.delete(resourceKey);
         });
-        return taskId;
+        return { success: true, taskId };
     });
-    contents.ipc.handle(downloadChannels.cancel, async (event, taskId: unknown) => {
-        checkSender(event);
-        if (typeof taskId !== "string") throw new Error("Invalid download task.");
-        for (const [resourceKey, task] of active) if (task.taskId === taskId) await cancel(resourceKey, task);
+    handle(contents, downloadChannels.cancel, async (taskId: unknown): Promise<OperationResult> => {
+        if (typeof taskId !== "string") return { success: false, error: { kind: "download-invalid-request" } };
+        try {
+            for (const [resourceKey, task] of active) if (task.taskId === taskId) await cancel(resourceKey, task);
+            return { success: true };
+        }
+        catch (error) {
+            if (isExpectedFailure(error)) return { success: false, error: error.failure };
+            if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "remove", error.path ?? null) };
+            throw error;
+        }
     });
-    contents.ipc.handle(downloadChannels.openDirectory, async (event, kind: unknown) => {
-        checkSender(event);
-        if (kind !== "model" && kind !== "backend") throw new Error("Unknown download kind.");
-        await mkdir(roots[kind], { recursive: true });
-        const error = await shell.openPath(roots[kind]);
-        if (error) throw new Error(error);
+    handle(contents, downloadChannels.openDirectory, async (kind: unknown): Promise<OperationResult> => {
+        if (kind !== "model" && kind !== "backend") return { success: false, error: { kind: "download-invalid-request" } };
+        const directory = roots[kind];
+        try {
+            await mkdir(directory, { recursive: true });
+        }
+        catch (error) {
+            if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "write", directory) };
+            throw error;
+        }
+        try {
+            const diagnostic = await shell.openPath(directory);
+            return diagnostic ? { success: false, error: { kind: "file-operation-failed", operation: "open-directory", path: directory, diagnostic } } : { success: true };
+        }
+        catch (error) {
+            return { success: false, error: { kind: "file-operation-failed", operation: "open-directory", path: directory, diagnostic: error instanceof Error ? error.message : String(error) } };
+        }
     });
     const cancelAll = (): void => {
         for (const task of active.values()) task.controller.abort();

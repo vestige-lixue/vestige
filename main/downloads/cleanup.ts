@@ -2,10 +2,11 @@ import { rm } from "node:fs/promises";
 import { basename } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath } from "../util/file";
+import { VestigeErrors } from "../../shared/failure";
 
-export class DownloadCleanupError extends Error {
+export class DownloadCleanupError extends VestigeErrors {
     constructor(readonly root: AbsolutePath, readonly staging: AbsolutePath, readonly installed: boolean, cause: unknown) {
-        super(`Could not remove temporary download ${staging}: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+        super({ kind: "download-cleanup", directory: staging, installed, diagnostic: cause instanceof Error ? cause.message : String(cause) }, { cause });
     }
 
     async retry(): Promise<void> {

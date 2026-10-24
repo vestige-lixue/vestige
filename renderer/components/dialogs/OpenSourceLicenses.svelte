@@ -223,7 +223,8 @@
         openingDirectory = true;
         directoryFailure = "";
         try {
-            await window.api.file.openFFmpegDirectory();
+            const result = await window.api.file.openFFmpegDirectory();
+            if (!result.success) directoryFailure = describeFailure(result.error);
         }
         catch (error) {
             directoryFailure = describeFailure(toFailureInfo(error));

@@ -114,7 +114,9 @@
         starting = true;
         failure = "";
         try {
-            taskId = await window.api.downloads.start(download.kind, download.id);
+            const result = await window.api.downloads.start(download.kind, download.id);
+            if (result.success) taskId = result.taskId;
+            else failure = describeFailure(result.error);
         }
         catch (error) {
             failure = describeFailure(toFailureInfo(error));
@@ -129,7 +131,8 @@
         cancelling = true;
         failure = "";
         try {
-            await window.api.downloads.cancel(taskId);
+            const result = await window.api.downloads.cancel(taskId);
+            if (!result.success) failure = describeFailure(result.error);
         }
         catch (error) {
             failure = describeFailure(toFailureInfo(error));

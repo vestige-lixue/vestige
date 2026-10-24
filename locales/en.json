@@ -665,7 +665,79 @@
             "directoryDiagnostic": "Could not read the dropped folder: {{diagnostic}}"
         },
         "file": {
-            "notLocal": "A local file path is required: {{name}}"
+            "notLocal": "A local file path is required: {{name}}",
+            "invalidDirectory": "Unknown folder category.",
+            "operations": {
+                "read": "Could not read the file.",
+                "write": "Could not write the file.",
+                "inspect": "Could not check the file or folder.",
+                "open-directory": "Could not open the folder.",
+                "remove": "Could not remove temporary files.",
+                "clear-logs": "Could not clear the logs.",
+                "access": "Could not access the file or folder."
+            }
+        },
+        "externalOpen": "Could not open the external link: {{url}}",
+        "documentation": {
+            "request": {
+                "kind": "Unknown documentation page.",
+                "language": "Documentation is unavailable in this language.",
+                "link": "This documentation link is invalid.",
+                "path": "Documentation must be a Markdown file inside the application data folder."
+            },
+            "file": {
+                "missing": "Documentation was not found: {{path}}",
+                "not-file": "Documentation is not a regular file: {{path}}",
+                "too-large": "Documentation exceeds {{limitMiB}} MiB: {{path}}",
+                "read": "Could not read documentation: {{path}}"
+            }
+        },
+        "download": {
+            "invalidRequest": "The requested download is invalid.",
+            "closing": "The application is closing. A new download cannot start.",
+            "code": "Error code: {{code}}",
+            "http": {
+                "http": "The download server returned HTTP {{status}}: {{resource}}",
+                "request": "Could not request download metadata or contact the transfer service: {{resource}}",
+                "metadata": "The release metadata is invalid: {{resource}}",
+                "asset": "The release has no verified archive matching this package: {{resource}}"
+            },
+            "transfer": {
+                "rpc": "The download service returned an invalid response or rejected the request.",
+                "stopped": "The transfer stopped: {{file}}",
+                "process-exited": "The download service exited before the transfer completed.",
+                "shutdown-timeout": "The download service did not close after completing the transfer.",
+                "port": "Could not allocate a local port for the download service."
+            },
+            "proxy": {
+                "timeout": "System proxy lookup timed out.",
+                "unsupported": "The system proxy type is unsupported. Configure an HTTP proxy in system settings.",
+                "resolution": "Could not resolve the system proxy."
+            },
+            "integrity": {
+                "checksum": "The file checksum does not match: {{file}}",
+                "size": "The file size does not match (expected {{expected}}, received {{actual}} bytes): {{file}}",
+                "empty": "The downloaded file is missing, empty, or not a regular file: {{file}}",
+                "html": "The server returned an HTML page instead of the requested file: {{file}}",
+                "runtime-manifest": "The runtime cache manifest is invalid or incomplete: {{file}}",
+                "runtime-file": "A cached runtime file failed validation: {{file}}",
+                "runtime-license": "The runtime archive is missing its license: {{file}}"
+            },
+            "archive": {
+                "unsafe-entry": "The archive contains an unsafe path: {{path}}",
+                "unsupported-entry": "The archive contains an unsupported entry or link: {{path}}",
+                "missing-file": "The archive is missing a required file: {{path}}",
+                "unpack": "Could not read or extract the archive: {{path}}"
+            },
+            "conflict": {
+                "exists": "The download folder already exists. Move it before downloading again: {{path}}",
+                "mismatch": "The installed backend does not match this release. Move it before downloading again: {{path}}",
+                "filename": "Different package files use the same destination: {{path}}"
+            },
+            "cleanup": {
+                "installed": "The package was installed, but temporary files could not be removed: {{directory}}",
+                "incomplete": "Temporary download files could not be removed: {{directory}}"
+            }
         }
     },
     "documentation": {

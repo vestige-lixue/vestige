@@ -167,7 +167,9 @@
         }
         else {
             const current = ++generation;
-            void window.api.documentation.openExternal(link.url).catch(error => {
+            void window.api.documentation.openExternal(link.url).then(result => {
+                if (current === generation && !result.success) failure = describeFailure(result.error);
+            }).catch(error => {
                 if (current === generation) failure = describeFailure(toFailureInfo(error));
             });
         }

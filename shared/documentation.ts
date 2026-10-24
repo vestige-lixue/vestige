@@ -1,6 +1,21 @@
+import { type FailureInfo } from "./failure";
+
 export type DocumentationKind = "guide" | "params";
 
 export type Documentation = { path: string; content: string };
+
+export type DocumentationResult = { success: true; document: Documentation } | { success: false; error: FailureInfo };
+
+export type DocumentationFailure = ({
+    kind: "documentation-invalid-request";
+    reason: "kind" | "language" | "link" | "path";
+} | {
+    kind: "documentation-file";
+    reason: "missing" | "not-file" | "too-large" | "read";
+    path: string;
+    limitMiB?: number;
+    diagnostic?: string;
+});
 
 export type DocumentLink = ({
     kind: "url";

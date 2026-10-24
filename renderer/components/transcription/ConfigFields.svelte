@@ -123,9 +123,13 @@
     async function refreshDirectories(directory: DirectoryField): Promise<void> {
         const version = ++directory.version;
         try {
-            const names = await window.api.file.listDirectories(directory.kind);
+            const result = await window.api.file.listDirectories(directory.kind);
             if (!alive || version !== directory.version) return;
-            directory.items = names.map(name => ({ value: name, label: name }));
+            if (!result.success) {
+                error = result.error;
+                return;
+            }
+            directory.items = result.directories.map(name => ({ value: name, label: name }));
         }
         catch (cause) {
             if (alive && version === directory.version) error = toFailureInfo(cause);

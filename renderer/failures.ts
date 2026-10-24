@@ -42,6 +42,9 @@ const failureKeys = {
     "native-output-limit": "errors.native.outputLimit",
     "media-playback-failed": "errors.media.playbackFailed",
     "file-not-local": "errors.file.notLocal",
+    "file-invalid-directory": "errors.file.invalidDirectory",
+    "download-invalid-request": "errors.download.invalidRequest",
+    "download-closing": "errors.download.closing",
     "transcription-unknown-executor": "errors.transcription.unknownExecutor",
     "transcription-empty-path": "errors.transcription.emptyPath",
     "transcription-invalid-result": "errors.transcription.invalidResult",
@@ -57,9 +60,36 @@ const failureKeys = {
 
 const outputFields = { transcription: "array", text: "text", "segment.text": "segment" } as const;
 
+function withDiagnostic(message: string, failure: { diagnostic?: string | null }): string {
+    return failure.diagnostic ? `${message}\n${failure.diagnostic}` : message;
+}
+
 // Derive display text at the presentation boundary; state only keeps FailureInfo.
 export function describeFailure(failure: FailureInfo): string {
     switch (failure.kind) {
+        case "file-operation-failed":
+            return withDiagnostic(i18n.t(`errors.file.operations.${failure.operation}`) + (failure.path ? `\n${failure.path}` : ""), failure);
+        case "external-open-failed":
+            return withDiagnostic(i18n.t("errors.externalOpen", failure), failure);
+        case "documentation-invalid-request":
+            return i18n.t(`errors.documentation.request.${failure.reason}`);
+        case "documentation-file":
+            return withDiagnostic(i18n.t(`errors.documentation.file.${failure.reason}`, failure), failure);
+        case "download-http":
+            return withDiagnostic(i18n.t(`errors.download.http.${failure.reason}`, failure), failure);
+        case "download-transfer":
+            return withDiagnostic(i18n.t(`errors.download.transfer.${failure.reason}`, failure)
+                + (failure.code ? `\n${i18n.t("errors.download.code", { code: failure.code })}` : ""), failure);
+        case "download-proxy":
+            return withDiagnostic(i18n.t(`errors.download.proxy.${failure.reason}`), failure);
+        case "download-integrity":
+            return withDiagnostic(i18n.t(`errors.download.integrity.${failure.reason}`, failure), failure);
+        case "download-archive":
+            return withDiagnostic(i18n.t(`errors.download.archive.${failure.reason}`, failure), failure);
+        case "download-conflict":
+            return withDiagnostic(i18n.t(`errors.download.conflict.${failure.reason}`, failure), failure);
+        case "download-cleanup":
+            return withDiagnostic(i18n.t(failure.installed ? "errors.download.cleanup.installed" : "errors.download.cleanup.incomplete", failure), failure);
         case "unexpected": case "native-spawn-failed": case "transcription-invalid-json": case "project-invalid-json":
             return failure.diagnostic;
         case "native-failed":

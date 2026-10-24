@@ -1,5 +1,5 @@
 import { type ExecutionContext } from "../execute";
-import { TranscriptionFailure } from "../failure";
+import { VestigeErrors } from "../../../shared/failure";
 import { type AudioPart, splitAudioPart } from "./segmentation";
 
 export type DecodeProblem = "context" | "tokens" | "repetition" | "prompt";
@@ -31,7 +31,7 @@ export async function decodeWithRetry(
     if (!problem) return parts.map((part, index) => ({ part, value: values[index] }));
 
     // A prompt that alone fills the context cannot be repaired with less audio.
-    if (problem === "prompt") throw new TranscriptionFailure({ kind: "transcription-truncated-output" });
+    if (problem === "prompt") throw new VestigeErrors({ kind: "transcription-truncated-output" });
     if (parts.length > 1) {
         feedback?.record?.("Sherpa retry", { reason: problem, mode: "isolate", parts, depth });
         const result: DecodedPart[] = [];
@@ -54,7 +54,7 @@ export async function decodeWithRetry(
             if (!retry.problem) return [{ part, value: retry.values[0] }];
         }
         feedback?.record?.("Sherpa retry exhausted", { reason: problem, part, depth });
-        throw new TranscriptionFailure({ kind: "transcription-unstable-output", start: part.start.toFixed(3), end: part.end.toFixed(3) });
+        throw new VestigeErrors({ kind: "transcription-unstable-output", start: part.start.toFixed(3), end: part.end.toFixed(3) });
     }
     const children = await splitAudioPart(part, signal);
     feedback?.record?.("Sherpa retry", { reason: problem, mode: "split", part, children, depth: depth + 1 });

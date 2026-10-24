@@ -1,10 +1,10 @@
-import { toFailureInfo } from "../../shared/failure";
+import { isExpectedFailure } from "../../shared/failure";
 import { dirname } from "node:path";
 import { type Media } from "../../shared/Media";
 import { type MediaCheckResult } from "../../shared/media/check";
 import { type AbsolutePath } from "../../shared/util/path";
 import { parseAbsolutePath } from "../util/file";
-import { findExecutable, NativeProcessFailure, runProcess } from "../util/process";
+import { findExecutable, runProcess } from "../util/process";
 
 type MetadataResult = ({
     status: "ready";
@@ -54,7 +54,9 @@ export async function probeMedia(path: AbsolutePath, runtimeDirectory: AbsoluteP
     catch (error) {
         if (signal.aborted) return { status: "cancelled", error: { kind: "media-cancelled" } };
         if (timeout.aborted) return { status: "unreadable", error: { kind: "media-timeout" } };
-        if (error instanceof NativeProcessFailure) return { status: "unreadable", error: toFailureInfo(error) };
+        if (isExpectedFailure(error) && ["native-not-found", "native-output-limit", "native-spawn-failed", "native-failed"].includes(error.failure.kind)) {
+            return { status: "unreadable", error: error.failure };
+        }
         throw error;
     }
 }

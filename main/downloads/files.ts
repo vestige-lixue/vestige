@@ -6,6 +6,7 @@ import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, parseAbsolutePath } from "../util/file";
 import { errorCode, pathKey } from "../util/fs";
 import { type DownloadFile, type DownloadReporter, type DownloadTransfer } from "./types";
+import { VestigeErrors } from "../../shared/failure";
 
 export async function fileHash(file: AbsolutePath, signal: AbortSignal): Promise<string> {
     const hash = createHash("sha256");
@@ -39,14 +40,17 @@ export async function downloadFiles(files: DownloadFile[], staging: AbsolutePath
     for (const file of downloads) {
         signal.throwIfAborted();
         const info = await lstat(file.destination);
-        if (!info.isFile() || info.size === 0) throw new Error(`Incomplete download: ${file.destination}`);
-        if (file.size !== undefined && info.size !== file.size) throw new Error(`Incorrect download size: ${file.destination}`);
-        if (file.sha256 && await fileHash(file.destination, signal) !== file.sha256.toLowerCase()) throw new Error(`SHA-256 mismatch: ${file.destination}`);
+        if (!info.isFile() || info.size === 0) throw new VestigeErrors({ kind: "download-integrity", reason: "empty", file: file.destination });
+        if (file.size !== undefined && info.size !== file.size) throw new VestigeErrors({ kind: "download-integrity", reason: "size", file: file.destination, expected: file.size, actual: info.size });
+        if (file.sha256) {
+            const actual = await fileHash(file.destination, signal);
+            if (actual !== file.sha256.toLowerCase()) throw new VestigeErrors({ kind: "download-integrity", reason: "checksum", file: file.destination, expected: file.sha256, actual });
+        }
         const input = await open(file.destination, "r");
         try {
             const prefix = Buffer.alloc(512);
             const { bytesRead } = await input.read(prefix, 0, prefix.length, 0);
-            if (/^\s*(?:<!doctype\s+html|<html\b)/i.test(prefix.toString("utf8", 0, bytesRead))) throw new Error(`Unexpected HTML response: ${file.destination}`);
+            if (/^\s*(?:<!doctype\s+html|<html\b)/i.test(prefix.toString("utf8", 0, bytesRead))) throw new VestigeErrors({ kind: "download-integrity", reason: "html", file: file.destination });
         }
         finally {
             await input.close();

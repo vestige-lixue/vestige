@@ -1,12 +1,11 @@
-import { toFailureInfo } from "../../shared/failure";
+import { isExpectedFailure, VestigeErrors } from "../../shared/failure";
 import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { type Project } from "../../shared/project/Project";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type GetProjectResult, type SaveProjectResult, type CheckProjectFileResult, type MediaPathMode } from "../../shared/project/file";
-import { ProjectValidationFailure, validateProject } from "./validate";
-import { parseAbsolutePath, InvalidPathFailure, isSystemError } from "../util/file";
-import { pathKey, statOrNull, writeFileAtomic } from "../util/fs";
+import { parseProject } from "./validate";
+import { parseAbsolutePath, isSystemError } from "../util/file";
+import { fileOperationFailure, pathKey, statOrNull, writeFileAtomic } from "../util/fs";
 import { serializeMediaPath } from "./path";
 
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
@@ -21,14 +20,14 @@ export async function getProject(path: unknown): Promise<GetProjectResult> {
         }
         catch (error) {
             if (!(error instanceof SyntaxError)) throw error;
-            throw new ProjectValidationFailure({ kind: "project-invalid-json", diagnostic: error.message }, { cause: error });
+            throw new VestigeErrors({ kind: "project-invalid-json", diagnostic: error.message }, { cause: error });
         }
-        validateProject(project, parseAbsolutePath(dirname(normalized)));
-        return { success: true, project };
+        return { success: true, project: parseProject(project, parseAbsolutePath(dirname(normalized))) };
     }
     catch (error) {
         console.error("Could not open project:", path, error);
-        if (error instanceof ProjectValidationFailure || error instanceof InvalidPathFailure || isSystemError(error)) return { success: false, error: toFailureInfo(error) };
+        if (isExpectedFailure(error)) return { success: false, error: error.failure };
+        if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "read", typeof path === "string" ? path : null) };
         throw error;
     }
 }
@@ -37,32 +36,33 @@ export async function checkProjectFile(path: unknown): Promise<CheckProjectFileR
     try {
         const normalized = parseAbsolutePath(path);
         const existing = await statOrNull(normalized);
-        if (existing && !existing.isFile()) throw new InvalidPathFailure({ kind: "project-path-not-file" });
+        if (existing && !existing.isFile()) throw new VestigeErrors({ kind: "project-path-not-file" });
         return { success: true, exists: existing !== null };
     }
     catch (error) {
-        if (error instanceof InvalidPathFailure || isSystemError(error)) return { success: false, error: toFailureInfo(error) };
+        if (isExpectedFailure(error)) return { success: false, error: error.failure };
+        if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "inspect", typeof path === "string" ? path : null) };
         throw error;
     }
 }
 
 async function writeProject(path: AbsolutePath, text: string): Promise<SaveProjectResult> {
     const existing = await statOrNull(path);
-    if (existing && !existing.isFile()) throw new InvalidPathFailure({ kind: "project-path-not-file" });
+    if (existing && !existing.isFile()) throw new VestigeErrors({ kind: "project-path-not-file" });
     await writeFileAtomic(path, text, { sync: true, mode: existing?.mode });
     return { success: true };
 }
 
-export async function saveProject(path: unknown, project: Project, compress = false, rememberPlaybackPosition = true, mediaPathMode: MediaPathMode = "project"): Promise<SaveProjectResult> {
+export async function saveProject(path: unknown, project: unknown, compress = false, rememberPlaybackPosition = true, mediaPathMode: MediaPathMode = "project"): Promise<SaveProjectResult> {
     try {
         const normalized = parseAbsolutePath(path);
-        validateProject(project);
+        const parsed = parseProject(project);
         const directory = parseAbsolutePath(dirname(normalized));
         // Capture before waiting, so a queued write cannot observe later mutations.
         // Only the disk snapshot uses relative paths; runtime media keeps absolute paths.
         const snapshot = {
-            ...project,
-            vestiges: project.vestiges.map(vestige => ({
+            ...parsed,
+            vestiges: parsed.vestiges.map(vestige => ({
                 ...vestige,
                 media: { ...vestige.media, path: serializeMediaPath(vestige.media.path, directory, mediaPathMode) },
                 playbackPosition: rememberPlaybackPosition ? vestige.playbackPosition : 0
@@ -84,9 +84,8 @@ export async function saveProject(path: unknown, project: Project, compress = fa
     }
     catch (error) {
         console.error("Could not save project:", path, error);
-        if (error instanceof ProjectValidationFailure || error instanceof InvalidPathFailure || isSystemError(error)) {
-            return { success: false, error: toFailureInfo(error) };
-        }
+        if (isExpectedFailure(error)) return { success: false, error: error.failure };
+        if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "write", typeof path === "string" ? path : null) };
         throw error;
     }
 }

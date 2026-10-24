@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { type Stats } from "node:fs";
 import { lstat, open, rename, rm, stat, type FileHandle } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { type FailureInfo, type FileOperation } from "../../shared/failure";
+
+export function fileOperationFailure(error: NodeJS.ErrnoException, operation: FileOperation, path: string | null): FailureInfo {
+    return { kind: "file-operation-failed", operation, path, diagnostic: error.message };
+}
 
 export function errorCode(error: unknown): string | undefined {
     return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : undefined;

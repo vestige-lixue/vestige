@@ -5,6 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { type AbsolutePath } from "../../shared/util/path";
 import { findExecutable, runProcess } from "../util/process";
 import { type DownloadTransfer } from "./types";
+import { VestigeErrors } from "../../shared/failure";
 
 type DownloadStatus = {
     status: string;
@@ -17,7 +18,7 @@ type DownloadStatus = {
 async function availablePort(): Promise<number> {
     const server = createServer();
     return new Promise((resolve, reject) => {
-        server.once("error", reject);
+        server.once("error", error => reject(new VestigeErrors({ kind: "download-transfer", reason: "port", code: null, diagnostic: error.message }, { cause: error })));
         server.listen(0, "127.0.0.1", () => {
             const address = server.address();
             if (!address || typeof address === "string") {
@@ -25,7 +26,7 @@ async function availablePort(): Promise<number> {
                 reject(new Error("Could not allocate an aria2 RPC port."));
                 return;
             }
-            server.close(error => error ? reject(error) : resolve(address.port));
+            server.close(error => error ? reject(new VestigeErrors({ kind: "download-transfer", reason: "port", code: null, diagnostic: error.message }, { cause: error })) : resolve(address.port));
         });
     });
 }
@@ -35,16 +36,19 @@ async function systemProxy(url: string, resolveProxy: (url: string) => Promise<s
     const controller = new AbortController();
     try {
         const result = await Promise.race([
-            resolveProxy(url),
+            resolveProxy(url).catch(error => {
+                signal.throwIfAborted();
+                throw new VestigeErrors({ kind: "download-proxy", reason: "resolution", diagnostic: error instanceof Error ? error.message : String(error) }, { cause: error });
+            }),
             delay(15_000, undefined, { signal: AbortSignal.any([signal, controller.signal]) }).then(() => {
-                throw new Error("System proxy resolution timed out.");
+                throw new VestigeErrors({ kind: "download-proxy", reason: "timeout" });
             })
         ]);
         signal.throwIfAborted();
         const preferred = result.split(";", 1)[0].trim();
         if (preferred === "DIRECT") return "";
         const proxy = /^PROXY\s+(\S+)$/i.exec(preferred);
-        if (!proxy) throw new Error("The system proxy is not supported by aria2. Configure an HTTP proxy in system settings.");
+        if (!proxy) throw new VestigeErrors({ kind: "download-proxy", reason: "unsupported", diagnostic: result });
         return `http://${proxy[1]}`;
     }
     finally {
@@ -80,18 +84,33 @@ export function aria2Transfer(runtimeDirectory: AbsolutePath, resolveProxy: (url
         });
         const checkProcess = (): void => {
             signal.throwIfAborted();
-            if (exited) throw failure ?? new Error("aria2 exited before all downloads completed.");
+            if (exited) throw failure ?? new VestigeErrors({ kind: "download-transfer", reason: "process-exited", code: null });
         };
         const rpc = async <T>(method: string, params: unknown[] = []): Promise<T> => {
-            const response = await fetch(`http://127.0.0.1:${port}/jsonrpc`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: [`token:${secret}`, ...params] }),
-                signal: AbortSignal.any([processSignal, AbortSignal.timeout(3_000)])
-            });
-            if (!response.ok) throw new Error(`aria2 RPC HTTP ${response.status}.`);
-            const result = await response.json() as { result: T; error?: { message: string } };
-            if (result.error) throw new Error(`aria2: ${result.error.message}`);
+            let response: Response;
+            try {
+                response = await fetch(`http://127.0.0.1:${port}/jsonrpc`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: [`token:${secret}`, ...params] }),
+                    signal: AbortSignal.any([processSignal, AbortSignal.timeout(3_000)])
+                });
+            }
+            catch (error) {
+                signal.throwIfAborted();
+                throw new VestigeErrors({ kind: "download-http", stage: "rpc", reason: "request", resource: method, status: null, diagnostic: error instanceof Error ? error.message : String(error) }, { cause: error });
+            }
+            if (!response.ok) throw new VestigeErrors({ kind: "download-http", stage: "rpc", reason: "http", resource: method, status: response.status });
+            let result: { result: T; error?: { code?: unknown; message?: unknown } };
+            try {
+                result = await response.json();
+            }
+            catch (error) {
+                signal.throwIfAborted();
+                throw new VestigeErrors({ kind: "download-transfer", reason: "rpc", code: null, diagnostic: error instanceof Error ? error.message : String(error) }, { cause: error });
+            }
+            if (!result || typeof result !== "object" || !("result" in result || "error" in result)) throw new VestigeErrors({ kind: "download-transfer", reason: "rpc", code: null });
+            if (result.error) throw new VestigeErrors({ kind: "download-transfer", reason: "rpc", code: typeof result.error.code === "number" || typeof result.error.code === "string" ? String(result.error.code) : null, diagnostic: typeof result.error.message === "string" ? result.error.message : undefined });
             return result.result;
         };
         try {
@@ -131,7 +150,7 @@ export function aria2Transfer(runtimeDirectory: AbsolutePath, resolveProxy: (url
                 let total = 0, completed = 0, known = true;
                 for (const { file, status } of statuses) {
                     if (status.status === "error" || status.status === "removed") {
-                        throw new Error(`aria2 ${status.errorCode ?? status.status}: ${basename(file.destination)}: ${status.errorMessage ?? "Download stopped."}`);
+                        throw new VestigeErrors({ kind: "download-transfer", reason: "stopped", code: status.errorCode ?? null, file: file.destination, diagnostic: status.errorMessage });
                     }
                     const received = Number(status.completedLength);
                     const length = Number(status.totalLength) || (status.status === "complete" ? received : 0);
@@ -148,7 +167,7 @@ export function aria2Transfer(runtimeDirectory: AbsolutePath, resolveProxy: (url
             // The child must release its file handles before the staging directory is published or removed.
             const deadlineExit = Date.now() + 10_000;
             while (!exited && Date.now() < deadlineExit) await delay(100, undefined, { signal });
-            if (!exited) throw new Error("aria2 did not shut down after completing the downloads.");
+            if (!exited) throw new VestigeErrors({ kind: "download-transfer", reason: "shutdown-timeout", code: null });
             if (failure) throw failure;
         }
         catch (error) {

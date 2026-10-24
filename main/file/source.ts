@@ -1,10 +1,11 @@
-import { VestigeErrors, toFailureInfo } from "../../shared/failure";
+import { isExpectedFailure } from "../../shared/failure";
 import { net, protocol } from "electron";
 import { randomUUID } from "node:crypto";
 import { open, stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { type MediaURLResult } from "../../shared/media/check";
 import { parseAbsolutePath, isSystemError } from "../util/file";
+import { fileOperationFailure } from "../util/fs";
 
 const scheme = "vestige-media";
 type MediaSource = { path: string; controller: AbortController; pending: Set<Promise<unknown>> };
@@ -149,12 +150,12 @@ export async function getMediaURL(input: unknown): Promise<MediaURLResult> {
         return { status: "ready", id, url: `${scheme}://${id}/` };
     }
     catch (error) {
-        if (error instanceof VestigeErrors) return { status: "unreadable", error: error.failure };
+        if (isExpectedFailure(error)) return { status: "unreadable", error: error.failure };
         if (!isSystemError(error)) throw error;
         const code = error.code;
         return code === "ENOENT" || code === "ENOTDIR"
             ? { status: "missing", error: { kind: "media-missing" } }
-            : { status: "unreadable", error: toFailureInfo(error) };
+            : { status: "unreadable", error: fileOperationFailure(error, "read", typeof input === "string" ? input : null) };
     }
 }
 

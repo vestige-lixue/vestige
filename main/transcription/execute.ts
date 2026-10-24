@@ -1,16 +1,16 @@
-import { toFailureInfo } from "../../shared/failure";
+import { isExpectedFailure } from "../../shared/failure";
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, parseAbsolutePath, InvalidPathFailure, isSystemError } from "../util/file";
+import { containsPath, parseAbsolutePath, isSystemError } from "../util/file";
 import { type Run } from "../../shared/transcription/Run";
 import { type TranscriptionResult } from "../../shared/transcription/executor";
 import { waveDuration } from "./audio";
 import { type ParsedRequest, parseRequest } from "./parameters";
-import { findExecutable, NativeProcessFailure, runProcess, type ProcessOutputListener } from "../util/process";
+import { findExecutable, runProcess, type ProcessOutputListener } from "../util/process";
 import { execute as executeSherpa } from "./sherpa/execute";
 import { execute as executeWhisper } from "./whisper/execute";
-import { TranscriptionFailure } from "./failure";
+import { fileOperationFailure } from "../util/fs";
 import { resolveBackend, type BackendLocation } from "../backends/resolve";
 import { type AppPaths } from "../paths";
 
@@ -43,9 +43,8 @@ export async function transcribe(id: string, value: unknown, paths: ExecutionPat
     catch (error) {
         console.error("Transcription failed:", error);
         if (signal?.aborted && error === signal.reason) return { success: false, error: { kind: "transcription-cancelled" } };
-        if (error instanceof TranscriptionFailure || error instanceof NativeProcessFailure || error instanceof InvalidPathFailure || isSystemError(error)) {
-            return { success: false, error: toFailureInfo(error) };
-        }
+        if (isExpectedFailure(error)) return { success: false, error: error.failure };
+        if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "access", error.path ?? null) };
         throw error;
     }
 }

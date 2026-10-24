@@ -7,7 +7,7 @@ import { runProcess } from "../../util/process";
 import { parseResult } from "../result";
 import { nativeArguments } from "./parameters";
 import { toRun } from "./result";
-import { TranscriptionFailure } from "../failure";
+import { VestigeErrors } from "../../../shared/failure";
 import { isSystemError } from "../../util/file";
 import { whisperProgress } from "./progress";
 
@@ -32,7 +32,7 @@ export async function execute(context: ExecutionContext): Promise<Run> {
     catch (error) {
         if (!isSystemError(error)) throw error;
         // Some native failures exit with 0 without creating their output file.
-        throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: output.stderr || output.stdout || error.message }, { cause: error });
+        throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: output.stderr || output.stdout || error.message }, { cause: error });
     }
     feedback?.record?.("Whisper result.json", raw);
     return toRun(id, request, parseResult(raw, output.stderr), duration, elapsed);

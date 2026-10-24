@@ -1,4 +1,4 @@
-import { type FilePathResult } from "./util/file";
+import { type DirectoryListResult, type FilePathResult } from "./util/file";
 import { type TranscriptionRequest, type TranscriptionResult } from "./transcription/executor";
 import { type GetProjectResult, type SaveProjectResult, type CheckProjectFileResult } from "./project/file";
 import { type Project } from "./project/Project";
@@ -6,8 +6,9 @@ import { type AbsolutePath } from "./util/path";
 import { type MediaCheckResult, type MediaReference, type MediaURLResult } from "./media/check";
 import { type SettingsPatch, type SettingsResult, type SettingsSnapshot } from "./settings/Settings";
 import { type TaskSnapshot } from "./task";
-import { type Documentation, type DocumentationKind } from "./documentation";
-import { type Download, type DownloadKind } from "./downloads";
+import { type DocumentationResult, type DocumentationKind } from "./documentation";
+import { type DownloadListResult, type DownloadStartResult, type DownloadKind } from "./downloads";
+import { type OperationResult } from "./failure";
 
 export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
 
@@ -18,7 +19,7 @@ export type AppAPI = {
     supportsMica(): Promise<boolean>;
     quit(): void;
     edit(action: EditAction): void;
-    clearLogs(): Promise<void>;
+    clearLogs(): Promise<OperationResult>;
     // The renderer prompts/saves and returns true to block, false to allow quitting.
     beforeQuit(check: () => boolean | Promise<boolean>): () => void;
     settings: {
@@ -36,8 +37,8 @@ export type AppAPI = {
         selectMediaPath(path: AbsolutePath | null): Promise<AbsolutePath | null>;
         selectMediaPaths(): Promise<AbsolutePath[]>;
         selectDirectory(kind: DownloadKind): Promise<AbsolutePath | null>;
-        listDirectories(kind: DownloadKind): Promise<string[]>;
-        openFFmpegDirectory(): Promise<void>;
+        listDirectories(kind: DownloadKind): Promise<DirectoryListResult>;
+        openFFmpegDirectory(): Promise<OperationResult>;
     };
     transcription: {
         transcribe(id: string, request: TranscriptionRequest): Promise<TranscriptionResult>;
@@ -48,15 +49,15 @@ export type AppAPI = {
         subscribe(id: string, listener: (snapshot: TaskSnapshot) => void): () => void;
     };
     downloads: {
-        list(): Promise<Download[]>;
-        start(kind: DownloadKind, id: string): Promise<string>;
-        cancel(taskId: string): Promise<void>;
-        openDirectory(kind: DownloadKind): Promise<void>;
+        list(): Promise<DownloadListResult>;
+        start(kind: DownloadKind, id: string): Promise<DownloadStartResult>;
+        cancel(taskId: string): Promise<OperationResult>;
+        openDirectory(kind: DownloadKind): Promise<OperationResult>;
     };
     documentation: {
-        read(kind: DocumentationKind, language: string): Promise<Documentation>;
-        readLink(from: string, href: string): Promise<Documentation>;
-        openExternal(url: string): Promise<void>;
+        read(kind: DocumentationKind, language: string): Promise<DocumentationResult>;
+        readLink(from: string, href: string): Promise<DocumentationResult>;
+        openExternal(url: string): Promise<OperationResult>;
     };
     project: {
         getProject(path: AbsolutePath): Promise<GetProjectResult>;

@@ -2,7 +2,7 @@ import { nativeTheme, type BrowserWindow } from "electron";
 import { release } from "node:os";
 import * as settings from "./settings/store";
 import { appChannels } from "../shared/ipc";
-import { VestigeErrors } from "../shared/failure";
+import { handle } from "./util/ipc";
 import { resolveTheme, resolveThemeScheme, type ThemeColors } from "../shared/theme";
 
 function supportsMica(): boolean {
@@ -19,10 +19,7 @@ export function getWindowColors(): ThemeColors {
 export function registerWindowTheme(window: BrowserWindow): void {
     const micaSupported = supportsMica();
     const contents = window.webContents;
-    contents.ipc.handle(appChannels.supportsMica, event => {
-        if (event.senderFrame !== contents.mainFrame) throw new VestigeErrors({ kind: "ipc-not-main-frame" });
-        return micaSupported;
-    });
+    handle(contents, appChannels.supportsMica, () => micaSupported);
     let previous = "";
     let previousMica = false;
     const update = (): void => {

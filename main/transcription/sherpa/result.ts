@@ -1,7 +1,7 @@
 import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, number, probability, range, segments, createRun } from "../result";
-import { TranscriptionFailure } from "../failure";
+import { VestigeErrors } from "../../../shared/failure";
 
 const qwenLanguages: Record<string, string> = {
     chinese: "zh", english: "en", cantonese: "yue", arabic: "ar", german: "de", french: "fr", spanish: "es",
@@ -31,9 +31,9 @@ export function parseBatchResults(raw: string, diagnostic: string, expected: num
         results = expected === 1 ? [JSON.parse(raw)] : raw.trim().split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line));
     }
     catch (error) {
-        throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
+        throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
     }
-    if (results.length !== expected) throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw });
+    if (results.length !== expected) throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw });
     return results;
 }
 
@@ -48,7 +48,7 @@ export function needsWordSeparator(previous: string, next: string): boolean {
 }
 
 function sherpaTranscript(output: NativeObject, duration: number): TranscriptSpan[] {
-    if (typeof output.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executor: "sherpa-onnx", field: "text" });
+    if (typeof output.text !== "string") throw new VestigeErrors({ kind: "transcription-invalid-output", executor: "sherpa-onnx", field: "text" });
     const tokens = array(output.tokens);
     const timestamps = array(output.timestamps);
     const durations = array(output.durations);

@@ -1,23 +1,33 @@
 import { shell, type WebContents } from "electron";
-import { documentationChannels, parseDocumentLink } from "../../shared/documentation";
+import { documentationChannels, parseDocumentLink, type Documentation, type DocumentationResult } from "../../shared/documentation";
 import { type AbsolutePath } from "../../shared/util/path";
 import { readDocumentation, readDocumentationLink } from "./file";
+import { isExpectedFailure, type OperationResult } from "../../shared/failure";
+import { handle } from "../util/ipc";
 
 export function registerDocumentationIPCs(contents: WebContents, root: AbsolutePath, ready: Promise<void>): void {
-    contents.ipc.handle(documentationChannels.read, async (event, kind: unknown, language: unknown) => {
-        if (event.senderFrame !== contents.mainFrame) throw new Error("Invalid IPC frame.");
-        await ready;
-        return readDocumentation(root, kind, language);
-    });
-    contents.ipc.handle(documentationChannels.readLink, async (event, from: unknown, href: unknown) => {
-        if (event.senderFrame !== contents.mainFrame) throw new Error("Invalid IPC frame.");
-        await ready;
-        return readDocumentationLink(root, from, href);
-    });
-    contents.ipc.handle(documentationChannels.openExternal, async (event, url: unknown) => {
-        if (event.senderFrame !== contents.mainFrame) throw new Error("Invalid IPC frame.");
+    const read = async (operation: () => Promise<Documentation>): Promise<DocumentationResult> => {
+        try {
+            await ready;
+            return { success: true, document: await operation() };
+        }
+        catch (error) {
+            if (isExpectedFailure(error)) return { success: false, error: error.failure };
+            throw error;
+        }
+    };
+    handle(contents, documentationChannels.read, (kind: unknown, language: unknown) => read(() => readDocumentation(root, kind, language)));
+    handle(contents, documentationChannels.readLink, (from: unknown, href: unknown) => read(() => readDocumentationLink(root, from, href)));
+    handle(contents, documentationChannels.openExternal, async (url: unknown): Promise<OperationResult> => {
         const link = typeof url === "string" ? parseDocumentLink(url) : null;
-        if (!link || link.kind !== "url") throw new Error("Unsupported documentation URL.");
-        await shell.openExternal(link.url);
+        if (!link || link.kind !== "url") return { success: false, error: { kind: "documentation-invalid-request", reason: "link" } };
+        try {
+            await shell.openExternal(link.url);
+            return { success: true };
+        }
+        catch (error) {
+            // This boundary owns the external shell operation and preserves its diagnostic.
+            return { success: false, error: { kind: "external-open-failed", url: link.url, diagnostic: error instanceof Error ? error.message : String(error) } };
+        }
     });
 }

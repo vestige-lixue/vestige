@@ -7,7 +7,7 @@ export default defineConfig({
     plugins: [UnpluginTypia({
         tsconfig: resolve(import.meta.dirname, "tsconfig.test.json"),
         typia: { undefined: false },
-        include: [/[/\\]main[/\\]project[/\\]validate\.ts$/]
+        include: [/[/\\]main[/\\]project[/\\]validate\.ts$/, /[/\\]shared[/\\]media[/\\]check\.ts$/]
     })],
     test: {
         environment: "node",

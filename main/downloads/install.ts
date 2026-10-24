@@ -1,18 +1,19 @@
 import { copyFile, lstat, mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, parseAbsolutePath } from "../util/file";
-import { errorCode, lstatOrNull } from "../util/fs";
+import { containsPath, parseAbsolutePath, isSystemError } from "../util/file";
+import { errorCode, fileOperationFailure, lstatOrNull } from "../util/fs";
 import { type AppPaths } from "../paths";
 import { type DownloadSource, type DownloadReporter, type DownloadTransfer, type DownloadPayload } from "./types";
 import { filesIn, prepareArchive } from "./archive";
 import { DownloadCleanupError, removeDownloadStaging } from "./cleanup";
 import { downloadFiles, fileHash, linkOrCopy } from "./files";
 import { installRuntimes } from "./runtimes";
+import { VestigeErrors } from "../../shared/failure";
 
 async function assertAbsent(path: string): Promise<void> {
     if (!await lstatOrNull(path)) return;
-    throw new Error(`Download directory already exists. Move it before downloading again: ${path}`);
+    throw new VestigeErrors({ kind: "download-conflict", scope: "destination", reason: "exists", path });
 }
 
 async function canRepair(target: AbsolutePath, source: DownloadSource, payload: DownloadPayload): Promise<boolean> {
@@ -22,15 +23,22 @@ async function canRepair(target: AbsolutePath, source: DownloadSource, payload: 
         await assertAbsent(target);
         return false;
     }
-    const receipt = JSON.parse(await readFile(join(target, "download.json"), "utf8")) as { kind?: string; id?: string; files?: DownloadPayload["files"] };
+    let receipt: { kind?: string; id?: string; files?: DownloadPayload["files"] };
+    try {
+        receipt = JSON.parse(await readFile(join(target, "download.json"), "utf8"));
+    }
+    catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        throw new VestigeErrors({ kind: "download-conflict", scope: "backend", reason: "mismatch", path: target, diagnostic: error.message }, { cause: error });
+    }
     const archive = payload.files.find(file => file.destination === payload.archive!.filename);
-    if (receipt.kind !== source.kind || receipt.id !== source.id || !archive?.sha256
-        || !receipt.files?.some(file => file.destination === archive.destination && file.sha256 === archive.sha256)) {
-        throw new Error(`Existing backend does not match this release. Move it before downloading again: ${target}`);
+    if (!receipt || receipt.kind !== source.kind || receipt.id !== source.id || !archive?.sha256 || !Array.isArray(receipt.files)
+        || !receipt.files.some(file => file?.destination === archive.destination && file.sha256 === archive.sha256)) {
+        throw new VestigeErrors({ kind: "download-conflict", scope: "backend", reason: "mismatch", path: target });
     }
     for (const name of payload.archive.programs) {
         const info = await lstat(join(target, name));
-        if (!info.isFile() || !info.size) throw new Error(`Existing backend is incomplete: ${name}`);
+        if (!info.isFile() || !info.size) throw new VestigeErrors({ kind: "download-integrity", reason: "empty", file: join(target, name) });
     }
     return true;
 }
@@ -43,7 +51,7 @@ async function publishRepair(prepared: AbsolutePath, target: AbsolutePath, signa
         signal.throwIfAborted();
         const destination = parseAbsolutePath(join(target, relative(prepared, file)));
         const existing = await lstatOrNull(destination);
-        if (existing && (!existing.isFile() || await fileHash(file, signal) !== await fileHash(destination, signal))) throw new Error(`Conflicting runtime file. Move the backend before downloading again: ${destination}`);
+        if (existing && (!existing.isFile() || await fileHash(file, signal) !== await fileHash(destination, signal))) throw new VestigeErrors({ kind: "download-conflict", scope: "runtime", reason: "filename", path: destination });
     }
     for (const file of files) {
         signal.throwIfAborted();
@@ -113,7 +121,7 @@ export async function installDownload(
         reporter.append(`Saved to ${target}\n`);
     }
     catch (cause) {
-        failure = { cause };
+        failure = { cause: isSystemError(cause) ? new VestigeErrors(fileOperationFailure(cause, "access", cause.path ?? target), { cause }) : cause };
     }
     // Delete only our generated staging directory, never an installed package.
     try {

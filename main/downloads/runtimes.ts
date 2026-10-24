@@ -7,6 +7,7 @@ import { type AppPaths } from "../paths";
 import { filesIn, prepareArchive } from "./archive";
 import { downloadFiles, fileHash, linkOrCopy } from "./files";
 import { type DownloadReporter, type DownloadTransfer, type RuntimeDownload } from "./types";
+import { VestigeErrors } from "../../shared/failure";
 
 type RuntimeManifest = { archive: string; files: { path: string; size: number; sha256: string }[] };
 const pending = new Map<string, Promise<void>>();
@@ -26,16 +27,24 @@ function waitForRuntime(completion: Promise<void>, signal: AbortSignal): Promise
 async function readRuntime(directory: AbsolutePath, runtime: RuntimeDownload, signal: AbortSignal): Promise<RuntimeManifest | null> {
     const exists = await lstatOrNull(directory);
     if (!exists) return null;
-    if (!exists.isDirectory() || exists.isSymbolicLink()) throw new Error(`Invalid runtime cache: ${directory}`);
-    const manifest: RuntimeManifest = JSON.parse(await readFile(join(directory, "runtime.json"), "utf8"));
-    if (manifest.archive !== runtime.file.sha256 || !Array.isArray(manifest.files) || !manifest.files.length
-        || runtime.libraries.some(name => !manifest.files.some(file => file.path === name))) throw new Error(`Incomplete runtime cache: ${directory}`);
+    if (!exists.isDirectory() || exists.isSymbolicLink()) throw new VestigeErrors({ kind: "download-integrity", reason: "runtime-manifest", file: directory });
+    let manifest: RuntimeManifest;
+    try {
+        manifest = JSON.parse(await readFile(join(directory, "runtime.json"), "utf8"));
+    }
+    catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        throw new VestigeErrors({ kind: "download-integrity", reason: "runtime-manifest", file: directory, diagnostic: error.message }, { cause: error });
+    }
+    if (!manifest || manifest.archive !== runtime.file.sha256 || !Array.isArray(manifest.files) || !manifest.files.length
+        || manifest.files.some(file => !file || typeof file.path !== "string" || typeof file.sha256 !== "string" || !Number.isSafeInteger(file.size) || file.size < 0)
+        || runtime.libraries.some(name => !manifest.files.some(file => file.path === name))) throw new VestigeErrors({ kind: "download-integrity", reason: "runtime-manifest", file: directory });
     for (const file of manifest.files) {
         signal.throwIfAborted();
         const path = parseAbsolutePath(join(directory, file.path));
-        if (path === directory || !containsPath(directory, path) || !/^[a-f\d]{64}$/.test(file.sha256)) throw new Error(`Invalid runtime cache entry: ${file.path}`);
+        if (path === directory || !containsPath(directory, path) || !/^[a-f\d]{64}$/.test(file.sha256)) throw new VestigeErrors({ kind: "download-integrity", reason: "runtime-manifest", file: file.path });
         const info = await lstat(path);
-        if (!info.isFile() || info.size !== file.size || await fileHash(path, signal) !== file.sha256) throw new Error(`Corrupt runtime cache: ${path}`);
+        if (!info.isFile() || info.size !== file.size || await fileHash(path, signal) !== file.sha256) throw new VestigeErrors({ kind: "download-integrity", reason: "runtime-file", file: path });
     }
     return manifest;
 }
@@ -67,7 +76,7 @@ async function prepareRuntime(runtime: RuntimeDownload, cache: AbsolutePath, sta
             signal.throwIfAborted();
             manifest.files.push({ path: relative(prepared, path).replaceAll("\\", "/"), size: (await lstat(path)).size, sha256: await fileHash(path, signal) });
         }
-        if (!manifest.files.some(file => file.path.startsWith("licenses/"))) throw new Error(`Runtime archive has no license: ${runtime.name}`);
+        if (!manifest.files.some(file => file.path.startsWith("licenses/"))) throw new VestigeErrors({ kind: "download-integrity", reason: "runtime-license", file: runtime.name });
         await writeFile(join(prepared, "runtime.json"), JSON.stringify(manifest, null, 4), "utf8");
         await mkdir(cache, { recursive: true });
         signal.throwIfAborted();
@@ -105,7 +114,7 @@ export async function installRuntimes(runtimes: RuntimeDownload[], paths: Pick<A
             }
             catch (error) {
                 if (errorCode(error) !== "EEXIST") throw error;
-                if (!(await lstat(destination)).isFile() || await fileHash(destination, signal) !== file.sha256) throw new Error(`Conflicting runtime filename: ${file.path}`);
+                if (!(await lstat(destination)).isFile() || await fileHash(destination, signal) !== file.sha256) throw new VestigeErrors({ kind: "download-conflict", scope: "runtime", reason: "filename", path: file.path });
             }
         }
     }

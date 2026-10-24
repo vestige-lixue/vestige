@@ -1,7 +1,7 @@
 import { type Range } from "../../shared/util/range";
 import { type Run, type TranscriptSpan } from "../../shared/transcription/Run";
 import { type ParsedRequest } from "./parameters";
-import { TranscriptionFailure } from "./failure";
+import { VestigeErrors } from "../../shared/failure";
 
 export type NativeObject = Record<string, unknown>;
 export type Piece = { text: string; range?: Range; prob: number };
@@ -59,7 +59,7 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     }
     catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
-        throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
+        throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
     }
 }
 

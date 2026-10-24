@@ -1,15 +1,17 @@
+import { type NonNegativeInteger, type NonNegativeNumber } from "./Scalar";
+
 export type Range = {
     // Finite, non-negative seconds. Timestamps may exceed the media duration.
-    start: number;
+    start: NonNegativeNumber;
     // Finite seconds, greater than or equal to start.
-    end: number;
+    end: NonNegativeNumber;
 };
 
 export type TextPosition = {
     // Original displayed Run segment, or transcript.length for the unique EOF position.
-    segmentIdx: number;
+    segmentIdx: NonNegativeInteger;
     // Codepoint offset before a character. EOF always has offset 0.
-    offset: number;
+    offset: NonNegativeInteger;
 };
 
 export type TextRange = {

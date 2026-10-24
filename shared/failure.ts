@@ -1,9 +1,24 @@
 import { type AbsolutePath } from "./util/path";
 import { type Executor } from "./transcription/executor";
+import { type DownloadFailure } from "./downloads";
+import { type DocumentationFailure } from "./documentation";
+
+export type FileOperation = "read" | "write" | "inspect" | "access" | "open-directory" | "remove" | "clear-logs";
+
+export type OperationResult = { success: true } | { success: false; error: FailureInfo };
 
 // Application-owned failures carry identifiers and data, never display text.
 // diagnostic is reserved for unmodified external exception/native output.
-export type FailureInfo = ({
+export type FailureInfo = (DownloadFailure | DocumentationFailure | {
+    kind: "file-operation-failed";
+    operation: FileOperation;
+    path: string | null;
+    diagnostic: string;
+} | {
+    kind: "external-open-failed";
+    url: string;
+    diagnostic: string;
+} | {
     kind: "unexpected";
     diagnostic: string;
 } | {
@@ -17,7 +32,8 @@ export type FailureInfo = ({
         | "transcription-empty-result" | "transcription-truncated-output"
         | "audio-invalid-wave" | "audio-truncated-wave" | "audio-empty-wave"
         | "settings-invalid-update"
-        | "path-not-absolute" | "path-drive-relative" | "project-path-not-file" | "ipc-not-main-frame";
+        | "path-not-absolute" | "path-drive-relative" | "project-path-not-file" | "ipc-not-main-frame"
+        | "file-invalid-directory";
 } | {
     kind: "transcription-unstable-output";
     start: string;
@@ -91,6 +107,10 @@ export class VestigeErrors extends Error {
 }
 
 export function toFailureInfo(error: unknown): FailureInfo {
-    if (error instanceof VestigeErrors) return error.failure;
+    if (isExpectedFailure(error)) return error.failure;
     return { kind: "unexpected", diagnostic: error instanceof Error ? error.message : String(error) };
+}
+
+export function isExpectedFailure(error: unknown): error is VestigeErrors {
+    return error instanceof VestigeErrors;
 }

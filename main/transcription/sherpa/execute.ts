@@ -4,7 +4,7 @@ import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run
 import { type ExecutionContext } from "../execute";
 import { runProcess } from "../../util/process";
 import { createRun } from "../result";
-import { TranscriptionFailure } from "../failure";
+import { VestigeErrors } from "../../../shared/failure";
 import { nativeArguments } from "./parameters";
 import { modelArguments } from "./models";
 import { needsWordSeparator, parseBatchResults, toRun } from "./result";
@@ -55,7 +55,7 @@ export async function execute(context: ExecutionContext): Promise<Run> {
         }
         feedback?.progress(Math.min(0.99, (index + batch.length) / parts.length));
     }
-    if (!transcript.some(segment => segment.token.text.trim())) throw new TranscriptionFailure({ kind: "transcription-empty-result" });
+    if (!transcript.some(segment => segment.token.text.trim())) throw new VestigeErrors({ kind: "transcription-empty-result" });
     const elapsed = (performance.now() - start) / 1000;
     return createRun(id, request, language, transcript, elapsed);
 }

@@ -1,6 +1,6 @@
 import { monoPcm16Header } from "../../shared/audio/wave";
 import { open, writeFile } from "node:fs/promises";
-import { TranscriptionFailure } from "./failure";
+import { VestigeErrors } from "../../shared/failure";
 
 export type WaveInfo = {
     format: number;
@@ -22,7 +22,7 @@ export async function waveInfo(filename: string): Promise<WaveInfo> {
         const header = Buffer.alloc(16);
         await file.read(header, 0, 12, 0);
         if (header.toString("ascii", 0, 4) !== "RIFF" || header.toString("ascii", 8, 12) !== "WAVE") {
-            throw new TranscriptionFailure({ kind: "audio-invalid-wave" });
+            throw new VestigeErrors({ kind: "audio-invalid-wave" });
         }
         let byteRate = 0;
         let format = 0, channels = 0, sampleRate = 0, bitsPerSample = 0, blockAlign = 0;
@@ -30,7 +30,7 @@ export async function waveInfo(filename: string): Promise<WaveInfo> {
             await file.read(header, 0, 8, position);
             const kind = header.toString("ascii", 0, 4);
             const length = header.readUInt32LE(4);
-            if (position + 8 + length > size) throw new TranscriptionFailure({ kind: "audio-truncated-wave" });
+            if (position + 8 + length > size) throw new VestigeErrors({ kind: "audio-truncated-wave" });
             if (kind === "fmt " && length >= 16) {
                 await file.read(header, 0, 16, position + 8);
                 format = header.readUInt16LE(0);
@@ -43,7 +43,7 @@ export async function waveInfo(filename: string): Promise<WaveInfo> {
             if (kind === "data" && byteRate > 0) return { format, channels, sampleRate, bitsPerSample, blockAlign, dataOffset: position + 8, dataLength: length, duration: length / byteRate };
             position += 8 + length + length % 2;
         }
-        throw new TranscriptionFailure({ kind: "audio-empty-wave" });
+        throw new VestigeErrors({ kind: "audio-empty-wave" });
     }
     finally {
         await file.close();
@@ -57,18 +57,18 @@ export async function waveDuration(filename: string): Promise<number> {
 export async function writeWaveSlice(filename: string, destination: string, info: WaveInfo, start: number, end: number, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted();
     if (info.format !== 1 || info.channels !== 1 || info.sampleRate !== 16000 || info.bitsPerSample !== 16 || info.blockAlign !== 2) {
-        throw new TranscriptionFailure({ kind: "audio-invalid-wave" });
+        throw new VestigeErrors({ kind: "audio-invalid-wave" });
     }
     const from = Math.round(start * info.sampleRate) * info.blockAlign;
     const to = Math.min(info.dataLength, Math.round(end * info.sampleRate) * info.blockAlign);
-    if (from < 0 || to <= from) throw new TranscriptionFailure({ kind: "audio-empty-wave" });
+    if (from < 0 || to <= from) throw new VestigeErrors({ kind: "audio-empty-wave" });
     const samples = Buffer.alloc(to - from);
     const input = await open(filename, "r");
     try {
         for (let offset = 0; offset < samples.length;) {
             signal?.throwIfAborted();
             const { bytesRead } = await input.read(samples, offset, samples.length - offset, info.dataOffset + from + offset);
-            if (!bytesRead) throw new TranscriptionFailure({ kind: "audio-truncated-wave" });
+            if (!bytesRead) throw new VestigeErrors({ kind: "audio-truncated-wave" });
             offset += bytesRead;
         }
     }

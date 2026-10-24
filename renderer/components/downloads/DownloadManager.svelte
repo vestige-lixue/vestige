@@ -84,7 +84,9 @@
             return false;
         };
         void window.api.downloads.list().then(result => {
-            if (!disposed) rows = result.filter(download => download.kind === kind).map(download => ({ download, busy: !!download.taskId }));
+            if (disposed) return;
+            if (result.success) rows = result.downloads.filter(download => download.kind === kind).map(download => ({ download, busy: !!download.taskId }));
+            else failure = describeFailure(result.error);
         }).catch(error => {
             if (!disposed) failure = describeFailure(toFailureInfo(error));
         }).finally(() => {
@@ -99,7 +101,8 @@
     async function openDirectory(): Promise<void> {
         opening = true;
         try {
-            await window.api.downloads.openDirectory(kind);
+            const result = await window.api.downloads.openDirectory(kind);
+            if (!result.success) failure = describeFailure(result.error);
         }
         catch (error) {
             failure = describeFailure(toFailureInfo(error));

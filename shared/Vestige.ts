@@ -1,3 +1,4 @@
+import { type NonNegativeInteger, type NonNegativeNumber } from "./util/Scalar";
 import { type Media } from "./Media";
 import { type TextPosition, type TextRange } from "./util/range";
 import { type Run } from "./transcription/Run";
@@ -14,8 +15,8 @@ export type Modification = {
 
 export type Vestige = {
     media: Media;
-    playbackPosition: number;
+    playbackPosition: NonNegativeNumber;
     runs: Run[];
-    displayedRunIdx: number;
+    displayedRunIdx: NonNegativeInteger;
     modifications: Modification[];
 };

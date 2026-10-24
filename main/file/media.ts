@@ -1,17 +1,18 @@
-import { VestigeErrors, toFailureInfo } from "../../shared/failure";
+import { isExpectedFailure } from "../../shared/failure";
 import { open } from "node:fs/promises";
-import { validMediaHash, type MediaCheckResult, type MediaReference } from "../../shared/media/check";
+import { validMediaHash, type MediaCheckResult } from "../../shared/media/check";
 import { getFileName, type AbsolutePath } from "../../shared/util/path";
 import { parseAbsolutePath, isSystemError } from "../util/file";
 import { probeMedia } from "./probe";
+import { fileOperationFailure } from "../util/fs";
 import { hashMedia } from "./hash";
 
 export async function readMedia(
-    input: unknown, reference: MediaReference | null, runtimeDirectory: AbsolutePath, signal: AbortSignal
+    input: unknown, reference: unknown, runtimeDirectory: AbsolutePath, signal: AbortSignal
 ): Promise<MediaCheckResult> {
     try {
         const path = parseAbsolutePath(input);
-        if (reference !== null && (!reference || !Number.isSafeInteger(reference.size) || reference.size < 0 || !validMediaHash(reference.hash))) {
+        if (reference !== null && (typeof reference !== "object" || !reference || !("size" in reference) || typeof reference.size !== "number" || !Number.isSafeInteger(reference.size) || reference.size < 0 || !("hash" in reference) || !validMediaHash(reference.hash))) {
             return { status: "unreadable", error: { kind: "media-invalid-reference" } };
         }
         signal.throwIfAborted();
@@ -50,11 +51,11 @@ export async function readMedia(
     }
     catch (error) {
         if (signal.aborted) return { status: "cancelled", error: { kind: "media-cancelled" } };
-        if (error instanceof VestigeErrors) return { status: "unreadable", error: error.failure };
+        if (isExpectedFailure(error)) return { status: "unreadable", error: error.failure };
         if (!isSystemError(error)) throw error;
         const code = error.code;
         return code === "ENOENT" || code === "ENOTDIR"
             ? { status: "missing", error: { kind: "media-missing" } }
-            : { status: "unreadable", error: toFailureInfo(error) };
+            : { status: "unreadable", error: fileOperationFailure(error, "read", typeof input === "string" ? input : null) };
     }
 }

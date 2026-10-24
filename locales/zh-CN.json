@@ -665,7 +665,79 @@
             "directoryDiagnostic": "无法读取拖入的文件夹：{{diagnostic}}"
         },
         "file": {
-            "notLocal": "需要本地文件路径：{{name}}"
+            "notLocal": "需要本地文件路径：{{name}}",
+            "invalidDirectory": "未知的文件夹类别。",
+            "operations": {
+                "read": "无法读取文件。",
+                "write": "无法写入文件。",
+                "inspect": "无法检查文件或文件夹。",
+                "open-directory": "无法打开文件夹。",
+                "remove": "无法删除临时文件。",
+                "clear-logs": "无法清除日志。",
+                "access": "无法访问文件或文件夹。"
+            }
+        },
+        "externalOpen": "无法打开外部链接：{{url}}",
+        "documentation": {
+            "request": {
+                "kind": "未知的文档页面。",
+                "language": "没有此语言的文档。",
+                "link": "此文档链接无效。",
+                "path": "文档必须是应用数据文件夹内的 Markdown 文件。"
+            },
+            "file": {
+                "missing": "未找到文档：{{path}}",
+                "not-file": "文档不是普通文件：{{path}}",
+                "too-large": "文档超过 {{limitMiB}} MiB：{{path}}",
+                "read": "无法读取文档：{{path}}"
+            }
+        },
+        "download": {
+            "invalidRequest": "下载请求无效。",
+            "closing": "应用正在退出，无法开始新的下载。",
+            "code": "错误码：{{code}}",
+            "http": {
+                "http": "下载服务器返回 HTTP {{status}}：{{resource}}",
+                "request": "无法请求下载元数据或连接传输服务：{{resource}}",
+                "metadata": "发布版本的元数据无效：{{resource}}",
+                "asset": "此发布版本没有与软件包匹配的已验证归档：{{resource}}"
+            },
+            "transfer": {
+                "rpc": "下载服务返回了无效响应或拒绝了请求。",
+                "stopped": "传输已停止：{{file}}",
+                "process-exited": "下载服务在传输完成前退出。",
+                "shutdown-timeout": "下载服务在传输完成后未能关闭。",
+                "port": "无法为下载服务分配本地端口。"
+            },
+            "proxy": {
+                "timeout": "查询系统代理超时。",
+                "unsupported": "不支持此系统代理类型，请在系统设置中配置 HTTP 代理。",
+                "resolution": "无法解析系统代理。"
+            },
+            "integrity": {
+                "checksum": "文件校验和不符：{{file}}",
+                "size": "文件大小不符（预期 {{expected}}，实际 {{actual}} 字节）：{{file}}",
+                "empty": "下载的文件缺失、为空或不是普通文件：{{file}}",
+                "html": "服务器返回了 HTML 页面，而非请求的文件：{{file}}",
+                "runtime-manifest": "运行库缓存清单无效或不完整：{{file}}",
+                "runtime-file": "缓存的运行库文件未通过校验：{{file}}",
+                "runtime-license": "运行库归档缺少许可证：{{file}}"
+            },
+            "archive": {
+                "unsafe-entry": "归档中包含不安全的路径：{{path}}",
+                "unsupported-entry": "归档中包含不支持的条目或链接：{{path}}",
+                "missing-file": "归档缺少必需文件：{{path}}",
+                "unpack": "无法读取或解压归档：{{path}}"
+            },
+            "conflict": {
+                "exists": "下载文件夹已存在，请先移走再重新下载：{{path}}",
+                "mismatch": "已安装的后端与此发布版本不符，请先移走再重新下载：{{path}}",
+                "filename": "不同的软件包文件使用了相同的目标路径：{{path}}"
+            },
+            "cleanup": {
+                "installed": "软件包已安装，但无法删除临时文件：{{directory}}",
+                "incomplete": "无法删除临时下载文件：{{directory}}"
+            }
         }
     },
     "documentation": {

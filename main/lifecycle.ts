@@ -1,6 +1,7 @@
 import { app, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
 import { appChannels } from "../shared/ipc";
+import { listen } from "./util/ipc";
 
 let checkBeforeQuit: (() => Promise<boolean>) | null = null;
 let allowQuit = false;
@@ -76,8 +77,8 @@ export function registerWindowLifecycle(window: BrowserWindow, prepareClose: () 
     };
     checkBeforeQuit = checkClose;
 
-    contents.ipc.on(appChannels.beforeQuitResult, (event, id: unknown, block: unknown) => {
-        if (event.senderFrame !== contents.mainFrame || id !== pending?.id) return;
+    listen(contents, appChannels.beforeQuitResult, (id: unknown, block: unknown) => {
+        if (id !== pending?.id) return;
         // Missing or malformed answers keep the window open.
         pending?.finish(block !== false);
     });

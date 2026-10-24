@@ -1,20 +1,21 @@
+import { type DateMilliseconds, type NonNegativeNumber, type Probability } from "../util/Scalar";
 import { type Token } from "./Token";
 import { type Range } from "../util/range";
 import { type Config } from "./Config";
 
 export type TranscriptSpan = {
     range: Range;
-    blankProb: number;
+    blankProb: Probability;
     token: Token;
 };
 
 export type Run = {
     id: string;
-    startedAt: number;
+    startedAt: DateMilliseconds;
     config: Config;
     language: string;
-    languageProb: number;
+    languageProb: Probability;
     // IRL time taken to run the transcription, in seconds.
-    runTime: number;
+    runTime: NonNegativeNumber;
     transcript: TranscriptSpan[];
 };

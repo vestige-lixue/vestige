@@ -1,4 +1,6 @@
-import { type FailureInfo, toFailureInfo } from "../../shared/failure";
+import { type FailureInfo, toFailureInfo, isExpectedFailure } from "../../shared/failure";
+import { isSystemError } from "../util/file";
+import { fileOperationFailure } from "../util/fs";
 import { join } from "node:path";
 import { type Settings, type SettingsResult, type SettingsSnapshot } from "../../shared/settings/Settings";
 import { readSettings, writeSettings } from "./file";
@@ -51,6 +53,7 @@ export function update(value: unknown): SettingsResult {
         patch = validatePatch(value);
     }
     catch (error) {
+        if (!isExpectedFailure(error)) throw error;
         return { success: false, error: toFailureInfo(error), snapshot: get() };
     }
     const next: Settings = {
@@ -90,13 +93,16 @@ export function save(): Promise<SettingsResult> {
             error = null;
         }
         catch (cause) {
-            error = toFailureInfo(cause);
+            if (!isSystemError(cause) && !isExpectedFailure(cause)) throw cause;
+            error = isSystemError(cause) ? fileOperationFailure(cause, "write", path) : toFailureInfo(cause);
         }
-        pendingSaves--;
-        notify();
+        finally {
+            pendingSaves--;
+            notify();
+        }
         return error === null ? { success: true, snapshot: get() }
             : { success: false, error, snapshot: get() };
     });
-    writes = operation.then(() => {});
+    writes = operation.then(() => {}, () => {});
     return operation;
 }

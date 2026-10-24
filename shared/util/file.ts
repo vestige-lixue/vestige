@@ -1,4 +1,6 @@
 import { type FailureInfo } from "../failure";
+
+export type DirectoryListResult = { success: true; directories: string[] } | { success: false; error: FailureInfo };
 import { type AbsolutePath } from "./path";
 
 // A native path from a file picker, or a File supplied by drag and drop.

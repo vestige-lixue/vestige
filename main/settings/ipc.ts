@@ -1,13 +1,10 @@
-import { VestigeErrors } from "../../shared/failure";
-import { type BrowserWindow, type IpcMainInvokeEvent } from "electron";
+import { handle } from "../util/ipc";
+import { type BrowserWindow } from "electron";
 import { settingsChannels } from "../../shared/ipc";
 import * as settings from "./store";
 
 export function registerSettingsIPCs(window: BrowserWindow): () => void {
     const contents = window.webContents;
-    const checkSender = (event: IpcMainInvokeEvent): void => {
-        if (event.senderFrame !== contents.mainFrame) throw new VestigeErrors({ kind: "ipc-not-main-frame" });
-    };
     const rememberWindow = (): void => {
         if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) return;
         const { width, height } = window.getNormalBounds();
@@ -18,16 +15,13 @@ export function registerSettingsIPCs(window: BrowserWindow): () => void {
     window.on("unmaximize", rememberWindow);
     window.on("restore", rememberWindow);
     window.on("leave-full-screen", rememberWindow);
-    contents.ipc.handle(settingsChannels.get, event => {
-        checkSender(event);
+    handle(contents, settingsChannels.get, () => {
         return settings.get();
     });
-    contents.ipc.handle(settingsChannels.update, (event, patch: unknown) => {
-        checkSender(event);
+    handle(contents, settingsChannels.update, (patch: unknown) => {
         return settings.update(patch);
     });
-    contents.ipc.handle(settingsChannels.save, event => {
-        checkSender(event);
+    handle(contents, settingsChannels.save, () => {
         rememberWindow();
         return settings.save();
     });

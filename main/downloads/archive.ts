@@ -6,12 +6,13 @@ import { pathKey } from "../util/fs";
 import { findExecutable, runProcess } from "../util/process";
 import { type DownloadReporter } from "./types";
 import { fileHash, linkOrCopy } from "./files";
+import { isExpectedFailure, VestigeErrors } from "../../shared/failure";
 
 export function validateArchiveEntries(output: string): void {
     for (const entry of output.split(/\r?\n/).filter(Boolean)) {
         const path = entry.replaceAll("\\", "/");
         if (path.startsWith("/") || path.includes(":") || path.split("/").includes("..")) {
-            throw new Error(`Unsafe archive entry: ${entry}`);
+            throw new VestigeErrors({ kind: "download-archive", reason: "unsafe-entry", path: entry });
         }
     }
 }
@@ -23,10 +24,10 @@ export async function filesIn(directory: AbsolutePath, boundary = directory): Pr
         if (entry.isDirectory()) files.push(...await filesIn(path, boundary));
         else if (entry.isFile() || entry.isSymbolicLink()) {
             const target = parseAbsolutePath(await realpath(path));
-            if (!containsPath(boundary, target) || !(await lstat(target)).isFile()) throw new Error(`Unsupported archive link: ${path}`);
+            if (!containsPath(boundary, target) || !(await lstat(target)).isFile()) throw new VestigeErrors({ kind: "download-archive", reason: "unsupported-entry", path });
             files.push(path);
         }
-        else throw new Error(`Unsupported archive entry: ${path}`);
+        else throw new VestigeErrors({ kind: "download-archive", reason: "unsupported-entry", path });
     }
     return files;
 }
@@ -38,7 +39,18 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
     if ([...required].some(name => excluded.has(name))) throw new Error("Required archive file is excluded.");
     const zip = /\.(?:zip|whl)$/i.test(archive) && process.platform !== "win32";
     const tool = await findExecutable(runtimeDirectory, "archive", zip ? "unzip" : "tar");
-    const listing = await runProcess(tool, zip ? ["-Z1", archive] : ["-tf", archive], staging, signal);
+    const runArchive = async (args: string[], report = false): ReturnType<typeof runProcess> => {
+        try {
+            return await runProcess(tool, args, staging, signal, report ? (_stream, text) => reporter.append(text) : undefined);
+        }
+        catch (error) {
+            if (isExpectedFailure(error) && error.failure.kind === "native-failed") {
+                throw new VestigeErrors({ kind: "download-archive", reason: "unpack", path: archive, diagnostic: error.failure.diagnostic ?? undefined, exitCode: error.failure.exitCode, signal: error.failure.signal }, { cause: error });
+            }
+            throw error;
+        }
+    };
+    const listing = await runArchive(zip ? ["-Z1", archive] : ["-tf", archive]);
     validateArchiveEntries(listing.stdout);
     const unpacked = parseAbsolutePath(join(staging, "unpacked"));
     const ready = parseAbsolutePath(join(staging, "ready"));
@@ -46,8 +58,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
     await mkdir(ready);
     reporter.append(`Extracting ${basename(archive)}\n`);
     reporter.progress(null);
-    await runProcess(tool, zip ? ["-q", archive, "-d", unpacked] : ["-xf", archive, "-C", unpacked], staging, signal,
-        (_stream, text) => reporter.append(text));
+    await runArchive(zip ? ["-q", archive, "-d", unpacked] : ["-xf", archive, "-C", unpacked], true);
     const copied = new Map<string, AbsolutePath>();
     const targets = new Map<string, AbsolutePath>();
     for (const file of await filesIn(unpacked)) {
@@ -64,7 +75,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
         const previous = copied.get(key);
         if (previous) {
             const [previousHash, currentHash] = await Promise.all([fileHash(previous, signal), fileHash(file, signal)]);
-            if (previousHash !== currentHash) throw new Error(`Conflicting backend filename: ${name}`);
+            if (previousHash !== currentHash) throw new VestigeErrors({ kind: "download-conflict", scope: "backend", reason: "filename", path: name });
             continue;
         }
         copied.set(key, file);
@@ -79,7 +90,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
         if (process.platform !== "win32") await chmod(join(ready, name), 0o755);
     }
     for (const program of programs) {
-        if (!copied.has(pathKey(program))) throw new Error(`Archive does not contain ${program}.`);
+        if (!copied.has(pathKey(program))) throw new VestigeErrors({ kind: "download-archive", reason: "missing-file", path: program });
     }
     return ready;
 }

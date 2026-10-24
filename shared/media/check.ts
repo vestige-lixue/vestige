@@ -1,5 +1,6 @@
+import typia from "typia";
 import { type FailureInfo } from "../failure";
-import { type Media } from "../Media";
+import { type Media, type MediaHash } from "../Media";
 
 export type MediaReference = Pick<Media, "size" | "hash">;
 
@@ -22,6 +23,4 @@ export type MediaURLResult = ({
     error: FailureInfo;
 });
 
-export function validMediaHash(value: unknown): value is string {
-    return typeof value === "string" && /^[0-9a-f]{16}$/.test(value);
-}
+export const validMediaHash = typia.createIs<MediaHash>();

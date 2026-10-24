@@ -660,7 +660,8 @@
         clearingLogs = true;
         logsFailure = "";
         try {
-            await window.api.clearLogs();
+            const result = await window.api.clearLogs();
+            if (!result.success) logsFailure = describeFailure(result.error);
         }
         catch (error) {
             logsFailure = describeFailure(toFailureInfo(error));
@@ -675,7 +676,8 @@
         openingDirectory = true;
         directoryFailure = "";
         try {
-            await window.api.downloads.openDirectory(kind);
+            const result = await window.api.downloads.openDirectory(kind);
+            if (!result.success) directoryFailure = describeFailure(result.error);
         }
         catch (error) {
             directoryFailure = describeFailure(toFailureInfo(error));

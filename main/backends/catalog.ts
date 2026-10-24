@@ -2,6 +2,7 @@ import { type Backend } from "../../shared/backends";
 import { executors, type Executor } from "../../shared/transcription/executor";
 import { type DownloadPayload, type DownloadSource, type RuntimeDownload } from "../downloads/types";
 import { cudaRuntimes } from "./runtimes";
+import { VestigeErrors } from "../../shared/failure";
 
 export type BackendPackage = Backend & { repository: string; release: string; asset: string; license: boolean; estimatedBytes: number; runtimes: RuntimeDownload[] };
 export type FetchRelease = (url: string, signal: AbortSignal) => Promise<unknown>;
@@ -80,11 +81,13 @@ function archiveFiles(backend: BackendPackage): string[] {
 export async function resolveBackendDownload(backend: BackendPackage, fetchRelease: FetchRelease, signal: AbortSignal): Promise<DownloadPayload> {
     const value = await fetchRelease(`https://api.github.com/repos/${backend.repository}/releases/tags/${encodeURIComponent(backend.release)}`, signal);
     const release = value as { tag_name?: unknown; draft?: unknown; assets?: { name: string; browser_download_url: string; digest?: string; size: number; state: string }[] } | null;
-    if (!release || release.draft || release.tag_name !== backend.release || !Array.isArray(release.assets)) throw new Error("Invalid backend release metadata.");
-    const asset = release.assets.find(asset => asset.name === backend.asset && asset.state === "uploaded");
-    if (!asset || !/^sha256:[a-f\d]{64}$/i.test(asset.digest ?? "") || !Number.isSafeInteger(asset.size) || asset.size <= 0
-        || !asset.browser_download_url.startsWith(`https://github.com/${backend.repository}/releases/download/`)) {
-        throw new Error(`No verified backend archive: ${backend.asset}`);
+    if (!release || release.draft || release.tag_name !== backend.release || !Array.isArray(release.assets)) {
+        throw new VestigeErrors({ kind: "download-http", stage: "metadata", reason: "metadata", resource: `${backend.repository}/${backend.release}`, status: null });
+    }
+    const asset = release.assets.find(asset => asset && typeof asset === "object" && asset.name === backend.asset && asset.state === "uploaded");
+    if (!asset || typeof asset.digest !== "string" || !/^sha256:[a-f\d]{64}$/i.test(asset.digest) || !Number.isSafeInteger(asset.size) || asset.size <= 0
+        || typeof asset.browser_download_url !== "string" || !asset.browser_download_url.startsWith(`https://github.com/${backend.repository}/releases/download/`)) {
+        throw new VestigeErrors({ kind: "download-http", stage: "metadata", reason: "asset", resource: `${backend.repository}/${backend.release}/${backend.asset}`, status: null });
     }
     const files: DownloadPayload["files"] = [{ url: asset.browser_download_url, destination: backend.asset, size: asset.size, sha256: asset.digest!.slice(7) }];
     if (backend.license) files.push({ url: `https://raw.githubusercontent.com/${backend.repository}/${encodeURIComponent(backend.release)}/LICENSE`, destination: "licenses/LICENSE.txt" });

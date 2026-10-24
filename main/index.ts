@@ -20,6 +20,7 @@ import { captureConsole, LogDirectory } from "./logging";
 import { createAppPaths } from "./paths";
 import { registerAppIPCs } from "./app";
 import { getWindowIcon, registerWindowBehavior } from "./ui/window";
+import { listen } from "./util/ipc";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -119,8 +120,8 @@ function createWindow(): void {
         rememberWindow();
         mainWindow.show();
     };
-    mainWindow.webContents.ipc.on(appChannels.ready, event => {
-        if (event.senderFrame !== mainWindow.webContents.mainFrame || mainWindow.isVisible()) return;
+    listen(mainWindow.webContents, appChannels.ready, () => {
+        if (mainWindow.isVisible()) return;
         rendererReady = true;
         showWindow();
     });
