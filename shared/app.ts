@@ -1,5 +1,5 @@
 import { type FilePathResult } from "./util/file";
-import { type TranscriptionRequest, type TranscriptionResult } from "./transcription/executer";
+import { type TranscriptionRequest, type TranscriptionResult } from "./transcription/executor";
 import { type GetProjectResult, type SaveProjectResult } from "./project/file";
 import { type Project } from "./project/Project";
 import { type AbsolutePath } from "./util/path";

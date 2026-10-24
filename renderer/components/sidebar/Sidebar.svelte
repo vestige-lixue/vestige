@@ -7,7 +7,7 @@
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html logo}
     </div>
-    <RecordList />
+    <MediaList />
     <SideNav />
 </aside>
 <Resizer
@@ -57,7 +57,7 @@
 
 <script lang="ts">
     import logo from "../../../resources/logos/logo-black.svg?raw";
-    import RecordList from "./MediaList.svelte";
+    import MediaList from "./MediaList.svelte";
     import SideNav from "./SideNav.svelte";
     import Resizer from "../util/Resizer.svelte";
     import * as settings from "../../states/settings.svelte";

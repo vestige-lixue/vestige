@@ -1,8 +1,8 @@
-import { type Token } from "../util/Token";
+import { type Token } from "./Token";
 import { type Range } from "../util/range";
 import { type Config } from "./Config";
 
-export type Segment = {
+export type TranscriptSpan = {
     range: Range;
     blankProb: number;
     token: Token;
@@ -16,5 +16,5 @@ export type Run = {
     languageProb: number;
     // IRL time taken to run the transcription, in seconds.
     runTime: number;
-    transcript: Segment[];
+    transcript: TranscriptSpan[];
 };

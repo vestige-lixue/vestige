@@ -6,14 +6,14 @@ import { type Project } from "../../shared/project/Project";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type GetProjectResult, type SaveProjectResult, type MediaPathMode } from "../../shared/project/file";
 import { ProjectValidationFailure, validateProject } from "./validate";
-import { filePath, InvalidPathFailure, isSystemError } from "../util/file";
+import { parseAbsolutePath, InvalidPathFailure, isSystemError } from "../util/file";
 import { serializeMediaPath } from "./path";
 
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
 
 export async function getProject(path: unknown): Promise<GetProjectResult> {
     try {
-        const normalized = filePath(path);
+        const normalized = parseAbsolutePath(path);
         const text = await readFile(normalized, "utf8");
         let project: unknown;
         try {
@@ -23,7 +23,7 @@ export async function getProject(path: unknown): Promise<GetProjectResult> {
             if (!(error instanceof SyntaxError)) throw error;
             throw new ProjectValidationFailure({ kind: "project-invalid-json", diagnostic: error.message }, { cause: error });
         }
-        validateProject(project, filePath(dirname(normalized)));
+        validateProject(project, parseAbsolutePath(dirname(normalized)));
         return { success: true, project };
     }
     catch (error) {
@@ -61,9 +61,9 @@ async function writeProject(path: AbsolutePath, text: string): Promise<SaveProje
 
 export async function saveProject(path: unknown, project: Project, compress = false, rememberPlaybackPosition = true, mediaPathMode: MediaPathMode = "project"): Promise<SaveProjectResult> {
     try {
-        const normalized = filePath(path);
+        const normalized = parseAbsolutePath(path);
         validateProject(project);
-        const directory = filePath(dirname(normalized));
+        const directory = parseAbsolutePath(dirname(normalized));
         // Capture before waiting, so a queued write cannot observe later mutations.
         // Only the disk snapshot uses relative paths; runtime media keeps absolute paths.
         const snapshot = {

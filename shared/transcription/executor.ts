@@ -2,17 +2,17 @@ import { type FailureInfo } from "../failure";
 import { type Run } from "./Run";
 import { type AbsolutePath } from "../util/path";
 
-export type Executer = "sherpa-onnx" | "whisper.cpp";
+export type Executor = "sherpa-onnx" | "whisper.cpp";
 
-export const executers = {
+export const executors = {
     "whisper.cpp": { program: "whisper-cli" },
     "sherpa-onnx": { program: "sherpa-onnx-offline" }
-} as const satisfies Record<Executer, { program: string }>;
+} as const satisfies Record<Executor, { program: string }>;
 
 export type TranscriptionRequest = {
-    executer: Executer;
+    executor: Executor;
     backendDirectory: string;
-    // Absolute path, or relative to the user's models folder. The executer owns its file layout.
+    // Absolute path, or relative to the user's models folder. The executor owns its file layout.
     modelDirectory: string;
     mediaPath: AbsolutePath;
     mediaDuration: number;
@@ -30,5 +30,5 @@ export type TranscriptionResult = ({
     error: FailureInfo;
 });
 
-export const executerChannel = "transcription:transcribe";
-export const cancelExecuterChannel = "transcription:cancel";
+export const executorChannel = "transcription:transcribe";
+export const cancelExecutorChannel = "transcription:cancel";

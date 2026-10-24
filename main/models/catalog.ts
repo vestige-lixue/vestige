@@ -45,7 +45,7 @@ export const modelDownloads: DownloadConfiguration[] = [
         id: `whisper-${variant}`,
         name: `Whisper ${name}`,
         estimatedBytes,
-        executer: "whisper.cpp",
+        executor: "whisper.cpp",
         files: [
             { url: `${whisperSource}/ggml-${variant}.bin?download=true`, destination: "ggml-base.en.bin" },
             { url: "https://raw.githubusercontent.com/openai/whisper/main/LICENSE", destination: "LICENSE" }
@@ -62,7 +62,7 @@ export const modelDownloads: DownloadConfiguration[] = [
         id: "sherpa-paraformer-zh",
         name: "Paraformer zh",
         estimatedBytes: 822_641_426 + 75_354,
-        executer: "sherpa-onnx",
+        executor: "sherpa-onnx",
         files: [
             { url: `${paraformerSource}/model.onnx?download=true`, destination: "paraformer.onnx" },
             { url: `${paraformerSource}/tokens.txt?download=true`, destination: "tokens.txt" },
@@ -86,7 +86,7 @@ export const modelDownloads: DownloadConfiguration[] = [
         id: "sherpa-sense-voice-small-int8",
         name: "SenseVoiceSmall INT8",
         estimatedBytes: 239_233_841 + 315_894,
-        executer: "sherpa-onnx",
+        executor: "sherpa-onnx",
         files: [
             {
                 url: `${senseVoiceSource}/model.int8.onnx?download=true`, destination: "sense-voice-model.onnx",
@@ -110,7 +110,7 @@ export const modelDownloads: DownloadConfiguration[] = [
         id: "sherpa-fire-red-asr2-ctc-int8",
         name: "FireRedASR2-CTC INT8",
         estimatedBytes: 775_861_420 + 79_172,
-        executer: "sherpa-onnx",
+        executor: "sherpa-onnx",
         files: [
             {
                 url: `${fireRedSource}/model.int8.onnx?download=true`, destination: "fire-red-asr-ctc.onnx",
@@ -132,7 +132,7 @@ export const modelDownloads: DownloadConfiguration[] = [
         id: `sherpa-qwen3-asr-${variant}-int8`,
         name: `Qwen3-ASR ${name} INT8`,
         estimatedBytes: frontend.size + encoder.size + decoder.size + qwenTokenizer.reduce((sum, file) => sum + file.size, 0),
-        executer: "sherpa-onnx",
+        executor: "sherpa-onnx",
         files: [
             { url: `${source}/${modelPath}conv_frontend.onnx`, destination: "qwen3-asr-conv-frontend.onnx", ...frontend },
             { url: `${source}/${modelPath}encoder.int8.onnx`, destination: "qwen3-asr-encoder.onnx", ...encoder },

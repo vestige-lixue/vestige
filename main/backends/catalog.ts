@@ -1,5 +1,5 @@
 import { type Backend } from "../../shared/backends";
-import { executers, type Executer } from "../../shared/transcription/executer";
+import { executors, type Executor } from "../../shared/transcription/executor";
 import { type DownloadPayload, type DownloadSource, type RuntimeDownload } from "../downloads/types";
 import { cudaRuntimes } from "./runtimes";
 
@@ -34,13 +34,13 @@ export function backendPackages(platform: NodeJS.Platform = process.platform, ar
     if (!["win32", "linux", "darwin"].includes(platform) || !["x64", "arm64"].includes(arch)) return [];
     const suffix = platform === "win32" ? ".exe" : "";
     const packages: BackendPackage[] = [];
-    const add = (id: string, name: string, executer: Executer, repository: string, release: string, asset: string, license = true): void => {
+    const add = (id: string, name: string, executor: Executor, repository: string, release: string, asset: string, license = true): void => {
         let estimatedBytes = archiveBytes[asset];
         if (!estimatedBytes) throw new Error(`Missing backend download size: ${asset}`);
         const runtimes = id === "whisper-cuda-12" ? cudaRuntimes(12, platform, true)
             : id === "sherpa-cuda-12" ? cudaRuntimes(12, platform) : id === "sherpa-cuda-13" ? cudaRuntimes(13, platform) : [];
         estimatedBytes += runtimes.reduce((total, runtime) => total + runtime.file.size, 0);
-        packages.push({ id, name, executer, repository, release, asset, license, estimatedBytes, runtimes, program: executers[executer].program + suffix });
+        packages.push({ id, name, executor, repository, release, asset, license, estimatedBytes, runtimes, program: executors[executor].program + suffix });
     };
     const whisper = (id: string, name: string, asset: string): void => add(`whisper-${id}`, `whisper.cpp b5130 ${name}`, "whisper.cpp", "ggml-org/whisper.cpp", "b5130", asset);
     if (platform === "darwin") {
@@ -71,7 +71,7 @@ export function backendPackages(platform: NodeJS.Platform = process.platform, ar
 
 function archiveFiles(backend: BackendPackage): string[] {
     const files = [backend.program];
-    if (backend.executer === "sherpa-onnx") files.push(`sherpa-onnx-vad${backend.program.endsWith(".exe") ? ".exe" : ""}`);
+    if (backend.executor === "sherpa-onnx") files.push(`sherpa-onnx-vad${backend.program.endsWith(".exe") ? ".exe" : ""}`);
     // The CUDA 11 distribution already contains these runtime libraries.
     if (backend.id === "whisper-cuda-11") files.push("cublas64_11.dll", "cublasLt64_11.dll", "cudart64_110.dll");
     return files;
@@ -95,7 +95,7 @@ export async function resolveBackendDownload(backend: BackendPackage, fetchRelea
         files,
         archive: { filename: backend.asset, programs: archiveFiles(backend), exclude },
         runtimes: backend.runtimes,
-        notice: `${backend.name}\nExecuter: ${backend.executer}\nSource: https://github.com/${backend.repository}/releases/tag/${backend.release}\n${backend.runtimes.map(runtime => `Runtime: ${runtime.name}\nSource: ${runtime.file.url}\n`).join("")}Preserve the included licenses and distribution notices.`
+        notice: `${backend.name}\nExecutor: ${backend.executor}\nSource: https://github.com/${backend.repository}/releases/tag/${backend.release}\n${backend.runtimes.map(runtime => `Runtime: ${runtime.name}\nSource: ${runtime.file.url}\n`).join("")}Preserve the included licenses and distribution notices.`
     };
 }
 

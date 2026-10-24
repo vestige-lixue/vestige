@@ -1,7 +1,7 @@
 import { chmod, copyFile, lstat, mkdir, readdir, realpath } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, filePath } from "../util/file";
+import { containsPath, parseAbsolutePath } from "../util/file";
 import { findExecutable, runProcess } from "../util/process";
 import { type DownloadReporter } from "./types";
 import { fileHash, linkOrCopy } from "./files";
@@ -18,10 +18,10 @@ export function validateArchiveEntries(output: string): void {
 export async function filesIn(directory: AbsolutePath, boundary = directory): Promise<AbsolutePath[]> {
     const files: AbsolutePath[] = [];
     for (const entry of await readdir(directory, { withFileTypes: true })) {
-        const path = filePath(join(directory, entry.name));
+        const path = parseAbsolutePath(join(directory, entry.name));
         if (entry.isDirectory()) files.push(...await filesIn(path, boundary));
         else if (entry.isFile() || entry.isSymbolicLink()) {
-            const target = filePath(await realpath(path));
+            const target = parseAbsolutePath(await realpath(path));
             if (!containsPath(boundary, target) || !(await lstat(target)).isFile()) throw new Error(`Unsupported archive link: ${path}`);
             files.push(path);
         }
@@ -39,8 +39,8 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
     const tool = await findExecutable(runtimeDirectory, "archive", zip ? "unzip" : "tar");
     const listing = await runProcess(tool, zip ? ["-Z1", archive] : ["-tf", archive], staging, signal);
     validateArchiveEntries(listing.stdout);
-    const unpacked = filePath(join(staging, "unpacked"));
-    const ready = filePath(join(staging, "ready"));
+    const unpacked = parseAbsolutePath(join(staging, "unpacked"));
+    const ready = parseAbsolutePath(join(staging, "ready"));
     await mkdir(unpacked);
     await mkdir(ready);
     reporter.append(`Extracting ${basename(archive)}\n`);
@@ -68,7 +68,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
         }
         copied.set(key, file);
         const target = await realpath(file);
-        const destination = filePath(join(ready, name));
+        const destination = parseAbsolutePath(join(ready, name));
         const existing = targets.get(target);
         if (existing) await linkOrCopy(existing, destination);
         else {

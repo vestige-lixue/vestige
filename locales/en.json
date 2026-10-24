@@ -202,8 +202,8 @@
         "config": {
             "submit": "New transcription",
             "title": "Transcription configuration",
-            "executer": {
-                "label": "Executer"
+            "executor": {
+                "label": "Executor"
             },
             "modelDirectory": {
                 "label": "Model directory",
@@ -613,18 +613,18 @@
             "paramsObject": "Parameters must be a JSON object.",
             "paramValue": "Parameter values must be strings.",
             "paramNull": "Parameter values must not contain null characters.",
-            "unknownExecuter": "Unknown executer: {{executer}}",
+            "unknownExecutor": "Unknown executor: {{executor}}",
             "emptyPath": "{{field}} must be a non-empty path.",
-            "invalidResult": "Executer produced no JSON result.",
+            "invalidResult": "Executor produced no JSON result.",
             "emptyResult": "The model returned no transcribed text. Check the audio and selected model.",
             "truncatedOutput": "The model truncated the audio or generated text. No transcript was saved. Check custom hotwords and model parameters.",
             "unstableOutput": "The model still repeated or truncated its output for {{start}}–{{end}} s after retrying shorter parts. No transcript was saved. Try another model or adjust its parameters.",
             "invalidOption": "Invalid option name: {{option}}",
             "managedOption": "Option {{option}} is managed by Vestige.",
             "output": {
-                "array": "{{executer}} returned no transcription array.",
-                "text": "{{executer}} returned no transcript text.",
-                "segment": "{{executer}} returned a segment without text."
+                "array": "{{executor}} returned no transcription array.",
+                "text": "{{executor}} returned no transcript text.",
+                "segment": "{{executor}} returned a segment without text."
             }
         },
         "audio": {
@@ -655,8 +655,8 @@
         },
         "native": {
             "notFound": "Could not find {{executable}}. Check the native program and its libraries in {{directory}}.",
-            "outputLimit": "Executer output exceeded {{limitMiB}} MiB.",
-            "failed": "Executer exited with {{reason}}"
+            "outputLimit": "Executor output exceeded {{limitMiB}} MiB.",
+            "failed": "Executor exited with {{reason}}"
         },
         "drop": {
             "file": "Could not read the dropped file.",

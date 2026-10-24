@@ -7,7 +7,7 @@ import { fileChannels } from "../../shared/ipc";
 import { type DownloadKind } from "../../shared/downloads";
 import { type MediaReference, type MediaCheckResult, type MediaURLResult } from "../../shared/media/check";
 import { type AbsolutePath } from "../../shared/util/path";
-import { filePath } from "../util/file";
+import { parseAbsolutePath } from "../util/file";
 import { findExecutable } from "../util/process";
 import { readMedia } from "./media";
 import { getMediaURL, releaseMediaURL, releaseMediaURLs } from "./source";
@@ -34,7 +34,7 @@ export function registerFileIPCs(window: BrowserWindow, runtimeDirectory: Absolu
     contents.ipc.handle(fileChannels.normalize, (event, path: unknown): FilePathResult => {
         checkSender(event);
         try {
-            return { success: true, path: filePath(path) };
+            return { success: true, path: parseAbsolutePath(path) };
         }
         catch (error) {
             return { success: false, error: toFailureInfo(error) };

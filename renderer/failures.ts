@@ -42,7 +42,7 @@ const failureKeys = {
     "native-output-limit": "errors.native.outputLimit",
     "media-playback-failed": "errors.media.playbackFailed",
     "file-not-local": "errors.file.notLocal",
-    "transcription-unknown-executer": "errors.transcription.unknownExecuter",
+    "transcription-unknown-executor": "errors.transcription.unknownExecutor",
     "transcription-empty-path": "errors.transcription.emptyPath",
     "transcription-invalid-result": "errors.transcription.invalidResult",
     "transcription-invalid-option": "errors.transcription.invalidOption",

@@ -2,14 +2,14 @@ import { t } from "./i18n";
 import { dialog, type BrowserWindow } from "electron";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type DownloadKind } from "../../shared/downloads";
-import { filePath } from "../util/file";
+import { parseAbsolutePath } from "../util/file";
 
 export async function selectDirectory(window: BrowserWindow, kind: DownloadKind, root: AbsolutePath): Promise<AbsolutePath | null> {
     const result = await dialog.showOpenDialog(window, {
         buttonLabel: t(`native.directories.${kind}.confirm`),
         title: t(`native.directories.${kind}.title`), defaultPath: root, properties: ["openDirectory"]
     });
-    return result.canceled || !result.filePaths[0] ? null : filePath(result.filePaths[0]);
+    return result.canceled || !result.filePaths[0] ? null : parseAbsolutePath(result.filePaths[0]);
 }
 
 // Native dialogs are a presentation boundary too. Derive their options when opening.
@@ -30,7 +30,7 @@ export async function selectMediaPath(window: BrowserWindow, path: unknown): Pro
         defaultPath: typeof path === "string" ? path : undefined,
         properties: ["openFile"]
     });
-    return result.canceled || !result.filePaths[0] ? null : filePath(result.filePaths[0]);
+    return result.canceled || !result.filePaths[0] ? null : parseAbsolutePath(result.filePaths[0]);
 }
 
 export async function selectMediaPaths(window: BrowserWindow): Promise<AbsolutePath[]> {
@@ -38,7 +38,7 @@ export async function selectMediaPaths(window: BrowserWindow): Promise<AbsoluteP
         buttonLabel: t("native.media.import.confirm"),
         title: t("native.media.import.title"), filters: mediaFilters(), properties: ["openFile", "multiSelections"]
     });
-    return result.canceled ? [] : result.filePaths.map(path => filePath(path));
+    return result.canceled ? [] : result.filePaths.map(path => parseAbsolutePath(path));
 }
 
 export async function selectOpenProjectPath(window: BrowserWindow): Promise<AbsolutePath | null> {
@@ -47,7 +47,7 @@ export async function selectOpenProjectPath(window: BrowserWindow): Promise<Abso
         buttonLabel: t("native.project.open.confirm"),
         filters: [{ name: t("native.filters.project"), extensions: ["vestige"] }], properties: ["openFile"]
     });
-    return result.canceled || !result.filePaths[0] ? null : filePath(result.filePaths[0]);
+    return result.canceled || !result.filePaths[0] ? null : parseAbsolutePath(result.filePaths[0]);
 }
 
 export async function selectSaveProjectPath(window: BrowserWindow, path: unknown, saveAs: boolean): Promise<AbsolutePath | null> {
@@ -55,9 +55,9 @@ export async function selectSaveProjectPath(window: BrowserWindow, path: unknown
         title: t(saveAs ? "native.project.saveAs.title" : "native.project.save.title"),
         buttonLabel: t(saveAs ? "native.project.saveAs.confirm" : "native.project.save.confirm"),
         filters: [{ name: t("native.filters.project"), extensions: ["vestige"] }],
-        defaultPath: path == null ? t("native.project.defaultFileName") : filePath(path),
+        defaultPath: path == null ? t("native.project.defaultFileName") : parseAbsolutePath(path),
         properties: ["showOverwriteConfirmation"]
     });
     // Keep the exact confirmed path; appending an extension could overwrite another file.
-    return result.canceled || !result.filePath ? null : filePath(result.filePath);
+    return result.canceled || !result.filePath ? null : parseAbsolutePath(result.filePath);
 }

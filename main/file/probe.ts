@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { type Media } from "../../shared/Media";
 import { type MediaCheckResult } from "../../shared/media/check";
 import { type AbsolutePath } from "../../shared/util/path";
-import { filePath } from "../util/file";
+import { parseAbsolutePath } from "../util/file";
 import { findExecutable, NativeProcessFailure, runProcess } from "../util/process";
 
 type MetadataResult = ({
@@ -30,7 +30,7 @@ export async function probeMedia(path: AbsolutePath, runtimeDirectory: AbsoluteP
         const { stdout } = await runProcess(ffprobe, [
             "-v", "error", "-show_entries", "format=duration:stream=codec_type,duration:stream_disposition=attached_pic",
             "-of", "json", "-i", path
-        ], filePath(dirname(path)), operation);
+        ], parseAbsolutePath(dirname(path)), operation);
         operation.throwIfAborted();
         let value: unknown;
         try {

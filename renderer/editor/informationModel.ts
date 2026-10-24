@@ -1,5 +1,5 @@
-import { type Range } from "../util/range";
-import { codepointToUtf16, textPosition, type TextIndex, type TextProjection } from "./text";
+import { type Range } from "../../shared/util/range";
+import { codepointToUtf16, textPosition, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 
 export type TranscriptInformation = {
     key: string;

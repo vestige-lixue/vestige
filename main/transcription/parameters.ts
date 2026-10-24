@@ -1,6 +1,6 @@
 import { type AbsolutePath } from "../../shared/util/path";
-import { filePath, resolveFilePath } from "../util/file";
-import { type TranscriptionRequest } from "../../shared/transcription/executer";
+import { parseAbsolutePath, resolveFilePath } from "../util/file";
+import { type TranscriptionRequest } from "../../shared/transcription/executor";
 import { type Config } from "../../shared/transcription/Config";
 import { TranscriptionFailure } from "./failure";
 
@@ -15,8 +15,8 @@ export function parseRequest(value: unknown, modelRoot: AbsolutePath): ParsedReq
     const startedAt = Date.now();
     if (!value || typeof value !== "object") throw new TranscriptionFailure({ kind: "transcription-invalid-request" });
     const request = value as Record<string, unknown>;
-    if (request.executer !== "sherpa-onnx" && request.executer !== "whisper.cpp") {
-        throw new TranscriptionFailure({ kind: "transcription-unknown-executer", executer: String(request.executer) });
+    if (request.executor !== "sherpa-onnx" && request.executor !== "whisper.cpp") {
+        throw new TranscriptionFailure({ kind: "transcription-unknown-executor", executor: String(request.executor) });
     }
     for (const key of ["backendDirectory", "modelDirectory", "mediaPath"] as const) {
         if (typeof request[key] !== "string" || !request[key].trim() || request[key].includes("\0")) {
@@ -44,16 +44,16 @@ export function parseRequest(value: unknown, modelRoot: AbsolutePath): ParsedReq
         if (value.includes("\0")) throw new TranscriptionFailure({ kind: "transcription-param-null" });
     }
     return {
-        executer: request.executer,
+        executor: request.executor,
         backendDirectory: request.backendDirectory as string,
         modelDirectory: resolveFilePath(modelRoot, request.modelDirectory as string),
-        mediaPath: filePath(request.mediaPath),
+        mediaPath: parseAbsolutePath(request.mediaPath),
         mediaDuration: request.mediaDuration,
         params: request.params,
         options: params as Record<string, string>,
         startedAt,
         config: {
-            executer: request.executer,
+            executor: request.executor,
             backendDirectory: request.backendDirectory as string,
             modelDirectory: request.modelDirectory as string,
             params: { ...params as Record<string, string> }

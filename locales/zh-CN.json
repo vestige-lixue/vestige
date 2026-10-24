@@ -202,7 +202,7 @@
         "config": {
             "submit": "新建转写",
             "title": "转写配置",
-            "executer": {
+            "executor": {
                 "label": "执行器"
             },
             "modelDirectory": {
@@ -613,7 +613,7 @@
             "paramsObject": "参数必须是 JSON 对象。",
             "paramValue": "参数值必须是字符串。",
             "paramNull": "参数值不能包含空字符。",
-            "unknownExecuter": "未知执行器：{{executer}}",
+            "unknownExecutor": "未知执行器：{{executor}}",
             "emptyPath": "{{field}} 必须是非空路径。",
             "invalidResult": "执行器未生成 JSON 结果。",
             "emptyResult": "模型未返回可转写的正文。请检查音频和所选模型。",
@@ -622,9 +622,9 @@
             "invalidOption": "无效的选项名称：{{option}}",
             "managedOption": "选项 {{option}} 由 Vestige 管理。",
             "output": {
-                "array": "{{executer}} 未返回转写数组。",
-                "text": "{{executer}} 未返回转写文本。",
-                "segment": "{{executer}} 返回的片段缺少文本。"
+                "array": "{{executor}} 未返回转写数组。",
+                "text": "{{executor}} 未返回转写文本。",
+                "segment": "{{executor}} 返回的片段缺少文本。"
             }
         },
         "audio": {

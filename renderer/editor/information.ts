@@ -1,7 +1,7 @@
 import { type Node as PMNode } from "@tiptap/pm/model";
 import { Plugin } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
-import { transcriptInformation, type TranscriptInformation } from "../../shared/transcript/information";
+import { transcriptInformation, type TranscriptInformation } from "./informationModel";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { textRectangles } from "./geometry";
 

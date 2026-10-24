@@ -1,8 +1,8 @@
 <div class="fields">
     <div class="field">
-        <label for={`${id}-executer`}>{i18n.t("transcription.config.executer.label")}</label>
-        <DropdownSelector id={`${id}-executer`} items={executers} {disabled} value={config.executer} onValueChange={value => {
-            if (value === "whisper.cpp" || value === "sherpa-onnx") onchange({ ...config, executer: value });
+        <label for={`${id}-executor`}>{i18n.t("transcription.config.executor.label")}</label>
+        <DropdownSelector id={`${id}-executor`} items={executors} {disabled} value={config.executor} onValueChange={value => {
+            if (value === "whisper.cpp" || value === "sherpa-onnx") onchange({ ...config, executor: value });
         }} />
     </div>
     {#each directories as directory (directory.kind)}
@@ -87,7 +87,7 @@
     };
     let { dialogId, config, onchange, validate = $bindable(), disabled = false }: Props = $props();
     const id = $props.id();
-    const executers = [{ value: "whisper.cpp", label: "whisper.cpp" }, { value: "sherpa-onnx", label: "sherpa-onnx" }];
+    const executors = [{ value: "whisper.cpp", label: "whisper.cpp" }, { value: "sherpa-onnx", label: "sherpa-onnx" }];
     const directories = $state<DirectoryField[]>((["backend", "model"] as const).map(kind => ({ kind, input: null, items: [], version: 0 })));
     const emptyDirectoryMessages = { backend: "transcription.config.backendDirectory.required", model: "transcription.config.modelDirectory.required" } as const;
     let browsing = $state(false);

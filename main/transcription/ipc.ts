@@ -1,11 +1,11 @@
 import { type WebContents } from "electron";
-import { type TranscriptionResult, executerChannel, cancelExecuterChannel } from "../../shared/transcription/executer";
+import { type TranscriptionResult, executorChannel, cancelExecutorChannel } from "../../shared/transcription/executor";
 import { type ExecutionPaths, transcribe } from "./execute";
 import { type TaskOutputStore } from "../task/store";
 
 export function registerTranscriptionIPCs(contents: WebContents, paths: ExecutionPaths, tasks: TaskOutputStore): void {
     const running = new Map<string, AbortController>();
-    contents.ipc.handle(executerChannel, async (event, id: unknown, request: unknown): Promise<TranscriptionResult> => {
+    contents.ipc.handle(executorChannel, async (event, id: unknown, request: unknown): Promise<TranscriptionResult> => {
         if (event.senderFrame !== contents.mainFrame) return { success: false, error: { kind: "ipc-not-main-frame" } };
         if (typeof id !== "string" || !id || id.length > 128 || running.has(id) || tasks.get(id)?.status === "running") return { success: false, error: { kind: "transcription-invalid-id" } };
         const controller = new AbortController();
@@ -31,7 +31,7 @@ export function registerTranscriptionIPCs(contents: WebContents, paths: Executio
             running.delete(id);
         }
     });
-    contents.ipc.on(cancelExecuterChannel, (event, id: unknown) => {
+    contents.ipc.on(cancelExecutorChannel, (event, id: unknown) => {
         if (event.senderFrame === contents.mainFrame && typeof id === "string") running.get(id)?.abort();
     });
     const cancelAll = (): void => {

@@ -1,7 +1,7 @@
 import { copyFile, lstat, mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, filePath } from "../util/file";
+import { containsPath, parseAbsolutePath } from "../util/file";
 import { type DownloadSource, type DownloadReporter, type DownloadTransfer, type DownloadPayload } from "./types";
 import { filesIn, prepareArchive } from "./archive";
 import { DownloadCleanupError, removeDownloadStaging } from "./cleanup";
@@ -48,7 +48,7 @@ async function publishRepair(prepared: AbsolutePath, target: AbsolutePath, signa
     // never overwrite a DLL that could be shared with another installation.
     for (const file of files) {
         signal.throwIfAborted();
-        const destination = filePath(join(target, relative(prepared, file)));
+        const destination = parseAbsolutePath(join(target, relative(prepared, file)));
         const existing = await lstat(destination).catch((error: NodeJS.ErrnoException) => {
             if (error.code === "ENOENT") return null;
             throw error;
@@ -57,7 +57,7 @@ async function publishRepair(prepared: AbsolutePath, target: AbsolutePath, signa
     }
     for (const file of files) {
         signal.throwIfAborted();
-        const destination = filePath(join(target, relative(prepared, file)));
+        const destination = parseAbsolutePath(join(target, relative(prepared, file)));
         await mkdir(dirname(destination), { recursive: true });
         try {
             await linkOrCopy(file, destination);
@@ -77,11 +77,11 @@ export async function installDownload(
     reporter: DownloadReporter,
     signal: AbortSignal
 ): Promise<void> {
-    const target = filePath(join(root, source.id));
+    const target = parseAbsolutePath(join(root, source.id));
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(source.id) || target === root || !containsPath(root, target)) throw new Error("Invalid download destination.");
     await mkdir(root, { recursive: true });
     signal.throwIfAborted();
-    const staging = filePath(await mkdtemp(join(root, ".download-")));
+    const staging = parseAbsolutePath(await mkdtemp(join(root, ".download-")));
     let installed = false;
     let failure: { cause: unknown } | null = null;
     try {
@@ -95,7 +95,7 @@ export async function installDownload(
         let prepared = staging;
         if (repair) {
             reporter.append(`Completing runtime dependencies for ${target}\n`);
-            prepared = filePath(join(staging, "ready"));
+            prepared = parseAbsolutePath(join(staging, "ready"));
             await mkdir(prepared);
         }
         else if (payload.archive) {

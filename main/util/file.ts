@@ -9,7 +9,7 @@ export function isSystemError(error: unknown): error is NodeJS.ErrnoException {
         && "syscall" in error && typeof error.syscall === "string";
 }
 
-export function filePath(path: unknown, platform: NodeJS.Platform = process.platform): AbsolutePath {
+export function parseAbsolutePath(path: unknown, platform: NodeJS.Platform = process.platform): AbsolutePath {
     const syntax = platform === "win32" ? win32 : posix;
     if (typeof path !== "string" || path.includes("\0") || !syntax.isAbsolute(path)
         || (platform === "win32" && syntax.parse(path).root.length === 1)) {
@@ -22,15 +22,15 @@ export function filePath(path: unknown, platform: NodeJS.Platform = process.plat
 
 export function resolveFilePath(directory: AbsolutePath, path: string, platform: NodeJS.Platform = process.platform): AbsolutePath {
     const syntax = platform === "win32" ? win32 : posix;
-    if (syntax.isAbsolute(path)) return filePath(path, platform);
+    if (syntax.isAbsolute(path)) return parseAbsolutePath(path, platform);
     // A drive-relative path such as D:clip.wav can silently read that drive's cwd.
     if (syntax.parse(path).root) throw new InvalidPathFailure({ kind: "path-drive-relative" });
-    return filePath(syntax.resolve(filePath(directory, platform), path), platform);
+    return parseAbsolutePath(syntax.resolve(parseAbsolutePath(directory, platform), path), platform);
 }
 
 export function storedFilePath(path: string): AbsolutePath {
     // Projects can reference missing files or files from another operating system.
-    return filePath(path, path.startsWith("/") ? "linux" : "win32");
+    return parseAbsolutePath(path, path.startsWith("/") ? "linux" : "win32");
 }
 
 export function containsPath(directory: AbsolutePath, path: AbsolutePath, platform: NodeJS.Platform = process.platform): boolean {

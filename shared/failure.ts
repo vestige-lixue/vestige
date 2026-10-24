@@ -1,5 +1,5 @@
 import { type AbsolutePath } from "./util/path";
-import { type Executer } from "./transcription/executer";
+import { type Executor } from "./transcription/executor";
 
 // Application-owned failures carry identifiers and data, never display text.
 // diagnostic is reserved for unmodified external exception/native output.
@@ -49,8 +49,8 @@ export type FailureInfo = ({
     kind: "file-not-local";
     name: string;
 } | {
-    kind: "transcription-unknown-executer";
-    executer: string;
+    kind: "transcription-unknown-executor";
+    executor: string;
 } | {
     kind: "transcription-empty-path";
     field: "backendDirectory" | "modelDirectory" | "mediaPath";
@@ -62,7 +62,7 @@ export type FailureInfo = ({
     option: string;
 } | {
     kind: "transcription-invalid-output";
-    executer: Executer;
+    executor: Executor;
     field: "transcription" | "text" | "segment.text";
 } | {
     kind: "project-invalid-structure";

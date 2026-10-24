@@ -2,7 +2,7 @@ import { copyFile, open } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { type Range } from "../../../shared/util/range";
 import { type AbsolutePath } from "../../../shared/util/path";
-import { filePath } from "../../util/file";
+import { parseAbsolutePath } from "../../util/file";
 import { runProcess } from "../../util/process";
 import { type ExecutionContext } from "../execute";
 import { type WaveInfo, waveInfo, writeWaveSlice } from "../audio";
@@ -23,7 +23,7 @@ export function speechRanges(diagnostic: string, duration: number): Range[] {
 
 async function detectSpeech(context: ExecutionContext): Promise<Range[]> {
     const { audio, directory, backend, runtimeDirectory, signal, feedback, duration } = context;
-    const executable = filePath(join(dirname(backend.executable), `sherpa-onnx-vad${process.platform === "win32" ? ".exe" : ""}`));
+    const executable = parseAbsolutePath(join(dirname(backend.executable), `sherpa-onnx-vad${process.platform === "win32" ? ".exe" : ""}`));
     try {
         signal?.throwIfAborted();
         // Keep non-ASCII application paths out of the native model argument.
@@ -57,8 +57,8 @@ export function pauseBoundaries(speech: Range[]): number[] {
 export async function splitAudioPart(part: AudioPart, signal?: AbortSignal): Promise<AudioPart[]> {
     const info = await waveInfo(part.filename);
     const middle = Math.round(info.dataLength / info.blockAlign / 2) / info.sampleRate;
-    const left = filePath(part.filename.replace(/\.wav$/, "-0.wav"));
-    const right = filePath(part.filename.replace(/\.wav$/, "-1.wav"));
+    const left = parseAbsolutePath(part.filename.replace(/\.wav$/, "-0.wav"));
+    const right = parseAbsolutePath(part.filename.replace(/\.wav$/, "-1.wav"));
     await writeWaveSlice(part.filename, left, info, 0, middle, signal);
     await writeWaveSlice(part.filename, right, info, middle, info.duration, signal);
     return [
@@ -111,7 +111,7 @@ export async function prepareAudioParts(context: ExecutionContext): Promise<Audi
             end = pause ?? await quietBoundary(audio, info, target, signal);
         }
         end = Math.min(duration, Math.round(end * info.sampleRate) / info.sampleRate);
-        const filename = filePath(join(directory, `part-${parts.length.toString().padStart(6, "0")}.wav`));
+        const filename = parseAbsolutePath(join(directory, `part-${parts.length.toString().padStart(6, "0")}.wav`));
         await writeWaveSlice(audio, filename, info, start, end, signal);
         parts.push({ filename, start, end });
         start = end;

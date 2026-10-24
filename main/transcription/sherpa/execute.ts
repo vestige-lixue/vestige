@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { basename } from "node:path";
-import { type Run, type Segment } from "../../../shared/transcription/Run";
+import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ExecutionContext } from "../execute";
 import { runProcess } from "../../util/process";
 import { createRun } from "../result";
@@ -21,7 +21,7 @@ export async function execute(context: ExecutionContext): Promise<Run> {
     const fallbackTemperature = qwen && !nativeArguments(options).some(arg => /^--qwen3-asr-temperature(?:=|$)/.test(arg)) ? 0.4 : undefined;
     const start = performance.now();
     const parts = await prepareAudioParts(context);
-    const transcript: Segment[] = [];
+    const transcript: TranscriptSpan[] = [];
     let language = "und";
     let previousText = "";
     // Bound native batching too: avoid loading the entire recording's feature

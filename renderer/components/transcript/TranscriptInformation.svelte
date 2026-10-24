@@ -144,7 +144,7 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
-    import { type TranscriptInformation } from "../../../shared/transcript/information";
+    import { type TranscriptInformation } from "../../editor/informationModel";
     import { type InspectionInformation } from "../../editor/information";
 
     let { information, compact = false }: { information: InspectionInformation | null; compact?: boolean } = $props();

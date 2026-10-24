@@ -12,7 +12,7 @@ import { registerProjectIPCs } from "./project/ipc";
 import { registerWindowLifecycle } from "./lifecycle";
 import { appChannels } from "../shared/ipc";
 import { type EditAction } from "../shared/app";
-import { filePath } from "./util/file";
+import { parseAbsolutePath } from "./util/file";
 import { registerFileIPCs } from "./file/ipc";
 import { registerMediaScheme, registerMediaProtocol } from "./file/source";
 import * as settings from "./settings/store";
@@ -99,18 +99,18 @@ function createWindow(): void {
     });
 
     const resourcesDirectory = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources");
-    const runtimeDirectory = filePath(join(resourcesDirectory, "bin"));
-    const modelDirectory = filePath(join(dataPath, "models"));
-    const backendDirectory = filePath(join(dataPath, "backends"));
+    const runtimeDirectory = parseAbsolutePath(join(resourcesDirectory, "bin"));
+    const modelDirectory = parseAbsolutePath(join(dataPath, "models"));
+    const backendDirectory = parseAbsolutePath(join(dataPath, "backends"));
     mkdirSync(modelDirectory, { recursive: true });
     mkdirSync(backendDirectory, { recursive: true });
-    const documentationReady = initializeDocumentation(filePath(dataPath), filePath(join(resourcesDirectory, "docs"))).catch(console.error);
+    const documentationReady = initializeDocumentation(parseAbsolutePath(dataPath), parseAbsolutePath(join(resourcesDirectory, "docs"))).catch(console.error);
     mainWindow.webContents.on("console-message", details => {
         applicationLog?.record(`renderer ${details.level} ${details.sourceId}:${details.lineNumber}`, details.message);
     });
     mainWindow.webContents.on("render-process-gone", (_event, details) => applicationLog?.record("Renderer exited", details));
     const tasks = registerTaskOutputIPCs(mainWindow.webContents, logs);
-    registerDocumentationIPCs(mainWindow.webContents, filePath(dataPath), documentationReady);
+    registerDocumentationIPCs(mainWindow.webContents, parseAbsolutePath(dataPath), documentationReady);
     const stopDownloads = registerDownloadIPCs(mainWindow.webContents, { model: modelDirectory, backend: backendDirectory }, runtimeDirectory, tasks);
     registerFileIPCs(mainWindow, runtimeDirectory, modelDirectory, backendDirectory);
     mainWindow.webContents.ipc.on(appChannels.edit, (event, action: unknown) => {
@@ -130,7 +130,7 @@ function createWindow(): void {
         runtimeDirectory,
         modelDirectory,
         backendDirectory,
-        temporaryDirectory: filePath(join(app.getPath("temp"), "vestige-transcription"))
+        temporaryDirectory: parseAbsolutePath(join(app.getPath("temp"), "vestige-transcription"))
     }, tasks);
 
     if (process.platform !== "darwin") {

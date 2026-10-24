@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "ele
 import { type AppAPI } from "../shared/app";
 import { appChannels, settingsChannels, fileChannels, projectChannels } from "../shared/ipc";
 import { type SettingsSnapshot } from "../shared/settings/Settings";
-import { executerChannel, cancelExecuterChannel } from "../shared/transcription/executer";
+import { executorChannel, cancelExecutorChannel } from "../shared/transcription/executor";
 import { taskOutputChannels, type TaskSnapshot } from "../shared/task";
 import { documentationChannels } from "../shared/documentation";
 import { downloadChannels } from "../shared/downloads";
@@ -56,8 +56,8 @@ const api: AppAPI = {
         openFFmpegDirectory: () => ipcRenderer.invoke(fileChannels.openFFmpegDirectory)
     },
     transcription: {
-        transcribe: (id, request) => ipcRenderer.invoke(executerChannel, id, request),
-        cancel: id => ipcRenderer.send(cancelExecuterChannel, id)
+        transcribe: (id, request) => ipcRenderer.invoke(executorChannel, id, request),
+        cancel: id => ipcRenderer.send(cancelExecutorChannel, id)
     },
     project: {
         getProject: path => ipcRenderer.invoke(projectChannels.get, path),

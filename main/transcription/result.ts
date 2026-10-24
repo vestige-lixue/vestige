@@ -1,5 +1,5 @@
 import { type Range } from "../../shared/util/range";
-import { type Run, type Segment } from "../../shared/transcription/Run";
+import { type Run, type TranscriptSpan } from "../../shared/transcription/Run";
 import { type ParsedRequest } from "./parameters";
 import { TranscriptionFailure } from "./failure";
 
@@ -31,7 +31,7 @@ export function range(start: unknown, end: unknown, scale = 1): Range | undefine
     return Number.isFinite(result.start) && Number.isFinite(result.end) ? result : undefined;
 }
 
-export function segments(text: string, pieces: Piece[], fallback: Range, blankProb = 0): Segment[] {
+export function segments(text: string, pieces: Piece[], fallback: Range, blankProb = 0): TranscriptSpan[] {
     if (!text) return [];
     const joined = pieces.map(piece => piece.text).join("");
     const offset = joined.indexOf(text);
@@ -42,7 +42,7 @@ export function segments(text: string, pieces: Piece[], fallback: Range, blankPr
         return [{ range: fallback, blankProb, token: { text, prob: 1 } }];
     }
     let cursor = 0;
-    const result: Segment[] = [];
+    const result: TranscriptSpan[] = [];
     for (const piece of pieces) {
         const start = Math.max(0, offset - cursor);
         const end = Math.min(piece.text.length, offset + text.length - cursor);
@@ -63,7 +63,7 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     }
 }
 
-export function createRun(id: string, request: ParsedRequest, language: unknown, transcript: Segment[], runTime: number): Run {
+export function createRun(id: string, request: ParsedRequest, language: unknown, transcript: TranscriptSpan[], runTime: number): Run {
     return {
         id,
         startedAt: request.startedAt,

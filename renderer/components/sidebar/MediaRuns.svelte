@@ -32,7 +32,7 @@
                 <Tooltip side="right" sideOffset={24} disabled={disabled || hasDialog} tabindex={0} onclick={() => selectRun(run.id)}>
                     {#snippet text()}
                         <div class="runDetails">
-                            <div><b>{i18n.t("transcription.config.executer.label")}</b><span>{run.config.executer}</span></div>
+                            <div><b>{i18n.t("transcription.config.executor.label")}</b><span>{run.config.executor}</span></div>
                             <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{directoryName(run.config.backendDirectory)}</span></div>
                             <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{directoryName(run.config.modelDirectory)}</span></div>
                         </div>

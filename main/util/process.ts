@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { delimiter, dirname, isAbsolute, join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { filePath, isSystemError } from "./file";
+import { parseAbsolutePath, isSystemError } from "./file";
 
 export class NativeProcessFailure extends VestigeErrors {}
 
@@ -18,7 +18,7 @@ export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string,
     }
     for (const candidate of candidates) {
         try {
-            const executable = filePath(candidate);
+            const executable = parseAbsolutePath(candidate);
             await access(executable, constants.X_OK);
             return executable;
         }
@@ -26,7 +26,7 @@ export async function findExecutable(runtimeRoot: AbsolutePath, runtime: string,
             if (!isSystemError(error)) throw error;
         }
     }
-    throw new NativeProcessFailure({ kind: "native-not-found", executable: filename, directory: filePath(join(runtimeRoot, runtime)) });
+    throw new NativeProcessFailure({ kind: "native-not-found", executable: filename, directory: parseAbsolutePath(join(runtimeRoot, runtime)) });
 }
 
 export type ProcessOutput = { stdout: string; stderr: string };

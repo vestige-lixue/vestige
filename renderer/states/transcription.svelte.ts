@@ -1,5 +1,5 @@
 import { type FailureInfo } from "../../shared/failure";
-import { type TranscriptionRequest } from "../../shared/transcription/executer";
+import { type TranscriptionRequest } from "../../shared/transcription/executor";
 
 export type TranscriptionTask = {
     id: string;

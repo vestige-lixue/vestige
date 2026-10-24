@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { open, stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { type MediaURLResult } from "../../shared/media/check";
-import { filePath, isSystemError } from "../util/file";
+import { parseAbsolutePath, isSystemError } from "../util/file";
 
 const scheme = "vestige-media";
 type MediaSource = { path: string; controller: AbortController; pending: Set<Promise<unknown>> };
@@ -136,7 +136,7 @@ function rangeError(size: number): Response {
 
 export async function getMediaURL(input: unknown): Promise<MediaURLResult> {
     try {
-        const path = filePath(input);
+        const path = parseAbsolutePath(input);
         const file = await open(path, "r");
         try {
             if (!(await file.stat()).isFile()) return { status: "unreadable", error: { kind: "media-not-file" } };

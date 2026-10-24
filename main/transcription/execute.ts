@@ -2,9 +2,9 @@ import { toFailureInfo } from "../../shared/failure";
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, filePath, InvalidPathFailure, isSystemError } from "../util/file";
+import { containsPath, parseAbsolutePath, InvalidPathFailure, isSystemError } from "../util/file";
 import { type Run } from "../../shared/transcription/Run";
-import { type TranscriptionResult } from "../../shared/transcription/executer";
+import { type TranscriptionResult } from "../../shared/transcription/executor";
 import { waveDuration } from "./audio";
 import { type ParsedRequest, parseRequest } from "./parameters";
 import { findExecutable, NativeProcessFailure, runProcess, type ProcessOutputListener } from "../util/process";
@@ -57,19 +57,19 @@ export async function transcribe(id: string, value: unknown, paths: ExecutionPat
 async function executeTask(id: string, value: unknown, paths: ExecutionPaths, signal?: AbortSignal, feedback?: ExecutionFeedback): Promise<Run> {
     const request = parseRequest(value, paths.modelDirectory);
     feedback?.record?.("Transcription request", request);
-    const backend = await resolveBackend(request.executer, request.backendDirectory, paths.backendDirectory);
+    const backend = await resolveBackend(request.executor, request.backendDirectory, paths.backendDirectory);
     feedback?.record?.("Backend", backend);
     const ffmpeg = await findExecutable(paths.runtimeDirectory, "ffmpeg", "ffmpeg");
     feedback?.record?.("FFmpeg executable", ffmpeg);
     signal?.throwIfAborted();
     const root = paths.temporaryDirectory;
     await mkdir(root, { recursive: true });
-    const directory = filePath(await mkdtemp(join(root, "task-")));
+    const directory = parseAbsolutePath(await mkdtemp(join(root, "task-")));
     try {
         // Native Windows CLIs may use narrow argv. A task-local link keeps the
         // model's parent path out of argv without copying large model files.
         await symlink(request.modelDirectory, join(directory, "models"), process.platform === "win32" ? "junction" : "dir");
-        const audio = filePath(join(directory, "audio.wav"));
+        const audio = parseAbsolutePath(join(directory, "audio.wav"));
         feedback?.output("stderr", "[ffmpeg] Preparing audio.\n");
         await runProcess(ffmpeg, [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", request.mediaPath,
@@ -77,8 +77,8 @@ async function executeTask(id: string, value: unknown, paths: ExecutionPaths, si
         ], directory, signal, feedback?.output);
         const duration = await waveDuration(audio);
         feedback?.record?.("Audio duration", { media: request.mediaDuration, prepared: duration });
-        const execute = request.executer === "sherpa-onnx" ? executeSherpa : executeWhisper;
-        feedback?.output("stderr", `[${request.executer}] Transcribing.\n`);
+        const execute = request.executor === "sherpa-onnx" ? executeSherpa : executeWhisper;
+        feedback?.output("stderr", `[${request.executor}] Transcribing.\n`);
         const run = await execute({ id, request, backend, directory, audio, duration, runtimeDirectory: paths.runtimeDirectory, signal, feedback });
         const outside = run.transcript.flatMap((segment, index) => segment.range.end > request.mediaDuration ? [{ index, ...segment.range }] : []);
         if (outside.length) feedback?.record?.("Timestamps beyond media duration", { duration: request.mediaDuration, segments: outside });

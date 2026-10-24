@@ -1,13 +1,13 @@
-import { type Run, type Segment } from "../../../shared/transcription/Run";
+import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, probability, range, segments, createRun } from "../result";
 import { TranscriptionFailure } from "../failure";
 
-function whisperTranscript(output: NativeObject, duration: number): Segment[] {
-    if (!Array.isArray(output.transcription)) throw new TranscriptionFailure({ kind: "transcription-invalid-output", executer: "whisper.cpp", field: "transcription" });
+function whisperTranscript(output: NativeObject, duration: number): TranscriptSpan[] {
+    if (!Array.isArray(output.transcription)) throw new TranscriptionFailure({ kind: "transcription-invalid-output", executor: "whisper.cpp", field: "transcription" });
     return output.transcription.flatMap(value => {
         const segment = object(value);
-        if (typeof segment.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executer: "whisper.cpp", field: "segment.text" });
+        if (typeof segment.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executor: "whisper.cpp", field: "segment.text" });
         const offsets = object(segment.offsets);
         const fallback = range(offsets.from, offsets.to, 0.001) ?? { start: 0, end: duration };
         const pieces = array(segment.tokens).map(object).filter(token => {

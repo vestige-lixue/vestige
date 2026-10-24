@@ -3,7 +3,7 @@ import { copyFile, link, lstat, mkdir, open } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, filePath } from "../util/file";
+import { containsPath, parseAbsolutePath } from "../util/file";
 import { type DownloadFile, type DownloadReporter, type DownloadTransfer } from "./types";
 
 export async function fileHash(file: AbsolutePath, signal: AbortSignal): Promise<string> {
@@ -24,7 +24,7 @@ export async function linkOrCopy(source: AbsolutePath, destination: AbsolutePath
 
 export async function downloadFiles(files: DownloadFile[], staging: AbsolutePath, transfer: DownloadTransfer, reporter: DownloadReporter, signal: AbortSignal): Promise<(DownloadFile & { destination: AbsolutePath })[]> {
     const downloads = files.map(file => {
-        const destination = filePath(join(staging, file.destination));
+        const destination = parseAbsolutePath(join(staging, file.destination));
         if (destination === staging || !containsPath(staging, destination)) throw new Error("Invalid download filename.");
         if (!["http:", "https:"].includes(new URL(file.url).protocol)) throw new Error("Invalid download URL.");
         if (file.sha256 !== undefined && !/^[a-f\d]{64}$/i.test(file.sha256)) throw new Error("Invalid download SHA-256.");

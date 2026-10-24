@@ -1,7 +1,7 @@
-import { type Executer } from "./transcription/executer";
+import { type Executor } from "./transcription/executor";
 
 export type Model = {
     id: string;
     name: string;
-    executer: Executer;
+    executor: Executor;
 };

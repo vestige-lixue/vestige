@@ -3,7 +3,7 @@ import { mkdir, open, realpath, rename, unlink, writeFile } from "node:fs/promis
 import { dirname, extname, join, resolve } from "node:path";
 import { type Documentation, parseDocumentLink } from "../../shared/documentation";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, filePath, isSystemError } from "../util/file";
+import { containsPath, parseAbsolutePath, isSystemError } from "../util/file";
 
 const documentNames = ["README.en.md", "README.zh-cn.md", "params.en.md", "params.zh-cn.md"] as const;
 const maximumBytes = 1024 * 1024;
@@ -51,12 +51,12 @@ export async function initializeDocumentation(root: AbsolutePath, source: Absolu
 }
 
 async function documentPath(root: AbsolutePath, path: string): Promise<AbsolutePath> {
-    const normalized = filePath(path);
+    const normalized = parseAbsolutePath(path);
     if (!containsPath(root, normalized) || extname(normalized).toLowerCase() !== ".md") {
         throw new Error(`Documentation must be a Markdown file inside the user data directory: ${path}`);
     }
-    const actualRoot = filePath(await realpath(root));
-    const actual = filePath(await realpath(normalized));
+    const actualRoot = parseAbsolutePath(await realpath(root));
+    const actual = parseAbsolutePath(await realpath(normalized));
     if (!containsPath(actualRoot, actual)) throw new Error(`Documentation is outside the user data directory: ${path}`);
     return normalized;
 }

@@ -1,9 +1,9 @@
 import { type Modification } from "../Vestige";
-import { type Segment } from "../transcription/Run";
+import { type TranscriptSpan } from "../transcription/Run";
 import { type TextPosition } from "../util/range";
 
 export type TextIndex = {
-    transcript: readonly Segment[];
+    transcript: readonly TranscriptSpan[];
     starts: number[];
     characters: string[];
 };
@@ -34,7 +34,7 @@ export type TextProjection = {
     modifications: Modification[];
 };
 
-export function createTextIndex(transcript: readonly Segment[]): TextIndex {
+export function createTextIndex(transcript: readonly TranscriptSpan[]): TextIndex {
     const starts: number[] = [];
     const characters: string[] = [];
     for (const segment of transcript) {

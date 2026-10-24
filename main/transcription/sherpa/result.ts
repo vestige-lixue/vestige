@@ -1,4 +1,4 @@
-import { type Run, type Segment } from "../../../shared/transcription/Run";
+import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, number, probability, range, segments, createRun } from "../result";
 import { TranscriptionFailure } from "../failure";
@@ -47,8 +47,8 @@ export function needsWordSeparator(previous: string, next: string): boolean {
     return !!last && !!first && !unspaced.test(last + first);
 }
 
-function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
-    if (typeof output.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executer: "sherpa-onnx", field: "text" });
+function sherpaTranscript(output: NativeObject, duration: number): TranscriptSpan[] {
+    if (typeof output.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executor: "sherpa-onnx", field: "text" });
     const tokens = array(output.tokens);
     const timestamps = array(output.timestamps);
     const durations = array(output.durations);

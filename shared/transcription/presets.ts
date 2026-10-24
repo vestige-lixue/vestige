@@ -2,25 +2,25 @@ import { type Config, type Presets } from "./Config";
 
 export const builtinPresets = {
     "Whisper Base (CPU)": {
-        executer: "whisper.cpp",
+        executor: "whisper.cpp",
         backendDirectory: "whisper-cpu",
         modelDirectory: "whisper-base",
         params: { "--language": "auto", "--no-gpu": "" }
     },
     "Whisper Large v3 Turbo (CUDA 12.4)": {
-        executer: "whisper.cpp",
+        executor: "whisper.cpp",
         backendDirectory: "whisper-cuda-12",
         modelDirectory: "whisper-large-v3-turbo",
         params: { "--language": "auto" }
     },
     "Paraformer zh (CPU)": {
-        executer: "sherpa-onnx",
+        executor: "sherpa-onnx",
         backendDirectory: "sherpa-cpu",
         modelDirectory: "sherpa-paraformer-zh",
         params: { "--provider": "cpu", "--decoding-method": "greedy_search" }
     },
     "Paraformer zh (CUDA 12)": {
-        executer: "sherpa-onnx",
+        executor: "sherpa-onnx",
         backendDirectory: "sherpa-cuda-12",
         modelDirectory: "sherpa-paraformer-zh",
         params: { "--provider": "cuda", "--decoding-method": "greedy_search" }
