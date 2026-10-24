@@ -143,7 +143,7 @@
                 "close": "Closing project",
                 "quit": "Quitting",
                 "open": "Opening project",
-                "read": "Reading and validating project",
+                "read": "Reading project",
                 "save": "Saving project",
                 "waitSave": "Waiting for project to save"
             },
@@ -220,7 +220,7 @@
         },
         "actions": {
             "new": "New transcription",
-            "reviewFailure": "Error details",
+            "reviewFailure": "Transcription error details",
             "cancelQueued": "Cancel queued task",
             "stop": "Stop transcription"
         },
@@ -263,6 +263,13 @@
         }
     },
     "transcript": {
+        "information": {
+            "tokenProbability": "Prob:",
+            "blankProbability": "No-speech:",
+            "deletion": "Deleted",
+            "gap": "No speech",
+            "estimated": "Estimated: "
+        },
         "runs": {
             "title": "Transcriptions",
             "empty": "No transcriptions",
@@ -312,6 +319,10 @@
             "compressProjectFiles": {
                 "label": "Compress project files",
                 "description": "Remove whitespaces in JSON to reduce file size, but decreases readability."
+            },
+            "clearLogs": {
+                "label": "Clear logs",
+                "error": "Could not clear logs: {{error}}"
             }
         },
         "transcription": {
@@ -324,12 +335,20 @@
         },
         "editing": {
             "title": "Edit",
+            "informationDisplay": {
+                "label": "Information display",
+                "description": "Choose where token probabilities, original text and audio ranges appear.",
+                "options": {
+                    "tooltip": "Tooltip",
+                    "bar": "Information bar"
+                }
+            },
             "spellcheck": {
                 "label": "Spell check",
                 "description": "Enable the browser's built-in spell checking in the transcript editor."
             },
             "fontSize": {
-                "label": "Editor font size (px)",
+                "label": "Editor font size",
                 "description": "Applies only to transcript text."
             }
         },
@@ -344,7 +363,7 @@
                 }
             },
             "volumeSliderMinDb": {
-                "label": "Minimum non-muted gain (dB)",
+                "label": "Minimum non-muted gain",
                 "description": "The gain at 1% slider position. 0% always mutes the audio.",
                 "invalid": "Enter a number no greater than {{max}}."
             },
@@ -352,7 +371,7 @@
                 "label": "Play state after switching media"
             },
             "wordSwitchPlayback": {
-                "label": "Play state after previous/next word"
+                "label": "Play state after switching word"
             },
             "rememberPlaybackPosition": {
                 "label": "Remember playback progress",
@@ -369,6 +388,16 @@
                     "keep": "Keep unchanged",
                     "invert": "Toggle"
                 }
+            },
+            "audioOffset": {
+                "label": "Audio synchronization offset",
+                "description": "Negative values play audio earlier; positive values play it later.",
+                "invalid": "Enter an integer from {{min}} to {{max}}.",
+                "start": "Start test",
+                "end": "End test",
+                "instruction": "Press the button on the third beat.\nOnce calibrated, the moving line should cross the thick line exactly when you hear the third beat.",
+                "tap": "TAP",
+                "failed": "Could not play the test audio. Check your audio output device and try again."
             },
             "showLevelMeter": {
                 "label": "Show audio levels"
@@ -398,7 +427,7 @@
                 "description": "Blend the sidebar with the colors of your desktop wallpaper."
             },
             "sidebarTransparency": {
-                "label": "Transparency (%)",
+                "label": "Transparency",
                 "description": "Higher values make the sidebar background more transparent."
             },
             "schemes": {
@@ -422,23 +451,23 @@
             "volumeStabilization": {
                 "title": "Volume Stabilization",
                 "maxGainDb": {
-                    "label": "Maximum boost (dB)",
+                    "label": "Maximum boost",
                     "description": "Limit how much quiet audio is amplified. Higher values may make background noise louder."
                 },
                 "gainAttackMs": {
-                    "label": "Gain reduction time (ms)",
+                    "label": "Gain reduction time",
                     "description": "Smooth gain reduction when audio gets louder. Lower values reduce the gain faster."
                 },
                 "gainReleaseMs": {
-                    "label": "Gain recovery time (ms)",
+                    "label": "Gain recovery time",
                     "description": "Smooth gain increases when audio gets quieter. Higher values make the change more gradual."
                 },
                 "gateThresholdDb": {
-                    "label": "Quiet threshold (dBFS)",
+                    "label": "Quiet threshold",
                     "description": "Stop increasing gain below this level, then remove the boost if audio stays quiet."
                 },
                 "targetLevelDb": {
-                    "label": "Target level (dBFS RMS)",
+                    "label": "Target level",
                     "description": "The average level automatic gain aims for (subjects to the maximum boost and peak limit)."
                 }
             }
@@ -456,16 +485,16 @@
             "description": "Download a built-in model below, or download one yourself and arrange its files as described in the <guide/>.",
             "title": "Built-in models",
             "details": {
-                "whisperTiny": "For whisper.cpp. Fast multilingual transcription with the lowest resource use, suited to modest hardware with limited accuracy. CPU supported; GPU weights use about 0.1 GiB.",
-                "whisperBase": "For whisper.cpp. Lightweight multilingual transcription, more accurate than Tiny and suited to clear speech. CPU supported; GPU weights use about 0.1 GiB.",
-                "whisperSmall": "For whisper.cpp. Multilingual transcription balancing accuracy and speed with moderate resource use. CPU supported; GPU weights use about 0.5 GiB.",
-                "whisperLargeV3": "For whisper.cpp. Multilingual transcription focused on accuracy, with slower processing and high resource use. CPU supported; GPU weights use about 2.9 GiB.",
-                "whisperLargeV3Turbo": "For whisper.cpp. Faster than Large v3 with a small accuracy tradeoff; repetition and hallucinations remain possible. CPU supported; GPU weights use about 1.5 GiB.",
-                "paraformerZh": "For sherpa-onnx. Fast, non-autoregressive recognition focused on Chinese, including mixed Chinese and English speech. Moderate resource use; runs on CPU with no dedicated GPU memory required.",
-                "senseVoiceSmall": "For sherpa-onnx. Fast recognition of Mandarin, Cantonese, English, Japanese and Korean, with text timestamps. Low resource use with INT8; CPU preferred, no dedicated GPU memory required.",
-                "fireRedAsr2Ctc": "For sherpa-onnx. CTC recognition for Chinese, English, mixed speech and Chinese dialects, with text timestamps. Moderate resource use with INT8; CPU preferred, no dedicated GPU memory required.",
-                "qwen3Asr06b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on efficiency, with moderate INT8 memory use and CPU support; text timestamps are currently unavailable.",
-                "qwen3Asr17b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on accuracy, with higher INT8 memory use, slower processing and CPU support; text timestamps are currently unavailable."
+                "whisperTiny": "For whisper.cpp. Fast multilingual transcription with the lowest resource use, suited to modest hardware with limited accuracy. CPU supported; GPU weights use about 0.07 GiB.",
+                "whisperBase": "For whisper.cpp. Lightweight multilingual transcription, more accurate than Tiny and suited to clear speech. CPU supported; GPU weights use about 0.14 GiB.",
+                "whisperSmall": "For whisper.cpp. Multilingual transcription balancing accuracy and speed with moderate resource use. CPU supported; GPU weights use about 0.45 GiB.",
+                "whisperLargeV3": "For whisper.cpp. Multilingual transcription focused on accuracy, with slower processing and high resource use. CPU supported; GPU weights use about 2.88 GiB.",
+                "whisperLargeV3Turbo": "For whisper.cpp. Faster than Large v3 with a small accuracy tradeoff; repetition and hallucinations remain possible. CPU supported; GPU weights use about 1.51 GiB.",
+                "paraformerZh": "For sherpa-onnx. Fast, non-autoregressive recognition focused on Chinese, including mixed Chinese and English speech. Moderate resource use; runs on CPU; GPU weights use about 0.77 GiB.",
+                "senseVoiceSmall": "For sherpa-onnx. Fast recognition of Mandarin, Cantonese, English, Japanese and Korean, with text timestamps. Low resource use with INT8; CPU preferred; GPU weights use about 0.22 GiB.",
+                "fireRedAsr2Ctc": "For sherpa-onnx. CTC recognition for Chinese, English, mixed speech and Chinese dialects, with text timestamps. Moderate resource use with INT8; CPU preferred; GPU weights use about 0.72 GiB.",
+                "qwen3Asr06b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on efficiency, with moderate INT8 memory use and CPU support; GPU weights use about 0.92 GiB; text timestamps are currently unavailable.",
+                "qwen3Asr17b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on accuracy, with higher INT8 memory use, slower processing and CPU support; GPU weights use about 2.23 GiB; text timestamps are currently unavailable."
             }
         },
         "loading": "Loading downloads…",
@@ -587,6 +616,9 @@
             "unknownExecuter": "Unknown executer: {{executer}}",
             "emptyPath": "{{field}} must be a non-empty path.",
             "invalidResult": "Executer produced no JSON result.",
+            "emptyResult": "The model returned no transcribed text. Check the audio and selected model.",
+            "truncatedOutput": "The model truncated the audio or generated text. No transcript was saved. Check custom hotwords and model parameters.",
+            "unstableOutput": "The model still repeated or truncated its output for {{start}}–{{end}} s after retrying shorter parts. No transcript was saved. Try another model or adjust its parameters.",
             "invalidOption": "Invalid option name: {{option}}",
             "managedOption": "Option {{option}} is managed by Vestige.",
             "output": {

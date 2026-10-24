@@ -143,7 +143,7 @@
                 "close": "正在关闭项目",
                 "quit": "正在退出应用",
                 "open": "正在打开项目",
-                "read": "正在读取并校验项目",
+                "read": "正在读取项目",
                 "save": "正在保存项目",
                 "waitSave": "正在等待项目保存"
             },
@@ -220,7 +220,7 @@
         },
         "actions": {
             "new": "新建转写",
-            "reviewFailure": "失败详情",
+            "reviewFailure": "转写失败详情",
             "cancelQueued": "取消排队",
             "stop": "停止转写"
         },
@@ -263,6 +263,13 @@
         }
     },
     "transcript": {
+        "information": {
+            "tokenProbability": "置信度",
+            "blankProbability": "无语音",
+            "deletion": "删除",
+            "gap": "无语音",
+            "estimated": "预计的："
+        },
         "runs": {
             "title": "转写列表",
             "empty": "暂无转写",
@@ -312,6 +319,10 @@
             "compressProjectFiles": {
                 "label": "压缩项目文件",
                 "description": "去除 JSON 空白符，可减少文件体积，但会降低可读性。"
+            },
+            "clearLogs": {
+                "label": "清除日志",
+                "error": "无法清除日志：{{error}}"
             }
         },
         "transcription": {
@@ -324,12 +335,20 @@
         },
         "editing": {
             "title": "编辑",
+            "informationDisplay": {
+                "label": "信息显示位置",
+                "description": "选择 token 概率、原文和音频范围的显示位置。",
+                "options": {
+                    "tooltip": "浮动提示",
+                    "bar": "信息栏"
+                }
+            },
             "spellcheck": {
                 "label": "拼写检查",
                 "description": "在转写编辑区启用浏览器原生拼写检查。"
             },
             "fontSize": {
-                "label": "编辑器字号（px）",
+                "label": "编辑器字号",
                 "description": "仅应用于转写正文。"
             }
         },
@@ -344,7 +363,7 @@
                 }
             },
             "volumeSliderMinDb": {
-                "label": "最低非静音增益（dB）",
+                "label": "最低非静音增益",
                 "description": "滑块为 1% 时的增益；0% 始终静音。",
                 "invalid": "请输入不大于 {{max}} 的数值。"
             },
@@ -352,7 +371,7 @@
                 "label": "切换媒体后播放状态"
             },
             "wordSwitchPlayback": {
-                "label": "选择上/下一词后播放状态"
+                "label": "词跳转后播放状态"
             },
             "rememberPlaybackPosition": {
                 "label": "保留播放进度",
@@ -369,6 +388,16 @@
                     "keep": "不变",
                     "invert": "反转"
                 }
+            },
+            "audioOffset": {
+                "label": "音频同步偏移",
+                "description": "负值提前音频，正值延后音频。",
+                "invalid": "请输入 {{min}} 到 {{max}} 之间的整数。",
+                "start": "开始测试",
+                "end": "结束测试",
+                "instruction": "在第三拍按下按钮。\n如果已校准，您应在听到第三拍时看到移动竖线恰好经过粗竖线。",
+                "tap": "按下",
+                "failed": "无法播放测试音频，请检查音频输出设备后重试。"
             },
             "showLevelMeter": {
                 "label": "显示电平"
@@ -398,7 +427,7 @@
                 "description": "让侧栏背景呈现桌面壁纸的色调。"
             },
             "sidebarTransparency": {
-                "label": "透明程度（%）",
+                "label": "透明程度",
                 "description": "数值越大，侧栏背景越通透。"
             },
             "schemes": {
@@ -422,23 +451,23 @@
             "volumeStabilization": {
                 "title": "音量稳定",
                 "maxGainDb": {
-                    "label": "最大提升（dB）",
+                    "label": "最大提升",
                     "description": "限制小声内容的放大幅度。数值越大，底噪也可能越明显。"
                 },
                 "gainAttackMs": {
-                    "label": "压低时间（ms）",
+                    "label": "压低时间",
                     "description": "声音变大时降低增益的平滑时间。数值越小，压低越快。"
                 },
                 "gainReleaseMs": {
-                    "label": "抬升时间（ms）",
+                    "label": "抬升时间",
                     "description": "声音变小时提高增益的平滑时间。数值越大，变化越平缓。"
                 },
                 "gateThresholdDb": {
-                    "label": "微弱声音阈值（dBFS）",
+                    "label": "微弱声音阈值",
                     "description": "低于此电平时停止继续放大，持续低于阈值后撤回已有提升。"
                 },
                 "targetLevelDb": {
-                    "label": "目标电平（dBFS RMS）",
+                    "label": "目标电平",
                     "description": "自动增益希望达到的平均电平，实际输出受最大提升和峰值上限限制。"
                 }
             }
@@ -456,16 +485,16 @@
             "description": "选择下方的内置模型进行下载，或自行下载并按<guide/>整理。",
             "title": "内置模型",
             "details": {
-                "whisperTiny": "适用 whisper.cpp。多语言转录，速度快、资源占用最低，适合低配置设备，准确率有限。可用 CPU；GPU 权重约 0.1 GiB。",
-                "whisperBase": "适用 whisper.cpp。多语言转录，轻量快速，比 Tiny 更准确，适合清晰语音。可用 CPU；GPU 权重约 0.1 GiB。",
-                "whisperSmall": "适用 whisper.cpp。多语言转录，兼顾准确率与速度，资源占用中等。可用 CPU；GPU 权重约 0.5 GiB。",
-                "whisperLargeV3": "适用 whisper.cpp。多语言转录，侧重准确率，速度较慢、资源占用高。可用 CPU；GPU 权重约 2.9 GiB。",
-                "whisperLargeV3Turbo": "适用 whisper.cpp。多语言转录，比 Large v3 更快，准确率略有取舍，仍可能重复或幻觉。可用 CPU；GPU 权重约 1.5 GiB。",
-                "paraformerZh": "适用 sherpa-onnx。侧重中文，支持中英混合语音，非自回归识别，转录速度快。资源占用中等，CPU 可运行，无独立显存要求。",
-                "senseVoiceSmall": "适用 sherpa-onnx。支持普通话、粤语、英语、日语和韩语，识别快速并提供文字时间戳。INT8 资源占用低，优先使用 CPU，无独立显存要求。",
-                "fireRedAsr2Ctc": "适用 sherpa-onnx。支持中英混合及多种中文方言，采用 CTC 识别并提供文字时间戳。INT8 资源占用中等，优先使用 CPU，无独立显存要求。",
-                "qwen3Asr06b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重效率。INT8 内存占用中等，CPU 可运行；当前不提供文字时间戳。",
-                "qwen3Asr17b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重准确率。INT8 内存占用较高、速度较慢，CPU 可运行；当前不提供文字时间戳。"
+                "whisperTiny": "适用 whisper.cpp。多语言转录，速度快、资源占用最低，适合低配置设备，准确率有限。可用 CPU；GPU 权重约 0.07 GiB。",
+                "whisperBase": "适用 whisper.cpp。多语言转录，轻量快速，比 Tiny 更准确，适合清晰语音。可用 CPU；GPU 权重约 0.14 GiB。",
+                "whisperSmall": "适用 whisper.cpp。多语言转录，兼顾准确率与速度，资源占用中等。可用 CPU；GPU 权重约 0.45 GiB。",
+                "whisperLargeV3": "适用 whisper.cpp。多语言转录，侧重准确率，速度较慢、资源占用高。可用 CPU；GPU 权重约 2.88 GiB。",
+                "whisperLargeV3Turbo": "适用 whisper.cpp。多语言转录，比 Large v3 更快，准确率略有取舍，仍可能重复或幻觉。可用 CPU；GPU 权重约 1.51 GiB。",
+                "paraformerZh": "适用 sherpa-onnx。侧重中文，支持中英混合语音，非自回归识别，转录速度快。资源占用中等，CPU 可运行；GPU 权重约 0.77 GiB。",
+                "senseVoiceSmall": "适用 sherpa-onnx。支持普通话、粤语、英语、日语和韩语，识别快速并提供文字时间戳。INT8 资源占用低，优先使用 CPU；GPU 权重约 0.22 GiB。",
+                "fireRedAsr2Ctc": "适用 sherpa-onnx。支持中英混合及多种中文方言，采用 CTC 识别并提供文字时间戳。INT8 资源占用中等，优先使用 CPU；GPU 权重约 0.72 GiB。",
+                "qwen3Asr06b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重效率。INT8 内存占用中等，CPU 可运行，GPU 权重约 0.92 GiB；当前不提供文字时间戳。",
+                "qwen3Asr17b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重准确率。INT8 内存占用较高、速度较慢，CPU 可运行，GPU 权重约 2.23 GiB；当前不提供文字时间戳。"
             }
         },
         "loading": "正在读取下载列表…",
@@ -587,6 +616,9 @@
             "unknownExecuter": "未知执行器：{{executer}}",
             "emptyPath": "{{field}} 必须是非空路径。",
             "invalidResult": "执行器未生成 JSON 结果。",
+            "emptyResult": "模型未返回可转写的正文。请检查音频和所选模型。",
+            "truncatedOutput": "模型截断了音频或生成的文本，本次转写未保存。请检查自定义热词和模型参数。",
+            "unstableOutput": "已缩短片段重试，但模型在 {{start}}–{{end}} 秒仍重复生成或截断输出，本次转写未保存。请尝试其他模型或调整参数。",
             "invalidOption": "无效的选项名称：{{option}}",
             "managedOption": "选项 {{option}} 由 Vestige 管理。",
             "output": {

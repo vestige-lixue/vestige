@@ -1,5 +1,5 @@
 import { type tags } from "typia";
-import { type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type volumeStabilizationLimits } from "../constants";
+import { type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits } from "../constants";
 import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
@@ -33,6 +33,7 @@ export type Settings = {
     readonly editing: {
         readonly spellcheck: boolean;
         readonly fontSize: number & tags.Minimum<typeof minEditorFontSize> & tags.Maximum<typeof maxEditorFontSize>;
+        readonly informationDisplay: "tooltip" | "bar";
     };
     readonly volumeStabilization: VolumeStabilizationSettings;
     readonly window: {
@@ -54,6 +55,7 @@ export type Settings = {
         readonly wordSwitchPlayback: "pause" | "play" | "keep" | "invert";
         readonly rememberPlaybackPosition: boolean;
         readonly pauseOnOutputDeviceChange: boolean;
+        readonly audioOffsetMs: number & tags.Type<"int32"> & tags.Minimum<typeof minAudioOffsetMs> & tags.Maximum<typeof maxAudioOffsetMs>;
         readonly showLevelMeter: boolean;
         readonly levelMeterReadout: AudioLevelStage;
         readonly volumeStabilization: boolean;

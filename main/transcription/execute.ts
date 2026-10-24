@@ -33,6 +33,7 @@ export type ExecutionContext = {
     directory: AbsolutePath;
     audio: AbsolutePath;
     duration: number;
+    runtimeDirectory: AbsolutePath;
     signal?: AbortSignal;
     feedback?: ExecutionFeedback;
 };
@@ -78,7 +79,7 @@ async function executeTask(id: string, value: unknown, paths: ExecutionPaths, si
         feedback?.record?.("Audio duration", { media: request.mediaDuration, prepared: duration });
         const execute = request.executer === "sherpa-onnx" ? executeSherpa : executeWhisper;
         feedback?.output("stderr", `[${request.executer}] Transcribing.\n`);
-        const run = await execute({ id, request, backend, directory, audio, duration, signal, feedback });
+        const run = await execute({ id, request, backend, directory, audio, duration, runtimeDirectory: paths.runtimeDirectory, signal, feedback });
         const outside = run.transcript.flatMap((segment, index) => segment.range.end > request.mediaDuration ? [{ index, ...segment.range }] : []);
         if (outside.length) feedback?.record?.("Timestamps beyond media duration", { duration: request.mediaDuration, segments: outside });
         return run;

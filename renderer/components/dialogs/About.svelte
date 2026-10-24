@@ -31,7 +31,7 @@
         </div>
         <div class="meta">
             <div>v{version}</div>
-            <div><a href="https://github.com/vestige-lixue/vestige" target="_blank">https://github.com/vestige-lixue/vestige</a></div>
+            <div><a class="focusable" href="https://github.com/vestige-lixue/vestige" target="_blank">https://github.com/vestige-lixue/vestige</a></div>
             <div>Copyright © {new Date().getFullYear()} <a class="focusable" href="https://github.com/ljm12914" target="_blank">LJM12914</a></div>
             <div><LocalizedText text={i18n.t("about.license")} slots={{ license: licenseLink }} />
                 {#snippet licenseLink()}<button class="link-button focusable" onclick={() => showLicense = !showLicense}>AGPL-3.0-or-later</button>{/snippet}

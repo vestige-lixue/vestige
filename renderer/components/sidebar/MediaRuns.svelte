@@ -1,3 +1,5 @@
+<svelte:window onpointerdowncapture={handlePointerdown} />
+
 <Popover.Root bind:open>
     <Tooltip text={i18n.t("transcript.runs.title")} {disabled} {tabindex} {onfocus} onclick={event => event.stopPropagation()}>
         {#snippet child({ props })}
@@ -11,48 +13,53 @@
         {/snippet}
     </Tooltip>
     <Popover.Portal>
-        <Popover.Overlay class="runsOverlay" style={`z-index: ${layerIndex};`} onclick={event => {
-            event.stopPropagation();
-            open = false;
-        }} />
         <PopoverContent bind:ref={content} class="mediaRuns option-surface" customAnchor={anchor} align="start" sideOffset={6} collisionPadding={8}
             style={`z-index: ${layerIndex + 1}; font-size: ${fontSize};`}
-            trapFocus={!hasDialog && !menuOpen} onInteractOutside={event => event.preventDefault()}
+            trapFocus={!hasDialog && !menuOpen} interactOutsideBehavior="ignore"
             onOpenAutoFocus={event => {
                 event.preventDefault();
                 focusRun(vestige?.displayedRunIdx ?? 0, false);
             }}
             onCloseAutoFocus={event => {
                 event.preventDefault();
-                if (!menuOpen) modal.restoreFocus(trigger);
+                if (!menuOpen && !pointerDismissed) modal.restoreFocus(trigger);
+                pointerDismissed = false;
             }}
             onkeydown={handleKeydown}
         >
             {#each vestige?.runs ?? [] as run, index (run.id)}
                 {@const displayed = index === vestige?.displayedRunIdx}
-                <div class="runRow activable" bind:this={rowElements[run.id]} onclick={() => selectRun(run.id)}>
-                    <Tooltip side="right" sideOffset={24} customAnchor={rowElements[run.id] ?? null} disabled={disabled || hasDialog} tabindex={0}>
-                        {#snippet text()}
-                            <div class="runDetails">
-                                <div><b>{i18n.t("transcription.config.executer.label")}</b><span>{run.config.executer}</span></div>
-                                <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{directoryName(run.config.backendDirectory)}</span></div>
-                                <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{directoryName(run.config.modelDirectory)}</span></div>
-                            </div>
-                        {/snippet}
-                        {#snippet child({ props })}
-                            <NiceLabel {...props} class="runLabel focusable" value={`#${index + 1} ${formatStartedAt(run.startedAt)}`}
+                <Tooltip side="right" sideOffset={24} disabled={disabled || hasDialog} tabindex={0} onclick={() => selectRun(run.id)}>
+                    {#snippet text()}
+                        <div class="runDetails">
+                            <div><b>{i18n.t("transcription.config.executer.label")}</b><span>{run.config.executer}</span></div>
+                            <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{directoryName(run.config.backendDirectory)}</span></div>
+                            <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{directoryName(run.config.modelDirectory)}</span></div>
+                        </div>
+                    {/snippet}
+                    {#snippet child({ props })}
+                        <div {...props} class="runRow activable focusable" onpointerover={event => {
+                            if (!(event.target instanceof Element) || event.target.closest("button")) return;
+                            const previous = event.relatedTarget;
+                            if (previous instanceof Element && event.currentTarget.contains(previous) && previous.closest("button")
+                                && typeof props.onpointerenter === "function") {
+                                // Leaving the nested delete button does not re-enter the row.
+                                props.onpointerenter(event);
+                            }
+                        }}>
+                            <NiceLabel class="runLabel" value={`#${index + 1} ${formatStartedAt(run.startedAt)}`}
                                 editable={false} onchange={() => {}} scrollMode="ontime" scrollParam={1.5} scrollPause={0.5} />
-                        {/snippet}
-                    </Tooltip>
-                    {#if displayed}
-                        <span class="option-checkmark">
-                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                            {@html checkmarkIcon}
-                        </span>
-                    {/if}
-                    <ConfirmDeleteButton text={i18n.t(displayed ? "transcript.runs.actions.removeWithEdits" : "transcript.runs.actions.remove")}
-                        disabled={disabled || hasDialog} resetKey={displayed} onconfirm={() => removeRun(run.id)} />
-                </div>
+                            {#if displayed}
+                                <span class="option-checkmark">
+                                    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                    {@html checkmarkIcon}
+                                </span>
+                            {/if}
+                            <ConfirmDeleteButton text={i18n.t(displayed ? "transcript.runs.actions.removeWithEdits" : "transcript.runs.actions.remove")}
+                                disabled={disabled || hasDialog} resetKey={displayed} onconfirm={() => removeRun(run.id)} />
+                        </div>
+                    {/snippet}
+                </Tooltip>
             {:else}
                 <div class="empty">{i18n.t("transcript.runs.empty")}</div>
             {/each}
@@ -91,12 +98,6 @@
         white-space: nowrap;
         pointer-events: none;
     }
-    :global(.runsOverlay) {
-        position: fixed;
-        inset: env(titlebar-area-height) 0 0;
-        background: transparent;
-        -webkit-app-region: no-drag;
-    }
     :global(.mediaRuns) {
         width: var(--bits-popover-anchor-width);
         gap: 4px;
@@ -110,7 +111,7 @@
         flex-shrink: 0;
         cursor: pointer;
     }
-    .runRow:hover, .runRow:focus-within {
+    .runRow:hover, .runRow:focus-visible, .runRow:has(:global(:focus-visible)) {
         background: var(--c-selection-bg);
     }
     .runRow :global(.runLabel) {
@@ -145,7 +146,7 @@
 
 <script lang="ts">
     import { Popover } from "bits-ui";
-    import { onDestroy, tick, untrack } from "svelte";
+    import { flushSync, onDestroy, tick, untrack } from "svelte";
     import * as i18n from "../../i18n.svelte";
     import * as project from "../../states/project.svelte";
     import * as dialogs from "../../states/dialogs.svelte";
@@ -174,9 +175,9 @@
     const hasDialog = $derived(dialogs.state.dialogs.length > 0);
     const menuOpen = $derived(menu.get() !== "");
     let open = $state(false);
+    let pointerDismissed = false;
     let trigger = $state<HTMLButtonElement | null>(null);
     let content = $state<HTMLDivElement | null>(null);
-    const rowElements = $state<Record<string, HTMLDivElement | undefined>>({});
     let fontSize = $state("inherit");
     const layer = Symbol();
     const layerIndex = $derived(modal.getLayerIndex(layer));
@@ -220,8 +221,8 @@
     }
 
     function focusRun(index: number, showTooltip = true): void {
-        const labels = content?.querySelectorAll<HTMLElement>(".runLabel");
-        const target = labels?.[Math.max(0, Math.min(index, labels.length - 1))] ?? content;
+        const rows = content?.querySelectorAll<HTMLElement>(".runRow");
+        const target = rows?.[Math.max(0, Math.min(index, rows.length - 1))] ?? content;
         if (showTooltip) target?.focus();
         else modal.restoreFocus(target);
     }
@@ -232,6 +233,13 @@
         projectAPI.removeRun(mediaId, runId);
         await tick();
         if (open) focusRun(index);
+    }
+
+    function handlePointerdown(event: PointerEvent): void {
+        if (!open || !(event.target instanceof Node) || content?.contains(event.target) || trigger?.contains(event.target)) return;
+        pointerDismissed = true;
+        // Release the focus trap before the pressed control handles the same event.
+        flushSync(() => open = false);
     }
 
     function handleKeydown(event: KeyboardEvent): void {
@@ -246,7 +254,7 @@
         const rows = [...content?.querySelectorAll<HTMLElement>(".runRow") ?? []];
         const index = rows.findIndex(row => row.contains(event.target as Node));
         if (index < 0) return;
-        if ((event.key === "Enter" || event.key === " ") && event.target.classList.contains("runLabel")) {
+        if ((event.key === "Enter" || event.key === " ") && event.target.classList.contains("runRow")) {
             event.preventDefault();
             const run = vestige?.runs[index];
             if (run) selectRun(run.id);

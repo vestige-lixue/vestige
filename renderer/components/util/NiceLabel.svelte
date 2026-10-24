@@ -31,9 +31,11 @@
 
 <style>
     div {
+        box-sizing: content-box;
         width: 100%;
         min-width: 0;
-        min-height: 1lh;
+        height: 1lh;
+        line-height: 1.5;
         overflow: hidden;
         color: inherit;
         white-space: nowrap;
@@ -47,6 +49,7 @@
     }
     .label span {
         display: block;
+        line-height: inherit;
         overflow: hidden;
         text-overflow: ellipsis;
     }

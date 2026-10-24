@@ -8,19 +8,19 @@ export default defineConfig({
         plugins: [UnpluginTypia({ tsconfig: "configs/tsconfig.node.json", typia: { undefined: false } })],
         build: {
             outDir: "dist/main",
-            rollupOptions: {
+            rolldownOptions: {
                 input: resolve("main/index.ts")
             }
         }
     },
     preload: {
-        esbuild: {
+        oxc: {
             // Erase inline type imports so the sandbox does not try to require their modules.
-            tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: false } }
+            typescript: { onlyRemoveTypeImports: false }
         },
         build: {
             outDir: "dist/preload",
-            rollupOptions: {
+            rolldownOptions: {
                 input: resolve("preload/index.ts"),
                 output: {
                     format: "cjs",
@@ -40,7 +40,7 @@ export default defineConfig({
         },
         build: {
             outDir: "dist/renderer",
-            rollupOptions: {
+            rolldownOptions: {
                 input: resolve("renderer/index.html")
             }
         },

@@ -2,37 +2,14 @@
 
 <section class:video={isVideo}>
     <div class="preview" style:height={`${previewHeight}px`} bind:contentBoxSize={null, sizes => previewWidth = sizes?.[0]?.inlineSize ?? 0}>
-        {#if source}
-            <!-- svelte-ignore a11y_media_has_caption -->
-            <video bind:this={element} crossorigin="anonymous" src={source} preload="metadata" class:audio={media?.kind === "audio"}
-                ontimeupdate={event => {
-                    if (event.currentTarget === element) observeTime();
-                }}
-                onpause={event => {
-                    observePause(event.currentTarget);
-                }}
-                onloadedmetadata={event => {
-                    if (event.currentTarget === element && element.currentSrc === source) {
-                        observeVideoSize(event.currentTarget);
-                        applySeek();
-                    }
-                }}
-                onresize={event => observeVideoSize(event.currentTarget)}
-                onseeked={event => {
-                    if (event.currentTarget !== element || element.currentSrc !== source || element.seeking) return;
-                    activeSeek = null;
-                    recoveringSeek = false;
-                    applySeek();
-                    settleSeek();
-                }}
-                onended={event => {
-                    if (event.currentTarget !== element || element.currentSrc !== source || !element.ended || element.seeking || seekedToEnd || settledSeek !== player.getSeekVersion()) return;
-                    playerAPI.finishPlayback();
-                }}
-                onerror={event => {
-                    if (event.currentTarget === element && element.currentSrc === source) handlePlaybackError();
-                }}
-            ></video>
+        {#if source && isVideo}
+            {#key source}
+                <!-- svelte-ignore a11y_media_has_caption -->
+                <video bind:this={video} crossorigin="anonymous" src={source} preload="auto" muted
+                    onloadedmetadata={event => observeVideoSize(event.currentTarget)}
+                    onresize={event => observeVideoSize(event.currentTarget)}
+                ></video>
+            {/key}
         {/if}
         {#if !source || media?.kind === "audio"}
             <Tooltip text={previewName} disabled={!nameTruncated}>
@@ -84,9 +61,6 @@
         min-height: 0;
         object-fit: contain;
     }
-    video.audio {
-        display: none;
-    }
     .preview-name {
         min-width: 0;
         width: 100%;
@@ -119,6 +93,7 @@
     import * as player from "../../states/player.svelte";
     import * as settings from "../../states/settings.svelte";
     import * as playbackAudio from "../../audio/playback";
+    import * as playbackTransport from "../../audio/transport";
     import { watchDefaultOutput } from "../../audio/outputDevices";
     import { type AudioLevels } from "../../audio/levels";
 
@@ -152,20 +127,10 @@
     const previewHeight = $derived(isVideo
         ? Math.min(maxVideoHeight, Math.max(minimumVideoHeight, settings.getVideoHeight() ?? defaultVideoHeight))
         : 64);
-    const previewSeekInterval = 75;
-    const progressInterval = 100;
-    let element = $state<HTMLVideoElement>();
+    let video = $state<HTMLVideoElement>();
     let audio = $state.raw<playbackAudio.PlaybackAudio | null>(null);
+    let transport = $state.raw<playbackTransport.Transport | null>(null);
     let levels = $state.raw<AudioLevels | null>(null);
-    let pendingSeek: { time: number; mode: player.SeekMode } | null = null;
-    let activeSeek: number | null = null;
-    let recoveringSeek = false;
-    let seekTimer: ReturnType<typeof setTimeout> | undefined;
-    let lastSeekAt = -Infinity;
-    let appliedSeek = -1;
-    let settledSeek = $state(-1);
-    let seekedToEnd = false;
-    const expectedPauses = new WeakMap<HTMLMediaElement, number>();
 
     onMount(() => watchDefaultOutput(() => {
         if (settings.getPlayback().pauseOnOutputDeviceChange) playerAPI.pauseForInterruption();
@@ -182,209 +147,113 @@
     });
 
     function observeVideoSize(target: HTMLVideoElement): void {
-        if (target !== element || target.currentSrc !== source || target.videoWidth <= 0 || target.videoHeight <= 0) return;
+        if (target !== video || target.currentSrc !== source || target.videoWidth <= 0 || target.videoHeight <= 0) return;
         videoSize = { source: target.currentSrc, ratio: target.videoHeight / target.videoWidth };
     }
 
-    function pauseElement(target: HTMLMediaElement): void {
-        if (!target.paused) expectedPauses.set(target, (expectedPauses.get(target) ?? 0) + 1);
-        target.pause();
-    }
-
-    function observePause(target: HTMLMediaElement): void {
-        const expected = expectedPauses.get(target) ?? 0;
-        if (expected > 0) expectedPauses.set(target, expected - 1);
-        if (target !== element || target.currentSrc !== source) return;
-        observeTime(true);
-        if (expected > 0 || !target.paused || !player.isPlaying() || recoveringSeek) return;
-        // Natural completion is handled by ended; seeking to EOF retains playback intent.
-        if (target.ended || (target.duration > 0 && target.currentTime >= target.duration)) return;
-        playerAPI.pauseForInterruption();
-    }
-
-    function observeTime(remember = false): void {
-        if (mediaId && media && element?.currentSrc === source && settledSeek === player.getSeekVersion() && !element.seeking && pendingSeek === null && activeSeek === null && player.getSeekMode() !== "preview") {
-            projectAPI.observePlaybackTime(mediaId, element.ended ? media.duration : element.currentTime, remember);
-        }
-    }
-
-    function settleSeek(): void {
-        if (!element || element.currentSrc !== source || element.readyState < 1 || element.seeking || pendingSeek !== null || activeSeek !== null || appliedSeek !== player.getSeekVersion()) return;
-        recoveringSeek = false;
-        seekedToEnd = element.ended || (element.duration > 0 && element.currentTime >= element.duration);
-        settledSeek = appliedSeek;
-        observeTime(true);
-    }
-
-    function applySeek(): void {
-        clearTimeout(seekTimer);
-        seekTimer = undefined;
-        if (!element || element.currentSrc !== source || element.readyState < 1 || pendingSeek === null) return;
-        const { mode } = pendingSeek;
-        const time = Number.isFinite(element.duration) ? Math.min(pendingSeek.time, element.duration) : pendingSeek.time;
-        if (time !== pendingSeek.time) {
-            projectAPI.seekPlayback(time, mode);
-            appliedSeek = player.getSeekVersion();
-        }
-        if (activeSeek !== null || element.seeking) {
-            if (activeSeek !== null && Math.abs(activeSeek - time) < 0.001) {
-                pendingSeek = null;
-                return;
-            }
-            return;
-        }
-        else if (Math.abs(element.currentTime - time) < 0.001) {
-            pendingSeek = null;
-            settleSeek();
-            return;
-        }
-        const delay = previewSeekInterval - (performance.now() - lastSeekAt);
-        if (mode === "preview" && delay > 0) {
-            seekTimer = setTimeout(applySeek, delay);
-            return;
-        }
-        pendingSeek = null;
-        activeSeek = time;
-        lastSeekAt = performance.now();
-        element.currentTime = time;
-    }
-
-    function handlePlaybackError(): void {
-        if (!mediaId || !element) return;
-        // FLAC seeks near EOF can leave Chromium's demuxer unable to seek again.
-        // Reload once for this seek, retaining the latest target and playback intent.
-        if (activeSeek !== null && !recoveringSeek) {
-            recoveringSeek = true;
-            clearTimeout(seekTimer);
-            seekTimer = undefined;
-            activeSeek = null;
-            lastSeekAt = -Infinity;
-            settledSeek = -1;
-            pendingSeek = { time: player.getCurrentTime(), mode: player.getSeekMode() };
-            expectedPauses.delete(element);
-            element.load();
-            return;
-        }
-        mediaImportAPI.reportPlaybackFailure(mediaId, "unreadable", { kind: "media-playback-failed", code: element.error?.code ?? null, diagnostic: element.error?.message || null });
-    }
-
     $effect(() => {
-        const target = element;
         const url = source;
         const id = mediaId;
-        if (!target || !url) return;
+        const picture = isVideo ? video : null;
+        if (!url || !id || !media || (isVideo && !picture)) return;
+        const element = new Audio();
+        element.crossOrigin = "anonymous";
+        element.preload = "auto";
         let pipeline: playbackAudio.PlaybackAudio | null = null;
-        const unregister = playerAPI.registerProgressReader(() => {
-            if (element !== target || player.getURL() !== url || mediaSelection.get() !== id) return;
-            if (!player.isPlaying()) {
-                pauseElement(target);
-                if (pipeline) playbackAudio.pause(pipeline);
-            }
-            observeTime(true);
-        });
+        let disposed = false;
+        const current = (): boolean => !disposed && player.getURL() === url && mediaSelection.get() === id;
         const reportFailure = (error: unknown): void => {
-            if (element !== target || player.getURL() !== url) return;
+            if (!current()) return;
             console.error("Volume stabilization is unavailable; ordinary playback has been restored.", error);
             if (player.isVolumeStabilizationEnabled()) playerAPI.setVolumeStabilization(false);
         };
         try {
-            pipeline = untrack(() => playbackAudio.create(target, player.getVolume(), player.isVolumeStabilizationEnabled(), reportFailure, settings.getVolumeStabilization(), value => {
-                if (element === target && player.getURL() === url) levels = value;
+            pipeline = untrack(() => playbackAudio.create(element, player.getVolume(), player.isVolumeStabilizationEnabled(), reportFailure, settings.getVolumeStabilization(), value => {
+                if (current()) levels = value;
             }, () => {
-                if (element === target && player.getURL() === url && audio === pipeline) playerAPI.pauseForInterruption();
+                if (current()) playerAPI.pauseForInterruption();
             }));
         }
         catch (error) {
             untrack(() => reportFailure(error));
         }
+        const controller = playbackTransport.create(element, picture ?? null, {
+            duration: media.duration,
+            resumeAudio: () => pipeline ? playbackAudio.resume(pipeline) : Promise.resolve(),
+            pauseAudio: () => {
+                if (pipeline) playbackAudio.pause(pipeline);
+            },
+            drainSeconds: () => pipeline ? (pipeline.processor ? 0.005 : 0) + pipeline.context.baseLatency + (pipeline.context.outputLatency || 0) : 0,
+            onTime: (time, remember) => {
+                if (current()) projectAPI.observePlaybackTime(id, time, remember);
+            },
+            onEnded: () => {
+                if (current()) playerAPI.finishPlayback();
+            },
+            onInterruption: () => {
+                if (current()) playerAPI.pauseForInterruption();
+            },
+            onClamp: (time, mode) => {
+                if (current()) projectAPI.seekPlayback(time, mode);
+            },
+            onError: target => {
+                if (current()) mediaImportAPI.reportPlaybackFailure(id, "unreadable", { kind: "media-playback-failed", code: target.error?.code ?? null, diagnostic: target.error?.message || null });
+            }
+        });
+        const unregister = playerAPI.registerProgressReader(() => {
+            if (!current()) return;
+            if (!player.isPlaying()) playbackTransport.setPlaying(controller, false);
+            if (!controller.seeking && player.getSeekMode() !== "preview") projectAPI.observePlaybackTime(id, playbackTransport.getTime(controller), true);
+        });
+        element.src = url;
         audio = pipeline;
+        transport = controller;
         return () => {
+            disposed = true;
             unregister();
-            clearTimeout(seekTimer);
-            seekTimer = undefined;
-            pendingSeek = null;
-            activeSeek = null;
-            recoveringSeek = false;
-            lastSeekAt = -Infinity;
-            appliedSeek = -1;
-            settledSeek = -1;
-            seekedToEnd = false;
-            target.pause();
-            expectedPauses.delete(target);
+            playbackTransport.dispose(controller);
             if (pipeline) playbackAudio.dispose(pipeline);
             if (audio === pipeline) audio = null;
+            if (transport === controller) transport = null;
             levels = null;
-            target.removeAttribute("src");
-            target.load();
-        };
-    });
-
-    $effect(() => {
-        const target = element;
-        const url = source;
-        const pipeline = audio;
-        const version = player.getPlayVersion();
-        if (!target || !url) return;
-        let cancelled = false;
-        if (player.isPlaying()) {
-            // Initial restoration and paused seeks must finish before play can start.
-            if (settledSeek !== player.getSeekVersion() || target.currentSrc !== url) return;
-            if (target.ended || (target.duration > 0 && target.currentTime >= target.duration)) {
-                // Keep playback intent at EOF so seeking back resumes without restarting here.
-                pauseElement(target);
-                if (pipeline) playbackAudio.pause(pipeline);
-                return;
+            for (const target of [element, picture]) {
+                if (!target) continue;
+                target.removeAttribute("src");
+                target.load();
             }
-            void (pipeline ? playbackAudio.resume(pipeline) : Promise.resolve()).then(async () => {
-                if (!cancelled && element === target && player.getURL() === url && version === player.getPlayVersion() && player.isPlaying()) await target.play();
-            }).catch(() => {
-                if (!cancelled && player.getURL() === url && version === player.getPlayVersion()) playerAPI.setPlaying(false);
-            });
-        }
-        else {
-            pauseElement(target);
-            if (pipeline) playbackAudio.pause(pipeline);
-        }
-        return () => {
-            cancelled = true;
         };
     });
 
     $effect(() => {
-        const target = element;
-        const url = source;
-        if (!target || !url || !player.isPlaying()) return;
-        const timer = setInterval(() => {
-            if (element === target && player.getURL() === url) observeTime(true);
-        }, progressInterval);
-        return () => clearInterval(timer);
+        const controller = transport;
+        player.getSeekVersion();
+        if (controller) untrack(() => playbackTransport.seek(controller, player.getCurrentTime(), player.getSeekMode()));
     });
 
     $effect(() => {
-        const version = player.getSeekVersion();
-        const target = element;
-        const url = source;
-        if (version !== appliedSeek) {
-            appliedSeek = version;
-            pendingSeek = untrack(() => ({ time: player.getCurrentTime(), mode: player.getSeekMode() }));
-        }
-        if (target && url) untrack(applySeek);
+        const controller = transport;
+        const speed = player.getSpeed();
+        const offset = settings.getPlayback().audioOffsetMs;
+        if (controller) untrack(() => playbackTransport.configure(controller, speed, offset));
     });
 
     $effect(() => {
-        if (element) element.playbackRate = player.getSpeed();
+        const controller = transport;
+        const playing = player.isPlaying();
+        player.getPlayVersion();
+        if (controller) untrack(() => playbackTransport.setPlaying(controller, playing));
     });
 
     $effect(() => {
         const volume = player.getVolume();
         if (audio) playbackAudio.setVolume(audio, volume);
-        else if (element) element.volume = volume;
+        else if (transport) transport.audio.volume = volume;
     });
 
     $effect(() => {
         const enabled = player.isVolumeStabilizationEnabled();
         if (audio) playbackAudio.setEnabled(audio, enabled);
-        else if (element && source && enabled) playerAPI.setVolumeStabilization(false);
+        else if (transport && enabled) playerAPI.setVolumeStabilization(false);
     });
 
     $effect(() => {

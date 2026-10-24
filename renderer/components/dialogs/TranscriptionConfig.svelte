@@ -1,7 +1,7 @@
 <Modal bind:open={() => visible, value => {
     if (value) visible = true;
     else void close();
-}} width="min(90%, 800px)" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={value => {
+}} width="min(90%, 800px)" escBehavior="close" clickMaskBehavior="close" onkeydown={handleKeydown} onOpenChangeComplete={value => {
     if (!value && !visible) onClosed();
 }}>
     <Dialog.Title class="modal-title">{i18n.t("transcription.config.title")}</Dialog.Title>
@@ -31,7 +31,7 @@
         <TextButton disabled={pending} onclick={() => void (initialized ? commit() : initialize())}>{i18n.t("common.retry")}</TextButton>
     {/if}
     {#snippet actions()}
-        <TextButton class="primary" disabled={disabled || project.projectState.locked || !mediaImport.isReady(mediaId)} onclick={() => void close(true)}>
+        <TextButton class="primary" disabled={startDisabled} onclick={() => void close(true)}>
             {i18n.t("transcription.config.submit")}
         </TextButton>
     {/snippet}
@@ -78,6 +78,7 @@
     import * as project from "../../states/project.svelte";
     import * as settings from "../../states/settings.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
+    import * as dialogs from "../../states/dialogs.svelte";
     import { defaultConfig, configsEqual, type Config } from "../../../shared/transcription/Config";
     import { mergePresets } from "../../../shared/transcription/presets";
     import { validTranscriptionConfig } from "../../../shared/settings/validate";
@@ -99,6 +100,7 @@
     let commitTask: Promise<boolean> | null = null;
     let validate = $state<(requireDirectory?: boolean, report?: boolean) => boolean>();
     const disabled = $derived(!initialized || pending);
+    const startDisabled = $derived(disabled || project.projectState.locked || !mediaImport.isReady(mediaId));
     const failure = $derived(settings.getError());
     const presets = $derived(mergePresets(settings.get()?.transcription.presets ?? {}));
     const presetItems = $derived(presets.map(preset => ({ value: preset.name, label: preset.name })));
@@ -118,6 +120,18 @@
     $effect(() => {
         if (selectedName && !presets.some(preset => preset.name === selectedName && configsEqual(preset.config, config))) selectedName = "";
     });
+
+    function handleKeydown(event: KeyboardEvent): void {
+        // Dropdowns consume Enter before it bubbles here, including the press that closes their list.
+        if (event.key !== "Enter" || event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.repeat
+            || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (!open || !visible || startDisabled || dialogs.state.dialogs.at(-1)?.id !== dialogId) return;
+        const target = event.target;
+        if (target !== event.currentTarget && (!(target instanceof HTMLInputElement) || target.type !== "text"
+            || target.disabled || target.readOnly || !target.matches(".combobox-input, .parameters input"))) return;
+        event.preventDefault();
+        void close(true);
+    }
 
     async function initialize(): Promise<void> {
         if (initialized || pending) return;

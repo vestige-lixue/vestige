@@ -56,10 +56,11 @@ export function registerDownloadIPCs(contents: WebContents, roots: DownloadRoots
     };
     contents.ipc.handle(downloadChannels.list, async (event): Promise<Download[]> => {
         checkSender(event);
-        return Promise.all(sources.map(async ({ kind, id, name, estimatedBytes }) => {
+        return Promise.all(sources.map(async ({ kind, id, name, estimatedBytes, requiredFiles }) => {
             const taskId = latest.get(key(kind, id));
             const task = taskId ? tasks.get(taskId) : null;
-            const installed = await lstat(join(roots[kind], id)).then(info => info.isDirectory()).catch((error: NodeJS.ErrnoException) => {
+            const installed = await lstat(join(roots[kind], id)).then(async info => info.isDirectory()
+                && (await Promise.all((requiredFiles ?? []).map(name => lstat(join(roots[kind], id, name)).then(file => file.isFile() && file.size > 0)))).every(Boolean)).catch((error: NodeJS.ErrnoException) => {
                 if (error.code === "ENOENT") return false;
                 throw error;
             });

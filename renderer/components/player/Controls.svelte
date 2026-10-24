@@ -33,6 +33,10 @@
             >
                 <div class="track">
                     <Slider.Range class="slider-range" />
+                    {#if inspectedRange && duration > 0}
+                        <span class="inspection-tick" style:left={`${Math.max(0, Math.min(1, inspectedRange.start / duration)) * 100}%`}></span>
+                        <span class="inspection-tick" style:left={`${Math.max(0, Math.min(1, inspectedRange.end / duration)) * 100}%`}></span>
+                    {/if}
                 </div>
                 <Slider.Thumb
                     bind:ref={progressThumb}
@@ -349,6 +353,15 @@
         background: var(--c-text-80p);
         transform: translateX(-50%);
     }
+    .inspection-tick {
+        position: absolute;
+        top: -5px;
+        width: 1px;
+        height: 14px;
+        background: var(--c-accent);
+        transform: translateX(-50%);
+        pointer-events: none;
+    }
     .time {
         white-space: nowrap;
         font-size: 14px;
@@ -403,6 +416,7 @@
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as project from "../../states/project.svelte";
     import * as menu from "../../states/menu.svelte";
+    import * as transcript from "../../states/transcript.svelte";
 
     import { commandDisabled, interfaceBlocked, runCommand } from "../../states/commands";
     import skipBackIcon from "../../../resources/icons/carbon--skip-back.svg?raw";
@@ -447,6 +461,7 @@
     const volumePosition = $derived(volumeToSlider(player.getVolume(), settings.getPlayback()));
     const media = $derived(project.getMedia(mediaSelection.get()));
     const duration = $derived(media?.duration ?? 0);
+    const inspectedRange = $derived(transcript.getInspectionRange());
     const unavailable = $derived(!media || !mediaImport.isReady(media.id) || !Number.isFinite(duration) || duration <= 0);
     const disabled = $derived(unavailable || !player.getURL());
     const progress = $derived(unavailable || !Number.isFinite(player.getCurrentTime())

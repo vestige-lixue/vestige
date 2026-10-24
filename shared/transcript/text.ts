@@ -1,6 +1,6 @@
 import { type Modification } from "../Vestige";
 import { type Segment } from "../transcription/Run";
-import { type TextPosition, type Range } from "../util/range";
+import { type TextPosition } from "../util/range";
 
 export type TextIndex = {
     transcript: readonly Segment[];
@@ -98,6 +98,9 @@ export function normalizeModifications(index: TextIndex, modifications: readonly
         if (patch.text === index.characters.slice(patch.from, patch.to).join("")) continue;
         if (previous && previous.from === previous.to && patch.from === patch.to && previous.from === patch.from) {
             previous.text += patch.text;
+        }
+        else if (previous && previous.text === "" && patch.text === "" && previous.to === patch.from) {
+            previous.to = patch.to;
         }
         else normalized.push(patch);
     }
@@ -202,29 +205,4 @@ export function utf16ToCodepoint(text: string, offset: number): number {
         if (position > offset) throw new RangeError("Position splits a codepoint.");
     }
     return count;
-}
-
-function sourceTime(index: TextIndex, offset: number, end: boolean): number | null {
-    if (!index.transcript.length) return null;
-    if (!index.characters.length || offset === index.characters.length && !end) return index.transcript.at(-1)!.range.end;
-    const preceding = end && offset > 0;
-    const position = textPosition(index, preceding ? offset - 1 : offset);
-    const segment = index.transcript[position.segmentIdx];
-    const length = index.starts[position.segmentIdx + 1] - index.starts[position.segmentIdx];
-    return segment.range.start + (segment.range.end - segment.range.start) * (position.offset + Number(preceding)) / length;
-}
-
-export function pieceTime(index: TextIndex, piece: TextPiece): Range | null {
-    const start = sourceTime(index, piece.sourceFrom, false);
-    const end = piece.sourceFrom === piece.sourceTo ? start : sourceTime(index, piece.sourceTo, true);
-    return start === null || end === null ? null : { start, end: Math.max(start, end) };
-}
-
-export function timeAtTextOffset(index: TextIndex, projection: TextProjection, offset: number): number | null {
-    const piece = projection.pieces.find(piece => piece.from <= offset && offset < piece.to) ?? projection.pieces.at(-1);
-    if (!piece) return sourceTime(index, index.characters.length, false);
-    const range = pieceTime(index, piece);
-    if (!range) return null;
-    const fraction = piece.to === piece.from ? 0 : Math.max(0, Math.min(1, (offset - piece.from) / (piece.to - piece.from)));
-    return range.start + (range.end - range.start) * fraction;
 }

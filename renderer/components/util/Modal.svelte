@@ -12,6 +12,7 @@
             style={`--modal-width: ${width}; --modal-height: ${height}; z-index: ${layerIndex + 1};`}
             escapeKeydownBehavior={escBehavior}
             interactOutsideBehavior="ignore"
+            {onkeydown}
             onOpenAutoFocus={event => {
                 event.preventDefault();
                 returnFocus = document.activeElement;
@@ -177,6 +178,7 @@
         scrollElement?: HTMLDivElement | null;
         children: Snippet;
         actions?: Snippet;
+        onkeydown?: (event: KeyboardEvent) => void;
         onOpenAutoFocus?: () => void;
         // Clear content data or unmount the caller only after this reports false.
         onOpenChangeComplete: (open: boolean) => void;
@@ -192,6 +194,7 @@
         scrollElement = $bindable(null),
         children,
         actions,
+        onkeydown,
         onOpenAutoFocus,
         onOpenChangeComplete
     }: Props = $props();

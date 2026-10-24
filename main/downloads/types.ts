@@ -13,14 +13,24 @@ export type DownloadTransfer = (
     signal: AbortSignal
 ) => Promise<void>;
 
+export type DownloadFile = { url: string; destination: string; sha256?: string; size?: number };
+
+export type RuntimeDownload = {
+    name: string;
+    file: DownloadFile & { sha256: string; size: number };
+    libraries: string[];
+};
+
 export type DownloadPayload = {
-    files: { url: string; destination: string; sha256?: string; size?: number }[];
+    files: DownloadFile[];
     notice: string;
-    archive?: { filename: string; program: string };
+    archive?: { filename: string; programs: string[]; exclude?: string[] };
+    runtimes?: RuntimeDownload[];
 };
 
 export type DownloadSource = Pick<Download, "kind" | "id" | "name" | "estimatedBytes"> & {
     resolve(signal: AbortSignal): Promise<DownloadPayload>;
+    requiredFiles?: string[];
 };
 
 export type DownloadRoots = Record<DownloadKind, AbsolutePath>;

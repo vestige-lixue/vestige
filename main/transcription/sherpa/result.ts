@@ -3,6 +3,50 @@ import { type ParsedRequest } from "../parameters";
 import { type NativeObject, type Piece, object, array, number, probability, range, segments, createRun } from "../result";
 import { TranscriptionFailure } from "../failure";
 
+const qwenLanguages: Record<string, string> = {
+    chinese: "zh", english: "en", cantonese: "yue", arabic: "ar", german: "de", french: "fr", spanish: "es",
+    portuguese: "pt", indonesian: "id", italian: "it", korean: "ko", russian: "ru", thai: "th", vietnamese: "vi",
+    japanese: "ja", turkish: "tr", hindi: "hi", malay: "ms", dutch: "nl", swedish: "sv", danish: "da", finnish: "fi",
+    polish: "pl", czech: "cs", filipino: "fil", persian: "fa", greek: "el", hungarian: "hu", macedonian: "mk", romanian: "ro"
+};
+
+export function normalizeQwenOutput(output: NativeObject): NativeObject {
+    if (typeof output.text !== "string") return output;
+    // Some 1.7B exports emit $LANGUAGE instead of the lowercase prefix stripped
+    // by sherpa. Only remove a complete leading protocol header, never words
+    // such as "language" that may themselves be the spoken transcript.
+    const prefix = /^\s*\$?languages?\s+([A-Za-z][A-Za-z -]{0,40})<asr_text>/i.exec(output.text);
+    if (!prefix) return output;
+    return {
+        ...output,
+        text: output.text.slice(prefix[0].length).trimStart(),
+        lang: qwenLanguages[prefix[1].trim().toLowerCase()] ?? output.lang,
+        tokens: [], timestamps: [], durations: [], ys_log_probs: []
+    };
+}
+
+export function parseBatchResults(raw: string, diagnostic: string, expected: number): unknown[] {
+    let results: unknown[];
+    try {
+        results = expected === 1 ? [JSON.parse(raw)] : raw.trim().split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line));
+    }
+    catch (error) {
+        throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
+    }
+    if (results.length !== expected) throw new TranscriptionFailure({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw });
+    return results;
+}
+
+export function needsWordSeparator(previous: string, next: string): boolean {
+    if (/\s$/.test(previous) || /^\s/.test(next)) return false;
+    const last = /([\p{L}\p{N}])[^\p{L}\p{N}]*$/u.exec(previous)?.[1];
+    const first = /^["“‘«([{]*([\p{L}\p{N}])/u.exec(next)?.[1];
+    // Independent windows omit the leading space that a continuous decoder
+    // would emit. Keep scripts without word spaces unchanged.
+    const unspaced = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+    return !!last && !!first && !unspaced.test(last + first);
+}
+
 function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
     if (typeof output.text !== "string") throw new TranscriptionFailure({ kind: "transcription-invalid-output", executer: "sherpa-onnx", field: "text" });
     const tokens = array(output.tokens);
@@ -41,7 +85,7 @@ function sherpaTranscript(output: NativeObject, duration: number): Segment[] {
     return tokenSegments;
 }
 
-export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number): Run {
-    const output = object(value);
+export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number, qwen = false): Run {
+    const output = qwen ? normalizeQwenOutput(object(value)) : object(value);
     return createRun(id, request, output.lang, sherpaTranscript(output, duration), runTime);
 }

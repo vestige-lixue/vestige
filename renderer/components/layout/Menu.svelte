@@ -1,7 +1,7 @@
 <svelte:window
     onkeydowncapture={handleKeydown}
     onkeyupcapture={handleKeyup}
-    onpointerdowncapture={cancelShortcuts}
+    onpointerdowncapture={handlePointerdown}
     onblur={cancelShortcuts}
 />
 
@@ -18,7 +18,7 @@
                 </Menubar.Trigger>
                 <Menubar.Portal>
                     <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents.all} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}
-                        style={`z-index: ${layerIndex + 1};`} onInteractOutside={event => event.preventDefault()}>
+                        style={`z-index: ${layerIndex + 1};`} interactOutsideBehavior="ignore">
                         {@render menuGroups()}
                     </Menubar.Content>
                 </Menubar.Portal>
@@ -34,15 +34,6 @@
         </div>
     </div>
 </header>
-
-{#if menu.get()}
-    <Portal to="body">
-        <div class="menu-overlay" style:z-index={layerIndex} onclick={event => {
-            event.stopPropagation();
-            menu.set("");
-        }}></div>
-    </Portal>
-{/if}
 
 {#snippet menuGroups()}
     {#each menus as menu (menu.value)}
@@ -66,7 +57,7 @@
                 <Menubar.Trigger class="menu-trigger hoverable activable focusable">{i18n.t(menu.label)}</Menubar.Trigger>
                 <Menubar.Portal>
                     <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents[menu.value]} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}
-                        style={`z-index: ${layerIndex + 1};`} onInteractOutside={event => event.preventDefault()}>
+                        style={`z-index: ${layerIndex + 1};`} interactOutsideBehavior="ignore">
                         {@render menu.items()}
                     </Menubar.Content>
                 </Menubar.Portal>
@@ -128,6 +119,7 @@
     >
         <div>{i18n.t(transcriptionActionKeys[transcription.getAction(mediaSelection.get())])}</div>
         {#if transcriptionCommand.kind === "openTranscriptionConfig"}<kbd>{modKeyText}+B</kbd>{/if}
+        {#if transcriptionCommand.kind === "reviewTranscriptionError"}<kbd>{modKeyText}+T</kbd>{/if}
     </Menubar.Item>
     <Menubar.Item class="activable focusable"
         disabled={selectedMediaId === null}
@@ -188,20 +180,17 @@
 {/snippet}
 
 {#snippet editItems()}
-    <Menubar.Item class="activable focusable"
-        disabled={false}
-        onSelect={() => {}}
-    >
+    <Menubar.Item class="activable focusable" onSelect={() => runEdit("selectAll")}>
         <div>{i18n.t("menu.edit.selectAll")}</div>
         <kbd>{modKeyText}+A</kbd>
     </Menubar.Item>
-    <Menubar.Item class="activable focusable" onSelect={() => runEdit("undo")}>
+    <Menubar.Item class="activable focusable" disabled={!canUndo} onSelect={() => runEdit("undo")}>
         <div>{i18n.t("menu.edit.undo")}</div>
         <kbd>{modKeyText}+Z</kbd>
     </Menubar.Item>
-    <Menubar.Item class="activable focusable" onSelect={() => runEdit("redo")}>
+    <Menubar.Item class="activable focusable" disabled={!canRedo} onSelect={() => runEdit("redo")}>
         <div>{i18n.t("menu.edit.redo")}</div>
-        <kbd>{modKeyText}+Y</kbd>
+        <kbd>{modKeyText}+{isMac ? "⇧+Z" : "Y"}</kbd>
     </Menubar.Item>
     <Menubar.Separator />
     <Menubar.Item class="activable focusable" onSelect={() => runEdit("cut")}>
@@ -338,12 +327,6 @@
     :global([data-menubar-content][data-keyboard="false"] .focusable:focus-visible) {
         outline: none;
     }
-    .menu-overlay {
-        position: fixed;
-        inset: env(titlebar-area-height) 0 0;
-        background: transparent;
-        -webkit-app-region: no-drag;
-    }
     .menu-bar {
         --menu-padding-inline: clamp(2px, calc(1.25vw - 6px), 8px);
         -webkit-app-region: drag;
@@ -460,16 +443,16 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
-    import { onDestroy, untrack } from "svelte";
+    import { flushSync, onDestroy, tick, untrack } from "svelte";
     import { type ParseKeys } from "i18next";
-    import { IsUsingKeyboard, Menubar, Portal } from "bits-ui";
+    import { IsUsingKeyboard, Menubar } from "bits-ui";
     import ProjectStatus from "./ProjectStatus.svelte";
     import menuIcon from "../../../resources/icons/carbon--menu.svg?raw";
     import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
     import externalLinkIcon from "../../../resources/icons/cil--external-link.svg?raw";
     import { commandDisabled, runCommand, interfaceBlocked, type Command } from "../../states/commands";
     import { type EditAction } from "../../../shared/app";
-    import { handleTranscriptEdit } from "../../editor/transcript";
+    import { handleTranscriptEdit, transcriptHistoryAvailable } from "../../editor/transcript";
     import * as transcription from "../../states/transcription.svelte";
     import * as player from "../../states/player.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
@@ -494,6 +477,7 @@
     });
     const isMac = window.api.platform === "darwin";
     const modKeyText = isMac ? "⌘" : "Ctrl";
+    const editShortcuts: Record<string, EditAction> = { a: "selectAll", z: "undo", y: "redo", x: "cut", c: "copy", v: "paste" };
     const shortcuts: Record<string, Command> = {
         n: { kind: "newProject" },
         o: { kind: "openProject" },
@@ -543,10 +527,13 @@
     } | null = null;
     let focusMenuOnOpen = false;
     let editor: HTMLElement | null = null;
+    let canUndo = $state(false);
+    let canRedo = $state(false);
     let editorRange: Range | null = null;
     let editorSelection: { start: number; end: number; direction: "forward" | "backward" | "none" } | null = null;
     let restoringEditor = false;
     let focusingControl = false;
+    let pointerDismissed = false;
     let removalConfirmation = $state<string | null>(null);
 
     const layer = Symbol();
@@ -585,6 +572,10 @@
         if (menu.get()) return;
         const active = document.activeElement;
         editor = active instanceof HTMLElement && (active.matches("input, textarea") || active.isContentEditable) ? active : null;
+        // Read native history before the menu takes focus; ProseMirror owns its own history.
+        const editable = editor && (!(editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) || !editor.readOnly && !editor.disabled);
+        canUndo = !!editable && (transcriptHistoryAvailable(editor, "undo") ?? document.queryCommandEnabled("undo"));
+        canRedo = !!editable && (transcriptHistoryAvailable(editor, "redo") ?? document.queryCommandEnabled("redo"));
         editorSelection = (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) && editor.selectionStart !== null && editor.selectionEnd !== null
             ? { start: editor.selectionStart, end: editor.selectionEnd, direction: editor.selectionDirection ?? "none" } : null;
         const selection = document.getSelection();
@@ -604,11 +595,13 @@
     }
 
     function runEdit(action: EditAction): void {
-        if (menuBlocked()) return;
+        if (menuBlocked() || action === "undo" && !canUndo || action === "redo" && !canRedo) return;
         restoringEditor = true;
         menu.set("");
-        restoreEditor();
-        if (!handleTranscriptEdit(editor, action)) window.api.edit(action);
+        void tick().then(() => {
+            restoreEditor();
+            if (!handleTranscriptEdit(editor, action)) window.api.edit(action);
+        });
     }
 
     function menuBlocked(): boolean {
@@ -641,7 +634,7 @@
     }
 
     function preventSpaceActivation(event: KeyboardEvent): void {
-        if (event.key !== " " || event.isComposing || isEditingTarget(event.target)) return;
+        if (menuBlocked() || event.key !== " " || event.isComposing || isEditingTarget(event.target)) return;
         event.preventDefault();
         event.stopPropagation();
     }
@@ -670,13 +663,23 @@
     }
 
     function handleFileShortcut(event: KeyboardEvent): void {
-        if (event.defaultPrevented || event.isComposing || event.altKey || event.getModifierState("AltGraph")) {
+        if (menuBlocked() || event.defaultPrevented || event.isComposing || event.altKey || event.getModifierState("AltGraph")) {
             wordNavigation = null;
             return;
         }
         const command = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
         const key = event.key.toLowerCase();
         const editing = isEditingTarget(event.target);
+        if (command && menu.get()) {
+            const editAction = event.shiftKey ? key === "z" ? "redo" : undefined : editShortcuts[key];
+            if (editAction) {
+                wordNavigation = null;
+                event.preventDefault();
+                event.stopPropagation();
+                runEdit(editAction);
+                return;
+            }
+        }
         let action: Command | undefined;
         if (command) {
             if (event.shiftKey) {
@@ -707,6 +710,15 @@
     function cancelShortcuts(): void {
         cancelAlt();
         wordNavigation = null;
+    }
+
+    function handlePointerdown(event: PointerEvent): void {
+        cancelShortcuts();
+        if (!menu.get() || !(event.target instanceof Element)
+            || event.target.closest("[data-menubar-trigger], [data-menubar-content], [data-menubar-sub-content]")) return;
+        pointerDismissed = true;
+        // Release the focus trap before the pressed control handles the same event.
+        flushSync(() => menu.set(""));
     }
 
     function handleKeydown(event: KeyboardEvent): void {
@@ -756,7 +768,7 @@
 
     function handleCloseAutoFocus(event: Event): void {
         // Switching menus or opening a dialog must keep focus in the new content.
-        if (menu.get() || menuBlocked() || restoringEditor || focusingControl) {
+        if (menu.get() || menuBlocked() || restoringEditor || focusingControl || pointerDismissed) {
             event.preventDefault();
         }
         else if (editor?.isConnected) {
@@ -765,5 +777,6 @@
         }
         restoringEditor = false;
         focusingControl = false;
+        pointerDismissed = false;
     }
 </script>

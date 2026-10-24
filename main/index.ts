@@ -24,6 +24,7 @@ import { registerDocumentationIPCs } from "./documentation/ipc";
 import { registerDownloadIPCs } from "./downloads/ipc";
 import { initializeDocumentation } from "./documentation/file";
 import { captureConsole, LogDirectory } from "./logging";
+import { VestigeErrors } from "../shared/failure";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -114,8 +115,12 @@ function createWindow(): void {
     registerFileIPCs(mainWindow, runtimeDirectory, modelDirectory, backendDirectory);
     mainWindow.webContents.ipc.on(appChannels.edit, (event, action: unknown) => {
         if (event.senderFrame !== mainWindow.webContents.mainFrame || typeof action !== "string"
-            || !["undo", "redo", "cut", "copy", "paste"].includes(action)) return;
+            || !["selectAll", "undo", "redo", "cut", "copy", "paste"].includes(action)) return;
         mainWindow.webContents[action as EditAction]();
+    });
+    mainWindow.webContents.ipc.handle(appChannels.clearLogs, event => {
+        if (event.senderFrame !== mainWindow.webContents.mainFrame) throw new VestigeErrors({ kind: "ipc-not-main-frame" });
+        logs.clear();
     });
     registerProjectIPCs(mainWindow);
     const rememberWindow = registerSettingsIPCs(mainWindow);

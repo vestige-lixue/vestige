@@ -1,11 +1,10 @@
 import { chmod, copyFile, lstat, mkdir, readdir, realpath } from "node:fs/promises";
-import { createReadStream } from "node:fs";
-import { createHash } from "node:crypto";
 import { basename, dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, filePath } from "../util/file";
 import { findExecutable, runProcess } from "../util/process";
 import { type DownloadReporter } from "./types";
+import { fileHash, linkOrCopy } from "./files";
 
 export function validateArchiveEntries(output: string): void {
     for (const entry of output.split(/\r?\n/).filter(Boolean)) {
@@ -16,7 +15,7 @@ export function validateArchiveEntries(output: string): void {
     }
 }
 
-async function filesIn(directory: AbsolutePath, boundary = directory): Promise<AbsolutePath[]> {
+export async function filesIn(directory: AbsolutePath, boundary = directory): Promise<AbsolutePath[]> {
     const files: AbsolutePath[] = [];
     for (const entry of await readdir(directory, { withFileTypes: true })) {
         const path = filePath(join(directory, entry.name));
@@ -31,15 +30,12 @@ async function filesIn(directory: AbsolutePath, boundary = directory): Promise<A
     return files;
 }
 
-async function fileHash(file: AbsolutePath, signal: AbortSignal): Promise<string> {
-    const hash = createHash("sha256");
-    for await (const chunk of createReadStream(file, { signal })) hash.update(chunk);
-    return hash.digest("hex");
-}
-
-export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePath, program: string, runtimeDirectory: AbsolutePath, reporter: DownloadReporter, signal: AbortSignal): Promise<AbsolutePath> {
-    if (!program || basename(program) !== program || /[\\/:]/.test(program)) throw new Error("Invalid backend program name.");
-    const zip = archive.endsWith(".zip") && process.platform !== "win32";
+export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePath, programs: string[], runtimeDirectory: AbsolutePath, reporter: DownloadReporter, signal: AbortSignal, selection: { libraries?: boolean; exclude?: string[] } = {}): Promise<AbsolutePath> {
+    if (!programs.length || [...programs, ...selection.exclude ?? []].some(program => !program || basename(program) !== program || /[\\/:]/.test(program))) throw new Error("Invalid required archive filenames.");
+    const required = new Set(programs.map(program => process.platform === "win32" ? program.toLowerCase() : program));
+    const excluded = new Set((selection.exclude ?? []).map(name => process.platform === "win32" ? name.toLowerCase() : name));
+    if ([...required].some(name => excluded.has(name))) throw new Error("Required archive file is excluded.");
+    const zip = /\.(?:zip|whl)$/i.test(archive) && process.platform !== "win32";
     const tool = await findExecutable(runtimeDirectory, "archive", zip ? "unzip" : "tar");
     const listing = await runProcess(tool, zip ? ["-Z1", archive] : ["-tf", archive], staging, signal);
     validateArchiveEntries(listing.stdout);
@@ -52,6 +48,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
     await runProcess(tool, zip ? ["-q", archive, "-d", unpacked] : ["-xf", archive, "-C", unpacked], staging, signal,
         (_stream, text) => reporter.append(text));
     const copied = new Map<string, AbsolutePath>();
+    const targets = new Map<string, AbsolutePath>();
     for (const file of await filesIn(unpacked)) {
         signal.throwIfAborted();
         const name = basename(file);
@@ -61,8 +58,8 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
             await mkdir(dirname(destination), { recursive: true });
             await copyFile(file, destination);
         }
-        if (name !== program && !/\.(?:dll|dylib|so(?:\.[\d.]+)?|metallib)$/i.test(name)) continue;
         const key = process.platform === "win32" ? name.toLowerCase() : name;
+        if (excluded.has(key) || !required.has(key) && (selection.libraries === false || !/\.(?:dll|dylib|so(?:\.[\d.]+)?|metallib)$/i.test(name))) continue;
         const previous = copied.get(key);
         if (previous) {
             const [previousHash, currentHash] = await Promise.all([fileHash(previous, signal), fileHash(file, signal)]);
@@ -70,9 +67,18 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
             continue;
         }
         copied.set(key, file);
-        await copyFile(file, join(ready, name));
+        const target = await realpath(file);
+        const destination = filePath(join(ready, name));
+        const existing = targets.get(target);
+        if (existing) await linkOrCopy(existing, destination);
+        else {
+            await copyFile(file, destination);
+            targets.set(target, destination);
+        }
         if (process.platform !== "win32") await chmod(join(ready, name), 0o755);
     }
-    if (!copied.has(process.platform === "win32" ? program.toLowerCase() : program)) throw new Error(`Archive does not contain ${program}.`);
+    for (const program of programs) {
+        if (!copied.has(process.platform === "win32" ? program.toLowerCase() : program)) throw new Error(`Archive does not contain ${program}.`);
+    }
     return ready;
 }

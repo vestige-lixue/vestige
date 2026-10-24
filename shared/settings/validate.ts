@@ -18,6 +18,7 @@ export function validPresetNames(presets: Presets): boolean {
 }
 
 const isEditorFontSize = typia.createIs<Settings["editing"]["fontSize"]>();
+export const validInformationDisplay = typia.createIs<Settings["editing"]["informationDisplay"]>();
 
 export function validEditorFontSize(value: unknown): value is Settings["editing"]["fontSize"] {
     return isEditorFontSize(value) && Number.isFinite(value);
@@ -32,6 +33,7 @@ export function validVolumeSliderMinDb(value: unknown): value is Settings["playb
 
 export const validMediaSwitchPlayback = typia.createIs<Settings["playback"]["mediaSwitchPlayback"]>();
 export const validWordSwitchPlayback = typia.createIs<Settings["playback"]["wordSwitchPlayback"]>();
+export const validAudioOffsetMs = typia.createIs<Settings["playback"]["audioOffsetMs"]>();
 export const validLevelMeterReadout = typia.createIs<Settings["playback"]["levelMeterReadout"]>();
 
 const volumeStabilizationValidators = {

@@ -14,6 +14,7 @@ const api: AppAPI = {
     supportsMica: () => ipcRenderer.invoke(appChannels.supportsMica),
     quit: () => ipcRenderer.send(appChannels.quit),
     edit: action => ipcRenderer.send(appChannels.edit, action),
+    clearLogs: () => ipcRenderer.invoke(appChannels.clearLogs),
     beforeQuit(check) {
         const listener = (_event: IpcRendererEvent, id: string): void => {
             Promise.resolve().then(check).then(block => {

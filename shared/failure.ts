@@ -14,9 +14,14 @@ export type FailureInfo = ({
         | "transcription-media-unavailable" | "transcription-cancelled" | "transcription-invalid-request"
         | "transcription-invalid-id" | "transcription-params-text" | "transcription-params-object"
         | "transcription-param-value" | "transcription-param-null"
+        | "transcription-empty-result" | "transcription-truncated-output"
         | "audio-invalid-wave" | "audio-truncated-wave" | "audio-empty-wave"
         | "settings-invalid-update"
         | "path-not-absolute" | "path-drive-relative" | "project-path-not-file" | "ipc-not-main-frame";
+} | {
+    kind: "transcription-unstable-output";
+    start: string;
+    end: string;
 } | {
     kind: "native-not-found";
     executable: string;

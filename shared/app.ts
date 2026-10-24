@@ -9,7 +9,7 @@ import { type TaskSnapshot } from "./task";
 import { type Documentation, type DocumentationKind } from "./documentation";
 import { type Download, type DownloadKind } from "./downloads";
 
-export type EditAction = "undo" | "redo" | "cut" | "copy" | "paste";
+export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
 
 export type AppAPI = {
     platform: NodeJS.Platform;
@@ -18,6 +18,7 @@ export type AppAPI = {
     supportsMica(): Promise<boolean>;
     quit(): void;
     edit(action: EditAction): void;
+    clearLogs(): Promise<void>;
     // The renderer prompts/saves and returns true to block, false to allow quitting.
     beforeQuit(check: () => boolean | Promise<boolean>): () => void;
     settings: {

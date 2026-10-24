@@ -8,6 +8,8 @@ export const maxEditorFontSize = 48;
 export const minPlaybackSpeed = 0.2;
 export const maxPlaybackSpeed = 3;
 export const maxVolumeSliderMinDb = -10;
+export const minAudioOffsetMs = -3000;
+export const maxAudioOffsetMs = 3000;
 
 export const volumeStabilizationLimits = {
     maxGainDb: { min: 0, max: 36 },

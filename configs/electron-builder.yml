@@ -21,6 +21,12 @@ extraResources:
     filter:
       - 'README.*.md'
       - 'params.*.md'
+  - from: resources/vad
+    to: vad
+    filter:
+      - 'silero_vad.onnx'
+      - 'LICENSE'
+      - 'README.md'
 win:
   executableName: vestige
   icon: resources/logos/logo-square-black.ico

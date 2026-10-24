@@ -86,6 +86,11 @@ type SeekSelectedMediaCommand = {
     mode?: player.SeekMode;
 };
 
+type SeekWordCommand = {
+    kind: "seekWord";
+    time: number;
+};
+
 type SetPlaybackSpeedCommand = {
     kind: "setPlaybackSpeed";
     speed: number;
@@ -110,6 +115,7 @@ export type Command = (
     MoveMediaCommand |
     AdjacentCommand |
     SeekSelectedMediaCommand |
+    SeekWordCommand |
     SetPlaybackSpeedCommand |
     SetPlaybackVolumeCommand
 );
@@ -173,6 +179,7 @@ export function commandDisabled(command: Command): boolean {
         case "openTranscriptionTask": return !command.mediaId || !transcription.getTask(command.mediaId);
         case "selectMedia": return !mediaImport.isReady(command.mediaId);
         case "playSelectedMedia": case "seekSelectedMedia": return !player.getURL();
+        case "seekWord": return !player.getURL() || !Number.isFinite(command.time);
         case "selectAdjacentMedia": return mediaSelection.adjacent(command.direction, true) === null;
         case "moveSelectedMedia": return adjacentMediaMove(command.direction) === null;
         case "seekAdjacentWord": return !player.getURL() || wordPosition(command.direction, command.fromWordIndex) === null;
@@ -223,12 +230,13 @@ export function runCommand(command: Command): void {
             if (move) projectAPI.moveMedia(move.mediaId, move.beforeId);
             break;
         }
-        case "seekAdjacentWord": {
-            const time = wordPosition(command.direction, command.fromWordIndex);
+        case "seekWord": case "seekAdjacentWord": {
+            const time = command.kind === "seekWord" ? command.time : wordPosition(command.direction, command.fromWordIndex);
             if (time !== null) {
                 const playing = player.isPlaying();
-                projectAPI.seekPlayback(time);
+                // Pausing captures the current transport position before the new seek is requested.
                 playerAPI.setPlaying({ pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback]);
+                projectAPI.seekPlayback(time);
             }
             break;
         }

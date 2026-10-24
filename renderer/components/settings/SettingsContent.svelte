@@ -3,7 +3,11 @@
 <h2 class="section-title">{i18n.t("settings.general.title")}</h2>
 <div class="item selectItem">
     <label for="interface-language" class="text">
-        <div class="label">{i18n.t("settings.general.language.label")}</div>
+        <div class="label languageLabel">
+            <span>{i18n.t("settings.general.language.label")}</span>
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html languageIcon}
+        </div>
     </label>
     <DropdownSelector id="interface-language" class="settingsSelect" items={languages} disabled={pending} align="end" bind:value={() => language, value => {
         if (validLanguage(value) && value !== language) {
@@ -40,6 +44,16 @@
     }} />
 </div>
 
+<div class="item">
+    <label for="clear-logs" class="text">
+        <div class="label">{i18n.t("settings.general.clearLogs.label")}</div>
+    </label>
+    <TextButton id="clear-logs" disabled={pending || clearingLogs} onclick={() => void clearLogs()}>
+        {i18n.t("settings.general.clearLogs.label")}
+    </TextButton>
+</div>
+{#if logsFailure}<div class="error-message">{i18n.t("settings.general.clearLogs.error", { error: logsFailure })}</div>{/if}
+
 <h2 class="section-title">{i18n.t("settings.transcription.title")}</h2>
 <div class="transcriptionActions">
     <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-backends", parentId: dialogId, onClosed: () => {} })}>
@@ -73,7 +87,7 @@
             <div class:inactive={validConcurrency(concurrency)}>{i18n.t("settings.transcription.concurrency.invalid")}</div>
         </div>
     </label>
-    <input class="input-control focusable" id="transcription-concurrency" type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1" bind:this={concurrencyInput} bind:value={concurrency} disabled={pending} onblur={() => {
+    <NumberInput class="settingsNumber" id="transcription-concurrency" min="1" max={Number.MAX_SAFE_INTEGER} step="1" bind:ref={concurrencyInput} bind:value={concurrency} disabled={pending} onblur={() => {
         if (!pending && validConcurrency(concurrency)) void apply({ transcription: { concurrency } });
     }} />
 </div>
@@ -100,10 +114,23 @@
             <div class:inactive={validEditorFontSize(editorFontSize)}>{i18n.t("settings.validation.number", { min: minEditorFontSize, max: maxEditorFontSize })}</div>
         </div>
     </label>
-    <input class="input-control focusable" id="editor-font-size" type="number" min={minEditorFontSize} max={maxEditorFontSize} step="any"
-        bind:this={editorFontSizeInput} bind:value={editorFontSize} disabled={pending} onblur={() => {
+    <NumberInput class="settingsNumber" id="editor-font-size" unit="px" min={minEditorFontSize} max={maxEditorFontSize} step="any"
+        bind:ref={editorFontSizeInput} bind:value={editorFontSize} disabled={pending} onblur={() => {
             if (!pending && validEditorFontSize(editorFontSize)) void apply({ editing: { fontSize: editorFontSize } });
         }} />
+</div>
+
+<div class="item selectItem">
+    <label for="editor-information-display" class="text">
+        <div class="label">{i18n.t("settings.editing.informationDisplay.label")}</div>
+        <div class="description">{i18n.t("settings.editing.informationDisplay.description")}</div>
+    </label>
+    <DropdownSelector id="editor-information-display" class="settingsSelect" items={informationDisplays} disabled={pending} align="end" bind:value={() => informationDisplay, value => {
+        if (validInformationDisplay(value) && value !== informationDisplay) {
+            informationDisplay = value;
+            void apply({ editing: { informationDisplay: value } });
+        }
+    }} />
 </div>
 
 <h2 class="section-title">{i18n.t("settings.playback.title")}</h2>
@@ -128,8 +155,8 @@
                 <div class:inactive={validVolumeSliderMinDb(volumeSliderMinDb)}>{i18n.t("settings.playback.volumeSliderMinDb.invalid", { max: maxVolumeSliderMinDb })}</div>
             </div>
         </label>
-        <input class="input-control focusable" id="volume-slider-min-db" type="number" max={maxVolumeSliderMinDb} step="any"
-            bind:this={volumeSliderMinInput} bind:value={volumeSliderMinDb} disabled={pending} onblur={() => {
+        <NumberInput class="settingsNumber" id="volume-slider-min-db" unit="dB" max={maxVolumeSliderMinDb} step="any"
+            bind:ref={volumeSliderMinInput} bind:value={volumeSliderMinDb} disabled={pending} onblur={() => {
                 if (!pending && validVolumeSliderMinDb(volumeSliderMinDb)) void apply({ playback: { volumeSliderMinDb } });
             }} />
     </div>
@@ -180,6 +207,11 @@
         }
     }} />
 </div>
+<AudioSync bind:value={audioOffsetMs} bind:input={audioOffsetInput} bind:stopTest={stopCalibration} disabled={pending}
+    onchange={value => {
+        audioOffsetMs = value;
+        void apply({ playback: { audioOffsetMs: value } });
+    }} />
 <div class="item">
     <label for="show-level-meter" class="text">
         <div class="label">{i18n.t("settings.playback.showLevelMeter.label")}</div>
@@ -253,8 +285,8 @@
                     <div class:inactive={validSidebarTransparency(sidebarTransparency)}>{i18n.t("settings.validation.number", { min: 0, max: 100 })}</div>
                 </div>
             </label>
-            <input class="input-control focusable" id="sidebar-transparency" type="number" min="0" max="100" step="any"
-                bind:this={sidebarTransparencyInput} bind:value={sidebarTransparency} disabled={pending} onblur={() => {
+            <NumberInput class="settingsNumber" id="sidebar-transparency" unit="%" min="0" max="100" step="any"
+                bind:ref={sidebarTransparencyInput} bind:value={sidebarTransparency} disabled={pending} onblur={() => {
                     if (!pending && validSidebarTransparency(sidebarTransparency)) void apply({ theme: { sidebarTransparency } });
                 }} />
         </div>
@@ -326,8 +358,8 @@
                 <div class:inactive={valid}>{i18n.t("settings.validation.number", limits)}</div>
             </div>
         </label>
-        <input class="input-control focusable" id={`volume-stabilization-${key}`} type="number" min={limits.min} max={limits.max} step="any"
-            bind:this={stabilizationInputs[key]} bind:value={stabilization[key]} disabled={pending} onblur={() => {
+        <NumberInput class="settingsNumber" id={`volume-stabilization-${key}`} unit={stabilizationUnits[key]} min={limits.min} max={limits.max} step="any"
+            bind:ref={stabilizationInputs[key]} bind:value={stabilization[key]} disabled={pending} onblur={() => {
                 const value = stabilization[key];
                 if (!pending && validVolumeStabilizationValue(key, value)) void apply({ volumeStabilization: { [key]: value } });
             }} />
@@ -380,10 +412,19 @@
         line-height: 1.6;
         overflow-wrap: anywhere;
     }
-    .item input {
+    .languageLabel {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .languageLabel :global(svg) {
+        flex: none;
+        width: 20px;
+        height: 20px;
+    }
+    .item :global(.settingsNumber) {
         flex: 0 0 160px;
         width: 160px;
-        padding: 6px 8px;
     }
     .description, .saveError {
         line-height: 1.6;
@@ -507,12 +548,14 @@
 
 <script lang="ts">
     import TextButton from "../util/TextButton.svelte";
+    import NumberInput from "../util/NumberInput.svelte";
     import * as i18n from "../../i18n.svelte";
     import * as settings from "../../states/settings.svelte";
     import * as modal from "../../states/modal.svelte";
     import { flushSync, onMount } from "svelte";
     import { Popover, RadioGroup } from "bits-ui";
     import DropdownSelector from "../util/DropdownSelector.svelte";
+    import AudioSync from "./AudioSync.svelte";
     import Switch from "../util/Switch.svelte";
     import Tooltip from "../util/Tooltip.svelte";
     import PopoverContent from "../util/PopoverContent.svelte";
@@ -521,12 +564,13 @@
     import { type Locale } from "../../../shared/locale";
     import { type DownloadKind } from "../../../shared/downloads";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout } from "../../../shared/settings/validate";
+    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { levelStages } from "../../audio/levels";
     import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits } from "../../../shared/constants";
     import { VestigeErrors, toFailureInfo } from "../../../shared/failure";
     import { describeFailure } from "../../failures";
+    import languageIcon from "../../../resources/icons/carbon--language.svg?raw";
     import externalLinkIcon from "../../../resources/icons/cil--external-link.svg?raw";
     import lightIcon from "../../../resources/icons/carbon--light.svg?raw";
     import contrastIcon from "../../../resources/icons/carbon--contrast.svg?raw";
@@ -545,6 +589,7 @@
     let mediaPathMode = $state(current.mediaPathMode);
     let spellcheck = $state(current.editing.spellcheck);
     let editorFontSize = $state<number | undefined>(current.editing.fontSize);
+    let informationDisplay = $state(current.editing.informationDisplay);
     let editorFontSizeInput = $state<HTMLInputElement>();
     let volumeSliderMapping = $state(current.playback.volumeSliderMapping);
     let volumeSliderMinDb = $state<number | undefined>(current.playback.volumeSliderMinDb);
@@ -552,6 +597,9 @@
     let wordSwitchPlayback = $state(current.playback.wordSwitchPlayback);
     let rememberPlaybackPosition = $state(current.playback.rememberPlaybackPosition);
     let pauseOnOutputDeviceChange = $state(current.playback.pauseOnOutputDeviceChange);
+    let audioOffsetMs = $state<number | undefined>(current.playback.audioOffsetMs);
+    let audioOffsetInput = $state<HTMLInputElement>();
+    let stopCalibration = $state<() => void>();
     let showLevelMeter = $state(current.playback.showLevelMeter);
     let levelMeterReadout = $state(current.playback.levelMeterReadout);
     let themeSettings = $state<ThemeSettings>(current.theme);
@@ -576,11 +624,16 @@
     let concurrency = $state<number | undefined>(current.transcription.concurrency);
     let stabilization = $state<Record<keyof VolumeStabilizationSettings, number | undefined>>({ ...current.volumeStabilization });
     let pending = $state(false);
+    let clearingLogs = $state(false);
+    let logsFailure = $state("");
     let openingDirectory = $state(false);
     let directoryFailure = $state("");
-    let concurrencyInput: HTMLInputElement;
+    let concurrencyInput = $state<HTMLInputElement>();
     let volumeSliderMinInput = $state<HTMLInputElement>();
     const stabilizationFields = ["maxGainDb", "gainAttackMs", "gainReleaseMs", "gateThresholdDb", "targetLevelDb"] as const;
+    const stabilizationUnits = {
+        maxGainDb: "dB", gainAttackMs: "ms", gainReleaseMs: "ms", gateThresholdDb: "dBFS", targetLevelDb: "dBFS RMS"
+    } satisfies Record<keyof VolumeStabilizationSettings, string>;
     const stabilizationInputs = $state<Partial<Record<keyof VolumeStabilizationSettings, HTMLInputElement>>>({});
     let updates = Promise.resolve(true);
     const failure = $derived(settings.getError());
@@ -589,6 +642,7 @@
         { value: "en", label: i18n.t("settings.general.language.options.en") }
     ]);
     const mediaPathModes = $derived((["absolute", "project", "relative"] as const).map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
+    const informationDisplays = $derived((["tooltip", "bar"] as const).map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
     const volumeSliderMappings = $derived((["amplitude", "decibel"] as const).map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));
     const switchPlaybackOptions = $derived((["pause", "play", "keep", "invert"] as const).map(value => ({ value, label: i18n.t(`settings.playback.switchPlayback.options.${value}`) })));
     const levelReadouts = $derived(levelStages.map(value => ({ value, label: i18n.t(`settings.playback.levelMeterReadout.options.${value}`) })));
@@ -601,6 +655,21 @@
             unsubscribe();
         };
     });
+
+    async function clearLogs(): Promise<void> {
+        if (clearingLogs) return;
+        clearingLogs = true;
+        logsFailure = "";
+        try {
+            await window.api.clearLogs();
+        }
+        catch (error) {
+            logsFailure = describeFailure(toFailureInfo(error));
+        }
+        finally {
+            clearingLogs = false;
+        }
+    }
 
     async function openDirectory(kind: DownloadKind): Promise<void> {
         if (openingDirectory) return;
@@ -655,6 +724,7 @@
     }
 
     async function commit(): Promise<boolean> {
+        stopCalibration?.();
         await updates;
         if (!validConcurrency(concurrency)) {
             focusInvalidInput(concurrencyInput);
@@ -662,6 +732,10 @@
         }
         if (!validEditorFontSize(editorFontSize)) {
             focusInvalidInput(editorFontSizeInput);
+            return false;
+        }
+        if (!validAudioOffsetMs(audioOffsetMs)) {
+            focusInvalidInput(audioOffsetInput);
             return false;
         }
         if (volumeSliderMapping === "decibel" && !validVolumeSliderMinDb(volumeSliderMinDb)) {
@@ -693,7 +767,8 @@
         const current = settings.get();
         const editing: Partial<Settings["editing"]> = {
             ...(spellcheck !== current?.editing.spellcheck ? { spellcheck } : {}),
-            ...(editorFontSize !== current?.editing.fontSize ? { fontSize: editorFontSize } : {})
+            ...(editorFontSize !== current?.editing.fontSize ? { fontSize: editorFontSize } : {}),
+            ...(informationDisplay !== current?.editing.informationDisplay ? { informationDisplay } : {})
         };
         const playback: Partial<Settings["playback"]> = {
             ...(volumeSliderMapping !== current?.playback.volumeSliderMapping ? { volumeSliderMapping } : {}),
@@ -702,6 +777,7 @@
             ...(wordSwitchPlayback !== current?.playback.wordSwitchPlayback ? { wordSwitchPlayback } : {}),
             ...(rememberPlaybackPosition !== current?.playback.rememberPlaybackPosition ? { rememberPlaybackPosition } : {}),
             ...(pauseOnOutputDeviceChange !== current?.playback.pauseOnOutputDeviceChange ? { pauseOnOutputDeviceChange } : {}),
+            ...(audioOffsetMs !== current?.playback.audioOffsetMs ? { audioOffsetMs } : {}),
             ...(showLevelMeter !== current?.playback.showLevelMeter ? { showLevelMeter } : {}),
             ...(levelMeterReadout !== current?.playback.levelMeterReadout ? { levelMeterReadout } : {})
         };
