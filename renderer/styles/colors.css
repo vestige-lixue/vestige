@@ -7,8 +7,8 @@
 :root {
     --interaction-rgb: 0 0 0;
     --c-link: #2170bf;
-    --c-selection: #cfe5fc;
-    --c-selection-bg: #c8e1fb;
+    --c-selection: color-mix(in srgb, var(--c-accent) 22%, var(--c-background));
+    --c-selection-bg: color-mix(in srgb, var(--c-accent) 25%, var(--c-background));
     --c-scrollbar: #808080;
     --c-border: #e1e4e8;
     --c-border-110p: #d1d6dd;
@@ -24,8 +24,8 @@
 :root[data-theme="dark"] {
     --interaction-rgb: 255 255 255;
     --c-link: #79b8ff;
-    --c-selection: #264a70;
-    --c-selection-bg: #223c58;
+    --c-selection: color-mix(in srgb, var(--c-accent) 30%, var(--c-background));
+    --c-selection-bg: color-mix(in srgb, var(--c-accent) 22%, var(--c-background));
     --c-scrollbar: #7b8592;
     --c-border: #303944;
     --c-border-110p: #303741;
