@@ -47,6 +47,8 @@ const api: AppAPI = {
         },
         readMedia: (id, path, reference) => ipcRenderer.invoke(fileChannels.readMedia, id, path, reference),
         cancelMediaRead: id => ipcRenderer.send(fileChannels.cancelMediaRead, id),
+        validationLoad: () => ipcRenderer.invoke(fileChannels.validationLoad),
+        validationPlayback: playing => ipcRenderer.send(fileChannels.validationPlayback, playing),
         getMediaURL: path => ipcRenderer.invoke(fileChannels.getMediaURL, path),
         releaseMediaURL: id => ipcRenderer.invoke(fileChannels.releaseMediaURL, id),
         selectMediaPath: path => ipcRenderer.invoke(fileChannels.selectMediaPath, path),

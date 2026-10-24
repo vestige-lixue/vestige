@@ -11,6 +11,7 @@ import { parseAbsolutePath, isSystemError } from "../util/file";
 import { fileOperationFailure } from "../util/fs";
 import { handle, listen } from "../util/ipc";
 import { findExecutable } from "../util/process";
+import { validationLoad, validationPlayback } from "./validation";
 import { readMedia } from "./media";
 import { getMediaURL, releaseMediaURL, releaseMediaURLs } from "./source";
 import { listDirectories } from "./directories";
@@ -23,6 +24,7 @@ export function registerFileIPCs(window: BrowserWindow, paths: Pick<AppPaths, "r
     let generation = 0;
     const cancelAll = (): void => {
         generation++;
+        validationPlayback(false);
         for (const controller of checks.values()) controller.abort();
         void releaseMediaURLs();
     };
@@ -54,6 +56,11 @@ export function registerFileIPCs(window: BrowserWindow, paths: Pick<AppPaths, "r
     listen(contents, fileChannels.cancelMediaRead, (id: unknown) => {
         if (typeof id !== "string") return;
         checks.get(id)?.abort();
+    });
+    handle(contents, fileChannels.validationLoad, validationLoad);
+    listen(contents, fileChannels.validationPlayback, (playing: unknown) => {
+        if (typeof playing === "boolean") validationPlayback(playing);
+        else console.warn("Invalid media validation playback flag.");
     });
     handle(contents, fileChannels.getMediaURL, async (path: unknown): Promise<MediaURLResult> => {
         const current = generation;

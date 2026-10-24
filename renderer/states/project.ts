@@ -356,7 +356,7 @@ export function updateMediaPath(id: string, path: AbsolutePath): void {
         media.path = path;
         projectRevision++;
     }
-    if (mediaSelection.get() === id) void playerAPI.synchronize().catch(reportUnexpected);
+    if (mediaSelection.get() === id && mediaImport.isReady(id)) void playerAPI.synchronize().catch(reportUnexpected);
 }
 
 export function appendRun(id: string, run: Run): void {
@@ -429,10 +429,11 @@ export async function selectMediaForImport(): Promise<void> {
 
 export function selectMedia(id: string | null, playFromStart = false): void {
     const previous = mediaSelection.get();
-    if (previous === id || (id !== null && !mediaImport.isReady(id))) return;
+    if (previous === id || (id !== null && !mediaImport.isSelectable(id))) return;
     playerAPI.commitSeekPreview();
     playerAPI.captureProgress();
     if (!mediaSelection.select(id)) return;
+    mediaImportAPI.prioritize(id);
     if (playFromStart) {
         const vestige = project.getVestige(id);
         if (vestige && vestige.playbackPosition !== 0) {

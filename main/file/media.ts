@@ -28,7 +28,9 @@ export async function readMedia(
             signal.throwIfAborted();
             const probe = await probeMedia(path, runtimeDirectory, signal);
             if (probe.status !== "ready") return probe;
+            // Recheck the original handle to detect files still being written during import.
             const after = await file.stat();
+            // Reopen the path to detect a complete replacement while the first handle stayed valid.
             const currentFile = await open(path, "r");
             try {
                 // Compare handle stats consistently: path stat can report a different device ID on Windows.

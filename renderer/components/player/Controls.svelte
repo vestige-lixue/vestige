@@ -448,7 +448,8 @@
     // Keep the slider's step rounding from writing back to the precise playback time.
     const progressSteps = 1000;
     const volumePosition = $derived(volumeToSlider(player.getVolume(), settings.getPlayback()));
-    const media = $derived(project.getMedia(mediaSelection.get()));
+    const selectedMedia = $derived(project.getMedia(mediaSelection.get()));
+    const media = $derived(selectedMedia && mediaImport.isReady(selectedMedia.id) ? selectedMedia : null);
     const duration = $derived(media?.duration ?? 0);
     const inspectedRange = $derived(transcript.getInspectionRange());
     const unavailable = $derived(!media || !mediaImport.isReady(media.id) || !Number.isFinite(duration) || duration <= 0);

@@ -41,6 +41,10 @@ export class TaskQueue<Value> {
         return task;
     }
 
+    hasPending(): boolean {
+        return this.active > 0 || this.entries.size > 0;
+    }
+
     get(id: string): ScheduledTask<Value> | undefined {
         return this.entries.get(id)?.task;
     }

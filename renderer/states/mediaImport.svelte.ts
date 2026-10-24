@@ -46,6 +46,15 @@ export function isReady(id: string): boolean {
     return get(id)?.stage === "ready";
 }
 
+export function isSelectable(id: string): boolean {
+    const item = get(id);
+    return item !== null && (item.stage === "ready" || project.getMedia(id) !== null);
+}
+
+export function getSelectableIds(): string[] {
+    return state.items.filter(item => isSelectable(item.id)).map(item => item.id);
+}
+
 export function getReadyIds(): string[] {
     return state.items.filter(item => item.stage === "ready").map(item => item.id);
 }

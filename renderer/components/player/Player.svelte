@@ -102,10 +102,11 @@
     import * as settingsAPI from "../../states/settings";
     import * as projectAPI from "../../states/project";
     import * as mediaImportAPI from "../../states/mediaImport";
+    import * as mediaImport from "../../states/mediaImport.svelte";
 
     const { availableHeight }: { availableHeight: number } = $props();
     const mediaId = $derived(mediaSelection.get());
-    const media = $derived(project.getMedia(mediaId));
+    const media = $derived(mediaId !== null && mediaImport.isReady(mediaId) ? project.getMedia(mediaId) : null);
     const source = $derived(player.getURL());
     const isVideo = $derived(media?.kind === "video");
     const previewName = $derived(media?.name ?? i18n.t("player.noMedia"));

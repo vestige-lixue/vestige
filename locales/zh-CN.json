@@ -70,6 +70,7 @@
     },
     "media": {
         "reference": {
+            "checking": "正在校验",
             "actions": {
                 "ignore": "忽略",
                 "relocate": "重新定位"

@@ -1,3 +1,6 @@
+import { validationInitialConcurrency, validationSampleMs } from "../../shared/media/validation";
+import { MediaValidationConcurrency } from "./mediaValidation";
+import * as playerAPI from "./player";
 import { TaskQueue, type ScheduledTask } from "./taskQueue";
 import { type FailureInfo, VestigeErrors, toFailureInfo } from "../../shared/failure";
 import { type MediaIssueStatus } from "../../shared/media/check";
@@ -22,8 +25,16 @@ type TaskSource = ({
 
 type ImportTask = ScheduledTask<TaskSource>;
 
+let validation = new MediaValidationConcurrency(navigator.hardwareConcurrency || validationInitialConcurrency);
+let playing = false;
+let validationReady = false;
+let validationEpoch = 0;
+let samplingEpoch: number | null = null;
+let validationTimer: ReturnType<typeof setInterval> | null = null;
+let prioritized: string | null = null;
+
 const tasks = new TaskQueue<TaskSource>({
-    concurrency: 2,
+    concurrency: 0,
     run: task => run(task.id, task),
     settled: (task, current) => {
         if (current) mediaImport.names.delete(task.id);
@@ -32,6 +43,67 @@ const tasks = new TaskQueue<TaskSource>({
 const issueDialogs = new Map<string, string>();
 const failureDialogs = new Map<mediaImport.MediaImportFailure, string>();
 let collection: AbortController | null = null;
+
+function resetValidation(): void {
+    validationEpoch++;
+    if (validationTimer !== null) clearInterval(validationTimer);
+    validationTimer = null;
+    validation = new MediaValidationConcurrency(navigator.hardwareConcurrency || validationInitialConcurrency);
+    validation.setPlaying(playing);
+    validationReady = false;
+    tasks.setConcurrency(0);
+    prioritized = null;
+}
+
+function monitorValidation(): void {
+    if (validationTimer !== null) return;
+    const epoch = validationEpoch;
+    const sample = async (): Promise<void> => {
+        if (epoch !== validationEpoch || samplingEpoch === epoch) return;
+        if (!tasks.hasPending()) {
+            if (validationTimer !== null) clearInterval(validationTimer);
+            validationTimer = null;
+            return;
+        }
+        samplingEpoch = epoch;
+        const started = performance.now();
+        try {
+            const load = await window.api.file.validationLoad();
+            if (epoch !== validationEpoch) return;
+            const roundTripMs = performance.now() - started;
+            const previous = validation.getConcurrency();
+            validation.observe(load, roundTripMs);
+            validationReady = true;
+            tasks.setConcurrency(validation.getConcurrency());
+            if (previous !== validation.getConcurrency()) console.debug("Media validation concurrency", {
+                concurrency: validation.getConcurrency(), bytesPerSecond: validation.getBytesPerSecond(),
+                eventLoopDelayMs: load.eventLoopDelayMs, roundTripMs
+            });
+        }
+        catch (error) {
+            if (epoch === validationEpoch) console.error("Could not sample media validation load:", error);
+        }
+        finally {
+            if (samplingEpoch === epoch) samplingEpoch = null;
+        }
+    };
+    validationTimer = setInterval(() => void sample(), validationSampleMs);
+    void sample();
+}
+
+export function updateValidationPlayback(value: boolean): void {
+    if (playing === value) return;
+    playing = value;
+    validation.setPlaying(value);
+    tasks.setConcurrency(validationReady ? validation.getConcurrency() : 0);
+    window.api.file.validationPlayback(value);
+}
+
+export function prioritize(id: string | null): void {
+    if (prioritized !== null) tasks.setPriority(prioritized, 0);
+    prioritized = id;
+    if (id !== null) tasks.setPriority(id, 1);
+}
 
 export function rename(id: string, name: string): void {
     const task = tasks.get(id);
@@ -85,6 +157,7 @@ export function reset(ids: string[]): void {
     collection = null;
     mediaImport.state.collecting = false;
     tasks.clear();
+    resetValidation();
     mediaImport.names.clear();
     for (const dialog of [...issueDialogs.values(), ...failureDialogs.values()]) dialogsAPI.close(dialog);
     issueDialogs.clear();
@@ -167,7 +240,7 @@ function reportFailure(id: string, status: MediaIssueStatus, error: FailureInfo,
     const media = project.getMedia(id);
     if (media) {
         update({ id, stage: status, error, path: path ?? media.path, ignored: false });
-        if (mediaSelection.get() === id) projectAPI.selectMedia(null);
+        if (mediaSelection.get() === id) void playerAPI.synchronize().catch(console.error);
         showIssue(id);
     }
     else {
@@ -180,7 +253,9 @@ function enqueue(id: string, source: TaskSource, name: string): void {
     closeIssue(id);
     update({ id, stage: "queued" });
     tasks.enqueue(id, source);
+    if (prioritized === id) tasks.setPriority(id, 1);
     mediaImport.names.set(id, name);
+    monitorValidation();
 }
 
 async function run(id: string, task: ImportTask): Promise<void> {
@@ -216,9 +291,15 @@ async function run(id: string, task: ImportTask): Promise<void> {
         const cancel = (): void => window.api.file.cancelMediaRead(requestId);
         task.signal.addEventListener("abort", cancel, { once: true });
         const expected = project.getMedia(id);
+        const reference = expected ? { path: expected.path, size: expected.size, hash: expected.hash } : null;
         const result = await window.api.file.readMedia(requestId, path, expected ? { size: expected.size, hash: expected.hash } : null)
             .finally(() => task.signal.removeEventListener("abort", cancel));
         if (!tasks.isCurrent(task)) return;
+        if (expected && (project.getMedia(id) !== expected || expected.path !== reference!.path || expected.size !== reference!.size || expected.hash !== reference!.hash)) {
+            const current = project.getMedia(id);
+            if (current) enqueue(id, { kind: "check", path: current.path }, "");
+            return;
+        }
         if (result.status !== "ready") {
             if (result.status !== "cancelled") reportFailure(id, result.status, result.error, path);
             return;
@@ -230,7 +311,8 @@ async function run(id: string, task: ImportTask): Promise<void> {
             projectAPI.appendMedia({ ...result.media, id, name: mediaImport.getName(id) }, index);
         }
         update({ id, stage: "ready" });
-        if (mediaSelection.get() === null) projectAPI.selectMedia(id);
+        if (mediaSelection.get() === id) void playerAPI.synchronize(false).catch(console.error);
+        else if (mediaSelection.get() === null) projectAPI.selectMedia(id);
     }
     catch (error) {
         if (!tasks.isCurrent(task) || task.signal.aborted) return;

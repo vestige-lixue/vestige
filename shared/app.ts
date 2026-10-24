@@ -3,6 +3,7 @@ import { type TranscriptionRequest, type TranscriptionResult } from "./transcrip
 import { type GetProjectResult, type SaveProjectResult, type CheckProjectFileResult } from "./project/file";
 import { type Project } from "./project/Project";
 import { type AbsolutePath } from "./util/path";
+import { type MediaValidationLoad } from "./media/validation";
 import { type MediaCheckResult, type MediaReference, type MediaURLResult } from "./media/check";
 import { type SettingsPatch, type SettingsResult, type SettingsSnapshot } from "./settings/Settings";
 import { type TaskSnapshot } from "./task";
@@ -32,6 +33,8 @@ export type AppAPI = {
         getPathForFile(file: File): Promise<FilePathResult>;
         readMedia(id: string, path: AbsolutePath, reference: MediaReference | null): Promise<MediaCheckResult>;
         cancelMediaRead(id: string): void;
+        validationLoad(): Promise<MediaValidationLoad>;
+        validationPlayback(playing: boolean): void;
         getMediaURL(path: AbsolutePath): Promise<MediaURLResult>;
         releaseMediaURL(id: string): Promise<void>;
         selectMediaPath(path: AbsolutePath | null): Promise<AbsolutePath | null>;

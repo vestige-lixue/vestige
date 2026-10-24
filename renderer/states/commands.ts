@@ -237,7 +237,7 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         enabled: command => !!command.mediaId && !!transcription.getTask(command.mediaId), label: label("transcription.tasks.title")
     },
     selectMedia: {
-        run: command => projectAPI.selectMedia(command.mediaId), enabled: command => mediaImport.isReady(command.mediaId),
+        run: command => projectAPI.selectMedia(command.mediaId), enabled: command => mediaImport.isSelectable(command.mediaId),
         label: command => mediaImport.getName(command.mediaId)
     },
     renameMedia: { run: command => projectAPI.renameMedia(command.mediaId, command.name), enabled: always, label: label("media.renameHint") },

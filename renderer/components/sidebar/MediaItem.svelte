@@ -43,7 +43,7 @@
                 {:else if item.stage !== "ready"}
                     <span class="import-progress">
                         <Spinner size="12px" />
-                        {importStages[item.stage]}
+                        {vestige && item.stage !== "relocating" ? i18n.t("media.reference.checking") : importStages[item.stage]}
                     </span>
                 {/if}
                 {#if task?.status === "queued"}<span>{i18n.t("media.queuedTranscription")}</span>{/if}

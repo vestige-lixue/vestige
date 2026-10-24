@@ -53,6 +53,7 @@ export function setPlaying(playing: boolean): void {
     const media = project.getMedia(mediaSelection.get());
     if (playing && media && media.duration > 0 && player.state.currentTime >= media.duration) projectAPI.seekPlayback(0);
     player.state.playing = player.state.url !== null && playing;
+    mediaImportAPI.updateValidationPlayback(player.state.playing);
     if (!player.state.playing) captureProgress();
 }
 
@@ -69,7 +70,7 @@ export function finishPlayback(): void {
         return;
     }
     if (mode !== "repeat-one") {
-        const next = mediaSelection.adjacent(1, mode === "repeat-all");
+        const next = mediaSelection.adjacent(1, mode === "repeat-all", "ready");
         if (next !== null) {
             projectAPI.selectMedia(next, true);
             return;
@@ -147,6 +148,7 @@ export function synchronize(playing = false): Promise<void> {
     pendingPlaying = playing;
     player.state.url = null;
     player.state.playing = false;
+    mediaImportAPI.updateValidationPlayback(false);
     projectAPI.restorePlayback();
     queued = true;
     switching ??= drain().then(() => {
@@ -173,10 +175,12 @@ async function drain(): Promise<void> {
         }
         const current = generation;
         const id = mediaSelection.get();
-        const path = project.getMedia(id)?.path;
-        if (!id || !path) continue;
+        const media = project.getMedia(id);
+        if (!id || !media || !mediaImport.isReady(id)) continue;
+        const { path, size, hash } = media;
         const matches = (): boolean => current === generation && mediaSelection.get() === id
-            && mediaImport.isReady(id) && project.getMedia(id)?.path === path;
+            && mediaImport.isReady(id) && project.getMedia(id) === media
+            && media.path === path && media.size === size && media.hash === hash;
         let result;
         try {
             result = await window.api.file.getMediaURL(path);
