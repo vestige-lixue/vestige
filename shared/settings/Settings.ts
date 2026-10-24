@@ -1,16 +1,19 @@
 import { type tags } from "typia";
-import { type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits } from "../constants";
+import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits } from "../constants";
 import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
 import { type Config, type Presets } from "../transcription/Config";
 import { type MediaPathMode } from "../project/file";
 
+import { type taskCapacity } from "../task";
+import { type audioLevelStages, type playbackModes, type informationDisplays, type volumeSliderMappings, type switchPlaybackModes } from "./options";
+
 type StabilizationLimits = typeof volumeStabilizationLimits;
 type PlaybackSpeed = number & tags.Minimum<typeof minPlaybackSpeed> & tags.Maximum<typeof maxPlaybackSpeed>;
 
-export type AudioLevelStage = "source" | "project" | "monitor";
-export type PlaybackMode = "single" | "sequential" | "repeat-all" | "repeat-one";
+export type AudioLevelStage = typeof audioLevelStages[number];
+export type PlaybackMode = typeof playbackModes[number];
 
 export type VolumeStabilizationSettings = {
     readonly [Key in keyof StabilizationLimits]: number & tags.Minimum<StabilizationLimits[Key]["min"]> & tags.Maximum<StabilizationLimits[Key]["max"]>;
@@ -23,7 +26,7 @@ export type Settings = {
     readonly mediaPathMode: MediaPathMode;
     readonly theme: ThemeSettings;
     readonly transcription: {
-        readonly concurrency: number & tags.Type<"uint64"> & tags.Minimum<1> & tags.Maximum<9007199254740991>;
+        readonly concurrency: number & tags.Type<"uint64"> & tags.Minimum<1> & tags.Maximum<typeof taskCapacity>;
         readonly presets: Presets;
         readonly lastConfig: {
             readonly config: Config;
@@ -33,26 +36,26 @@ export type Settings = {
     readonly editing: {
         readonly spellcheck: boolean;
         readonly fontSize: number & tags.Minimum<typeof minEditorFontSize> & tags.Maximum<typeof maxEditorFontSize>;
-        readonly informationDisplay: "tooltip" | "bar";
+        readonly informationDisplay: typeof informationDisplays[number];
     };
     readonly volumeStabilization: VolumeStabilizationSettings;
     readonly window: {
-        readonly width: number & tags.Type<"uint32"> & tags.Minimum<typeof minWindowWidth> & tags.Maximum<2147483647>;
-        readonly height: number & tags.Type<"uint32"> & tags.Minimum<typeof minWindowHeight> & tags.Maximum<2147483647>;
+        readonly width: number & tags.Type<"uint32"> & tags.Minimum<typeof minWindowWidth> & tags.Maximum<typeof maxLayoutDimension>;
+        readonly height: number & tags.Type<"uint32"> & tags.Minimum<typeof minWindowHeight> & tags.Maximum<typeof maxLayoutDimension>;
         readonly maximized: boolean;
     };
     readonly layout: {
         // null retains the responsive default until the sidebar is resized.
         readonly sidebarWidth: (number & tags.Minimum<typeof minSidebarWidth> & tags.Maximum<typeof maxSidebarWidth>) | null;
         // null uses the responsive default; viewport limits only affect the displayed height.
-        readonly videoHeight: (number & tags.Minimum<0> & tags.Maximum<2147483647>) | null;
+        readonly videoHeight: (number & tags.Minimum<0> & tags.Maximum<typeof maxLayoutDimension>) | null;
     };
     readonly playback: {
         readonly mode: PlaybackMode;
-        readonly volumeSliderMapping: "amplitude" | "decibel";
+        readonly volumeSliderMapping: typeof volumeSliderMappings[number];
         readonly volumeSliderMinDb: number & tags.Maximum<typeof maxVolumeSliderMinDb>;
-        readonly mediaSwitchPlayback: "pause" | "play" | "keep" | "invert";
-        readonly wordSwitchPlayback: "pause" | "play" | "keep" | "invert";
+        readonly mediaSwitchPlayback: typeof switchPlaybackModes[number];
+        readonly wordSwitchPlayback: typeof switchPlaybackModes[number];
         readonly rememberPlaybackPosition: boolean;
         readonly pauseOnOutputDeviceChange: boolean;
         readonly audioOffsetMs: number & tags.Type<"int32"> & tags.Minimum<typeof minAudioOffsetMs> & tags.Maximum<typeof maxAudioOffsetMs>;

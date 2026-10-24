@@ -330,7 +330,7 @@
             "concurrency": {
                 "label": "转写并行任务数",
                 "description": "降低数量后，正在执行的任务会继续，等待中的任务按新的上限开始。",
-                "invalid": "转写并行任务数必须是正整数。"
+                "invalid": "转写并行任务数必须是 1 到 {{maximum}} 之间的整数。"
             }
         },
         "editing": {

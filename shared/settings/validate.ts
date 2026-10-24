@@ -4,11 +4,7 @@ import { type Config, type Presets } from "../transcription/Config";
 
 export const validLanguage = typia.createIs<Settings["language"]>();
 export const validMediaPathMode = typia.createIs<Settings["mediaPathMode"]>();
-const isSidebarTransparency = typia.createIs<Settings["theme"]["sidebarTransparency"]>();
-
-export function validSidebarTransparency(value: unknown): value is Settings["theme"]["sidebarTransparency"] {
-    return isSidebarTransparency(value) && Number.isFinite(value);
-}
+export const validSidebarTransparency = typia.createIs<Settings["theme"]["sidebarTransparency"]>();
 
 export const validConcurrency = typia.createIs<Settings["transcription"]["concurrency"]>();
 export const validTranscriptionConfig = typia.createEquals<Config>();
@@ -17,12 +13,8 @@ export function validPresetNames(presets: Presets): boolean {
     return Object.keys(presets).every(name => name.trim().length > 0);
 }
 
-const isEditorFontSize = typia.createIs<Settings["editing"]["fontSize"]>();
+export const validEditorFontSize = typia.createIs<Settings["editing"]["fontSize"]>();
 export const validInformationDisplay = typia.createIs<Settings["editing"]["informationDisplay"]>();
-
-export function validEditorFontSize(value: unknown): value is Settings["editing"]["fontSize"] {
-    return isEditorFontSize(value) && Number.isFinite(value);
-}
 
 export const validVolumeSliderMapping = typia.createIs<Settings["playback"]["volumeSliderMapping"]>();
 const isVolumeSliderMinDb = typia.createIs<Settings["playback"]["volumeSliderMinDb"]>();

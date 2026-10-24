@@ -1,4 +1,5 @@
 export const settingsVersion = 1;
+export const maxLayoutDimension = 2147483647;
 export const minWindowWidth = 640;
 export const minWindowHeight = 480;
 export const minSidebarWidth = 150;

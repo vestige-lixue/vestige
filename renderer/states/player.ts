@@ -1,3 +1,4 @@
+import { playbackModes } from "../../shared/settings/options";
 import { toFailureInfo } from "../../shared/failure";
 import { tick } from "svelte";
 import * as project from "./project.svelte";
@@ -56,12 +57,7 @@ export function setPlaying(playing: boolean): void {
 }
 
 export function cycleMode(): void {
-    const mode = ({
-        single: "sequential",
-        sequential: "repeat-all",
-        "repeat-all": "repeat-one",
-        "repeat-one": "single"
-    } as const)[player.getMode()];
+    const mode = playbackModes[(playbackModes.indexOf(player.getMode()) + 1) % playbackModes.length];
     void settingsAPI.update({ playback: { mode } });
 }
 

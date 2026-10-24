@@ -1,4 +1,5 @@
 import { type FailureInfo, toFailureInfo } from "../../shared/failure";
+import { taskCapacity } from "../../shared/task";
 import { type Config } from "../../shared/transcription/Config";
 import * as mediaImport from "./mediaImport.svelte";
 import * as project from "./project.svelte";
@@ -82,7 +83,7 @@ function fail(task: transcription.TranscriptionTask, error: FailureInfo): void {
 }
 
 function drain(): void {
-    const concurrency = settings.get()?.transcription.concurrency ?? 0;
+    const concurrency = Math.min(taskCapacity, settings.get()?.transcription.concurrency ?? 0);
     while (transcription.state.activeCount < concurrency) {
         const task = transcription.tasks.find(task => task.status === "queued");
         if (!task) break;

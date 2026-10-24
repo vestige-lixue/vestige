@@ -1,5 +1,7 @@
 import { type FailureInfo } from "./failure";
 
+export const taskCapacity = 128;
+
 export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled";
 
 export type TaskSnapshot = {

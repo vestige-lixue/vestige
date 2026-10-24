@@ -1,6 +1,7 @@
 import { type AudioLevelStage } from "../../shared/settings/Settings";
 
-export const levelStages = ["source", "project", "monitor"] as const;
+import { audioLevelStages as levelStages } from "../../shared/settings/options";
+export { audioLevelStages as levelStages } from "../../shared/settings/options";
 export const clipHoldMs = 1500;
 
 export type AudioLevel = {

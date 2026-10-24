@@ -84,10 +84,10 @@
         <div class="label">{i18n.t("settings.transcription.concurrency.label")}</div>
         <div class="description" class:error-message={!validConcurrency(concurrency)}>
             <div class:inactive={!validConcurrency(concurrency)}>{i18n.t("settings.transcription.concurrency.description")}</div>
-            <div class:inactive={validConcurrency(concurrency)}>{i18n.t("settings.transcription.concurrency.invalid")}</div>
+            <div class:inactive={validConcurrency(concurrency)}>{i18n.t("settings.transcription.concurrency.invalid", { maximum: taskCapacity })}</div>
         </div>
     </label>
-    <NumberInput class="settingsNumber" id="transcription-concurrency" min="1" max={Number.MAX_SAFE_INTEGER} step="1" bind:ref={concurrencyInput} bind:value={concurrency} disabled={pending} onblur={() => {
+    <NumberInput class="settingsNumber" id="transcription-concurrency" min="1" max={taskCapacity} step="1" bind:ref={concurrencyInput} bind:value={concurrency} disabled={pending} onblur={() => {
         if (!pending && validConcurrency(concurrency)) void apply({ transcription: { concurrency } });
     }} />
 </div>
@@ -563,6 +563,9 @@
     import { hexToHsla, hslaToHex, type HslaColor } from "../util/ColorPicker/color";
     import { type Locale } from "../../../shared/locale";
     import { type DownloadKind } from "../../../shared/downloads";
+    import { taskCapacity } from "../../../shared/task";
+    import { mediaPathModes as mediaPathModeValues } from "../../../shared/project/file";
+    import { informationDisplays as informationDisplayValues, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
     import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
@@ -576,7 +579,7 @@
     import contrastIcon from "../../../resources/icons/carbon--contrast.svg?raw";
     import moonIcon from "../../../resources/icons/carbon--moon.svg?raw";
     import {
-        themeSchemes, themeColorKeys, resolveTheme, validThemeMode,
+        themeSchemes, themeColorKeys, resolveTheme, validThemeMode, themeModes as themeModeValues,
         type ThemeColorKey, type ThemeScheme, type ThemeSettings, type ThemeOverrides
     } from "../../../shared/theme";
     import * as dialogsAPI from "../../states/dialogs";
@@ -616,11 +619,7 @@
         ])))
     );
     let titlebarHeight = $state(0);
-    const themeModes = [
-        { mode: "light", icon: lightIcon },
-        { mode: "system", icon: contrastIcon },
-        { mode: "dark", icon: moonIcon }
-    ] as const;
+    const themeModes = themeModeValues.map(mode => ({ mode, icon: { light: lightIcon, system: contrastIcon, dark: moonIcon }[mode] }));
     let concurrency = $state<number | undefined>(current.transcription.concurrency);
     let stabilization = $state<Record<keyof VolumeStabilizationSettings, number | undefined>>({ ...current.volumeStabilization });
     let pending = $state(false);
@@ -641,10 +640,10 @@
         { value: "zh-CN", label: i18n.t("settings.general.language.options.zh-CN") },
         { value: "en", label: i18n.t("settings.general.language.options.en") }
     ]);
-    const mediaPathModes = $derived((["absolute", "project", "relative"] as const).map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
-    const informationDisplays = $derived((["tooltip", "bar"] as const).map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
-    const volumeSliderMappings = $derived((["amplitude", "decibel"] as const).map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));
-    const switchPlaybackOptions = $derived((["pause", "play", "keep", "invert"] as const).map(value => ({ value, label: i18n.t(`settings.playback.switchPlayback.options.${value}`) })));
+    const mediaPathModes = $derived(mediaPathModeValues.map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
+    const informationDisplays = $derived(informationDisplayValues.map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
+    const volumeSliderMappings = $derived(volumeSliderMappingValues.map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));
+    const switchPlaybackOptions = $derived(switchPlaybackModes.map(value => ({ value, label: i18n.t(`settings.playback.switchPlayback.options.${value}`) })));
     const levelReadouts = $derived(levelStages.map(value => ({ value, label: i18n.t(`settings.playback.levelMeterReadout.options.${value}`) })));
 
     onMount(() => {

@@ -1,7 +1,8 @@
 import { type FailureInfo } from "../failure";
 import { type Project } from "./Project";
 
-export type MediaPathMode = "absolute" | "project" | "relative";
+export const mediaPathModes = ["absolute", "project", "relative"] as const;
+export type MediaPathMode = typeof mediaPathModes[number];
 
 export type GetProjectResult = ({
     success: true;

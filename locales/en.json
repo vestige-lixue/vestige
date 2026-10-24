@@ -330,7 +330,7 @@
             "concurrency": {
                 "label": "Concurrent transcription tasks",
                 "description": "Lowering the limit does not affect running tasks.\nQueued tasks start according to the new limit.",
-                "invalid": "The number of concurrent transcription tasks must be a positive integer."
+                "invalid": "The number of concurrent transcription tasks must be an integer from 1 to {{maximum}}."
             }
         },
         "editing": {
