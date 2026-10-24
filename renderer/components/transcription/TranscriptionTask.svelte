@@ -1,12 +1,12 @@
-<TaskItem value={task.id} class="transcription-task" bind:ref expandable={task.status !== "queued"}
+<TaskItem value={task.id} class="transcription-task" bind:ref expandable={displayStatus !== "queued"}
     {progress} output={output.snapshot?.output ?? ""}
 >
     {#snippet title()}{project.getMedia(task.mediaId)?.name ?? task.mediaName}{/snippet}
-    {#snippet status()}<span class:danger={task.status === "failed"}>{i18n.t(`transcription.tasks.status.${task.status}`)}</span>{/snippet}
+    {#snippet status()}<span class:danger={displayStatus === "failed"}>{i18n.t(`transcription.tasks.status.${displayStatus}`)}</span>{/snippet}
     {#snippet actions()}
         {#if transcription.isPending(task)}
             <TextButton disabled={task.status === "stopping"} onclick={onStop}>
-                {i18n.t(task.status === "queued" ? "transcription.actions.cancelQueued" : task.status === "stopping" ? "transcription.tasks.status.stopping" : "transcription.actions.stop")}
+                {i18n.t(displayStatus === "queued" ? "transcription.actions.cancelQueued" : task.status === "stopping" ? "transcription.tasks.status.stopping" : "transcription.actions.stop")}
             </TextButton>
         {:else}
             <TextButton disabled={!mediaImport.isReady(task.mediaId) || transcription.isPending(transcription.getTask(task.mediaId))} onclick={onRetry}>{i18n.t("common.retry")}</TextButton>
@@ -15,7 +15,7 @@
             <TextButton class="danger" onclick={onRemove}>{i18n.t("transcription.tasks.actions.remove")}</TextButton>
         {/if}
     {/snippet}
-    {#if task.status !== "queued"}
+    {#if displayStatus !== "queued"}
         {#if !output.snapshot}
             <div class="task-item-message">{i18n.t(output.loading ? "transcription.tasks.output.loading" : "transcription.tasks.output.unavailable")}</div>
         {/if}
@@ -45,7 +45,8 @@
     } = $props();
     const outputTaskId = $derived(task.status === "queued" ? null : task.id);
     const output = taskOutput.observe(() => outputTaskId);
-    const progress = $derived(task.status !== "queued"
+    const displayStatus = $derived(task.status === "running" && output.snapshot?.status === "queued" ? "queued" : task.status);
+    const progress = $derived(displayStatus !== "queued"
         && (output.loading || output.snapshot && (output.snapshot.status === "running" || output.snapshot.progress !== null))
         ? output.snapshot?.progress ?? null : undefined);
 

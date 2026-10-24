@@ -13,6 +13,7 @@ import { registerSettingsIPCs } from "./settings/ipc";
 import { minWindowHeight, minWindowWidth } from "../shared/constants";
 import { getWindowColors, registerWindowTheme } from "./theme";
 import { registerTaskOutputIPCs } from "./task/ipc";
+import { TaskAdmission } from "./task/admission";
 import { registerDocumentationIPCs } from "./documentation/ipc";
 import { registerDownloadIPCs } from "./downloads/ipc";
 import { initializeDocumentation } from "./documentation/file";
@@ -54,6 +55,7 @@ mkdirSync(paths.modelDirectory, { recursive: true });
 mkdirSync(paths.backendDirectory, { recursive: true });
 // Refresh the bundled documents once per application launch; all windows share this work.
 const documentationReady = initializeDocumentation(paths.documentationDirectory, paths.documentationSourceDirectory).catch(console.error);
+const taskAdmission = new TaskAdmission();
 
 function createWindow(): void {
     const windowState = settings.get().settings.window;
@@ -93,7 +95,7 @@ function createWindow(): void {
         backendDirectory: paths.backendDirectory,
         runtimeDirectory: paths.runtimeDirectory,
         runtimeCacheDirectory: paths.runtimeCacheDirectory
-    }, tasks);
+    }, tasks, taskAdmission);
     registerFileIPCs(mainWindow, {
         runtimeDirectory: paths.runtimeDirectory,
         modelDirectory: paths.modelDirectory,
@@ -103,14 +105,16 @@ function createWindow(): void {
     registerProjectIPCs(mainWindow);
     const rememberWindow = registerSettingsIPCs(mainWindow);
     registerWindowTheme(mainWindow);
-    registerWindowLifecycle(mainWindow, stopDownloads);
-    registerTranscriptionIPCs(mainWindow.webContents, {
+    const stopTranscriptions = registerTranscriptionIPCs(mainWindow.webContents, {
         runtimeDirectory: paths.runtimeDirectory,
         modelDirectory: paths.modelDirectory,
         backendDirectory: paths.backendDirectory,
         temporaryDirectory: paths.temporaryDirectory,
         vadModelPath: paths.vadModelPath
-    }, tasks);
+    }, tasks, taskAdmission);
+    registerWindowLifecycle(mainWindow, async () => {
+        await Promise.all([stopDownloads(), stopTranscriptions()]);
+    });
 
     let rendererReady = false, windowReady = false;
     const showWindow = (): void => {

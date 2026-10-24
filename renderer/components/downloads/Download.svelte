@@ -10,10 +10,10 @@
     {/snippet}
     {#snippet actions()}
         <TextButton bind:ref={actionButton} class={{ attention }}
-            disabled={running || cancelling ? cancelling : installed || starting || !!taskId && loading}
-            onblur={() => attention = false} onclick={() => void (running ? cancel() : start())}
+            disabled={pending || cancelling ? cancelling : installed || starting || !!taskId && loading}
+            onblur={() => attention = false} onclick={() => void (pending ? cancel() : start())}
         >
-            {i18n.t(running || cancelling ? "common.cancel" : installed ? "downloads.status.installed" : "downloads.actions.download")}
+            {i18n.t(pending || cancelling ? "common.cancel" : installed ? "downloads.status.installed" : "downloads.actions.download")}
         </TextButton>
     {/snippet}
     {#if snapshot?.status === "failed" && snapshot.error}
@@ -53,6 +53,7 @@
     import { describeFailure } from "../../failures";
     import { toFailureInfo } from "../../../shared/failure";
     import { type Download as DownloadInfo } from "../../../shared/downloads";
+    import { isTaskPending } from "../../../shared/task";
     import * as taskOutput from "../../states/taskOutput.svelte";
     import TaskItem from "../util/TaskItem.svelte";
 
@@ -81,7 +82,7 @@
     const output = taskOutput.observe(() => taskId);
     const snapshot = $derived(output.snapshot);
     const loading = $derived(output.loading);
-    const running = $derived(snapshot?.status === "running");
+    const pending = $derived(!!snapshot && isTaskPending(snapshot.status));
     const installed = $derived(download.installed || snapshot?.status === "succeeded");
     let starting = $state(false);
     let cancelling = $state(false);
@@ -90,10 +91,10 @@
     let attention = $state(false);
     const phase = $derived(cancelling ? "cancelling" : starting || !!taskId && loading ? "loading"
         : failure ? "failed" : snapshot?.status ?? (taskId ? "unavailable" : null));
-    const progress = $derived(starting || !!taskId && loading ? null : snapshot?.progress ?? (running || cancelling ? null : undefined));
+    const progress = $derived(snapshot?.status === "queued" ? undefined : starting || !!taskId && loading ? null : snapshot?.progress ?? (pending || cancelling ? null : undefined));
 
     $effect(() => {
-        busy = starting || cancelling || running || !!taskId && loading;
+        busy = starting || cancelling || pending || !!taskId && loading;
     });
     $effect(() => {
         if (snapshot?.status === "failed" || output.error || failure) untrack(() => {
@@ -102,7 +103,7 @@
     });
     $effect(() => {
         focusCancel = () => {
-            if (!running || !actionButton || actionButton.disabled) return false;
+            if (!pending || !actionButton || actionButton.disabled) return false;
             attention = true;
             actionButton.focus();
             return true;

@@ -15,6 +15,7 @@ import { type DownloadRoots, type DownloadSource } from "./types";
 import { installDownload } from "./install";
 import { aria2Transfer } from "./aria2";
 import { DownloadCleanupError } from "./cleanup";
+import { type TaskAdmission } from "../task/admission";
 
 type ActiveDownload = {
     taskId: string;
@@ -24,7 +25,7 @@ type ActiveDownload = {
     cancellation: Promise<void> | null;
 };
 
-export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths, "modelDirectory" | "backendDirectory" | "runtimeDirectory" | "runtimeCacheDirectory">, tasks: TaskOutputStore): () => Promise<void> {
+export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths, "modelDirectory" | "backendDirectory" | "runtimeDirectory" | "runtimeCacheDirectory">, tasks: TaskOutputStore, admission: TaskAdmission): () => Promise<void> {
     const { runtimeDirectory, runtimeCacheDirectory } = paths;
     const roots: DownloadRoots = { model: paths.modelDirectory, backend: paths.backendDirectory };
     const sources: DownloadSource[] = [
@@ -99,23 +100,31 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
         const root = roots[source.kind];
         const taskId = `download-${randomUUID()}`;
         const controller = new AbortController();
-        tasks.start(taskId, "download");
+        tasks.enqueue(taskId, "download");
         tasks.record(taskId, "Download", { kind: source.kind, id: source.id, name: source.name, directory: root });
         latest.set(resourceKey, taskId);
         const task: ActiveDownload = { taskId, controller, completion: Promise.resolve(), cleanup: null, cancellation: null };
         active.set(resourceKey, task);
-        task.completion = installDownload(source, { rootDirectory: root, runtimeDirectory, runtimeCacheDirectory }, aria2Transfer(runtimeDirectory, url => contents.session.resolveProxy(url)), {
-            append: text => tasks.append(taskId, text),
-            progress: value => tasks.progress(taskId, value)
-        }, controller.signal).then(() => {
-            tasks.finish(taskId, "succeeded");
-        }).catch((error: unknown) => {
+        const fail = (error: unknown): void => {
             const failure = toFailureInfo(error);
             tasks.record(taskId, "Error", failure);
             tasks.append(taskId, `${error instanceof Error ? error.message : String(error)}\n`);
             if (error instanceof DownloadCleanupError) task.cleanup = error;
             else tasks.finish(taskId, controller.signal.aborted ? "cancelled" : "failed", failure);
-        }).finally(() => {
+        };
+        task.completion = admission.run(controller.signal, async () => {
+            tasks.start(taskId);
+            try {
+                await installDownload(source, { rootDirectory: root, runtimeDirectory, runtimeCacheDirectory }, aria2Transfer(runtimeDirectory, url => contents.session.resolveProxy(url)), {
+                    append: text => tasks.append(taskId, text),
+                    progress: value => tasks.progress(taskId, value)
+                }, controller.signal);
+                tasks.finish(taskId, "succeeded");
+            }
+            catch (error) {
+                fail(error);
+            }
+        }).catch(fail).finally(() => {
             if (!task.cleanup) active.delete(resourceKey);
         });
         return { success: true, taskId };
@@ -153,7 +162,14 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
     const cancelAll = (): void => {
         for (const task of active.values()) task.controller.abort();
     };
-    contents.once("destroyed", cancelAll);
+    contents.once("destroyed", () => {
+        closing = true;
+        cancelAll();
+    });
+    contents.on("render-process-gone", cancelAll);
+    contents.on("did-start-navigation", (_event, _url, isInPlace, isMainFrame) => {
+        if (isMainFrame && !isInPlace) cancelAll();
+    });
     return async () => {
         closing = true;
         cancelAll();

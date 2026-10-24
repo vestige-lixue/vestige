@@ -515,7 +515,8 @@
             "succeeded": "Download complete",
             "failed": "Download failed",
             "cancelled": "Download cancelled",
-            "unavailable": "Download history is unavailable."
+            "unavailable": "Download history is unavailable.",
+            "queued": "Queued for download"
         },
         "actions": {
             "download": "Download"

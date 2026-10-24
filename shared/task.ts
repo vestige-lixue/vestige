@@ -2,7 +2,11 @@ import { type FailureInfo } from "./failure";
 
 export const taskCapacity = 128;
 
-export type TaskStatus = "running" | "succeeded" | "failed" | "cancelled";
+export type TaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+
+export function isTaskPending(status: TaskStatus): boolean {
+    return status === "queued" || status === "running";
+}
 
 export type TaskSnapshot = {
     id: string;
