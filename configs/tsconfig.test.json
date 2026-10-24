@@ -1,0 +1,10 @@
+{
+    "extends": "./tsconfig.node.json",
+    "include": ["vitest.config.ts", "../tests/**/*.ts"],
+    "compilerOptions": {
+        "composite": false,
+        "emitDeclarationOnly": false,
+        "noEmit": true,
+        "types": ["node"]
+    }
+}
