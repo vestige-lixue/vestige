@@ -1,17 +1,18 @@
 import { type WebContents } from "electron";
 import { type TranscriptionResult } from "../../shared/transcription/executor";
 import { transcriptionChannels } from "../../shared/transcription/ipc";
+import { parseRequest, type ParsedRequest } from "./parameters";
 import { type ExecutionPaths, transcribe } from "./execute";
 import { type TaskOutputStore } from "../task/store";
 import { handle, listen } from "../util/ipc";
-import { toFailureInfo } from "../../shared/failure";
+import { isExpectedFailure, toFailureInfo } from "../../shared/failure";
 import { isTaskPending } from "../../shared/task";
 import { type TaskAdmission } from "../task/admission";
 
 export function registerTranscriptionIPCs(contents: WebContents, paths: ExecutionPaths, tasks: TaskOutputStore, admission: TaskAdmission): () => Promise<void> {
     const active = new Map<string, { controller: AbortController; completion: Promise<TranscriptionResult> }>();
     let closing = false;
-    const runTask = async (id: string, request: unknown, controller: AbortController): Promise<TranscriptionResult> => {
+    const runTask = async (id: string, request: ParsedRequest, controller: AbortController): Promise<TranscriptionResult> => {
         try {
             return await admission.run(controller.signal, async (): Promise<TranscriptionResult> => {
                 try {
@@ -19,7 +20,8 @@ export function registerTranscriptionIPCs(contents: WebContents, paths: Executio
                     const result = await transcribe(id, request, paths, controller.signal, {
                         output: (_stream, text) => tasks.append(id, text),
                         progress: value => tasks.progress(id, value),
-                        record: (event, value) => tasks.record(id, event, value)
+                        record: (event, value) => tasks.record(id, event, value),
+                        log: tasks.logReference(id)
                     });
                     if (result.success) tasks.record(id, "Run", JSON.stringify(result.run));
                     if (!result.success) tasks.append(id, `\n${JSON.stringify(result.error)}\n`);
@@ -49,10 +51,19 @@ export function registerTranscriptionIPCs(contents: WebContents, paths: Executio
             active.delete(id);
         }
     };
-    handle(contents, transcriptionChannels.transcribe, (id: unknown, request: unknown): Promise<TranscriptionResult> | TranscriptionResult => {
+    handle(contents, transcriptionChannels.transcribe, (id: unknown, value: unknown): Promise<TranscriptionResult> | TranscriptionResult => {
         if (closing) return { success: false, error: { kind: "transcription-cancelled" } };
         const previous = typeof id === "string" ? tasks.get(id) : null;
         if (typeof id !== "string" || !id || id.length > 128 || active.has(id) || previous && isTaskPending(previous.status)) return { success: false, error: { kind: "transcription-invalid-id" } };
+        let request: ParsedRequest;
+        try {
+            // Own the validated request before it waits for application capacity.
+            request = parseRequest(value, paths.modelDirectory);
+        }
+        catch (error) {
+            if (isExpectedFailure(error)) return { success: false, error: error.failure };
+            throw error;
+        }
         const controller = new AbortController();
         tasks.enqueue(id, "transcription");
         const completion = runTask(id, request, controller);

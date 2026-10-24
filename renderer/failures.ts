@@ -23,7 +23,6 @@ const failureKeys = {
     "transcription-cancelled": "errors.transcription.cancelled",
     "transcription-invalid-request": "errors.transcription.invalidRequest",
     "transcription-invalid-id": "errors.transcription.invalidId",
-    "transcription-params-text": "errors.transcription.paramsText",
     "transcription-params-object": "errors.transcription.paramsObject",
     "transcription-param-value": "errors.transcription.paramValue",
     "transcription-param-null": "errors.transcription.paramNull",
@@ -91,7 +90,7 @@ export function describeFailure(failure: FailureInfo): string {
         case "download-cleanup":
             return (failure.operation ? `${describeFailure(failure.operation)}\n\n` : "")
                 + withDiagnostic(i18n.t(failure.installed ? "errors.download.cleanup.installed" : "errors.download.cleanup.incomplete", failure), failure);
-        case "unexpected": case "native-spawn-failed": case "transcription-invalid-json": case "project-invalid-json":
+        case "unexpected": case "native-spawn-failed": case "project-invalid-json":
             return failure.diagnostic;
         case "native-failed":
             return failure.diagnostic || i18n.t("errors.native.failed", { reason: failure.signal ?? failure.exitCode });

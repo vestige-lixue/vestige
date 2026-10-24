@@ -28,7 +28,7 @@ export function start(mediaId: string, config: Config): Promise<void> | null {
         id,
         mediaId,
         mediaName: media.name,
-        request: { ...config, params: JSON.stringify(config.params), mediaPath: media.path, mediaDuration: media.duration },
+        request: { ...config, params: { ...config.params }, mediaPath: media.path, mediaDuration: media.duration },
         status: "queued"
     });
     updateConcurrency();

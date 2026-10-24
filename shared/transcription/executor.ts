@@ -1,6 +1,7 @@
 import { type FailureInfo } from "../failure";
 import { type Run } from "./Run";
 import { type AbsolutePath } from "../util/path";
+import { type NonNegativeNumber } from "../util/Scalar";
 
 export const executors = [
     { id: "whisper.cpp", name: "whisper.cpp" },
@@ -19,11 +20,11 @@ export type TranscriptionRequest = {
     // Absolute path, or relative to the user's models folder. The executor owns its file layout.
     modelDirectory: string;
     mediaPath: AbsolutePath;
-    mediaDuration: number;
-    // JSON text containing verbatim native CLI option names (including dashes) and string values.
+    mediaDuration: NonNegativeNumber;
+    // Verbatim native CLI option names (including dashes) and string values.
     // An empty value emits only the key. No boolean/number or path conversion is performed.
     // The user chooses a compatible model; native programs interpret these parameters.
-    params: string;
+    params: Readonly<Record<string, string>>;
 };
 
 export type TranscriptionResult = ({

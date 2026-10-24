@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from "node:util";
 import { isTaskPending, type TaskSnapshot, type TaskStatus } from "../../shared/task";
 import { type FailureInfo } from "../../shared/failure";
 import { type LogDirectory, type LogFile, type LogKind } from "../logging";
+import { type TaskLogReference } from "../../shared/transcription/Execution";
 
 const outputLimit = 256 * 1024;
 const historyLimit = 32;
@@ -83,6 +84,11 @@ export class TaskOutputStore {
     get(id: string): TaskSnapshot | null {
         const task = this.tasks.get(id);
         return task ? this.snapshot(task) : null;
+    }
+
+    logReference(id: string): TaskLogReference | null {
+        const log = this.tasks.get(id)?.log;
+        return log ? { taskId: id, path: log.path } : null;
     }
 
     dispose(): void {

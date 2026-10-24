@@ -1,6 +1,6 @@
-import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
+import { type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
-import { type NativeObject, type Piece, object, array, probability, range, segments, createRun } from "../result";
+import { type NativeObject, type Piece, type RunDraft, object, array, probability, range, segments, createRun } from "../result";
 import { VestigeErrors } from "../../../shared/failure";
 
 function whisperTranscript(output: NativeObject, duration: number): TranscriptSpan[] {
@@ -22,7 +22,7 @@ function whisperTranscript(output: NativeObject, duration: number): TranscriptSp
     });
 }
 
-export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number): Run {
+export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number): RunDraft {
     const output = object(value);
     return createRun(id, request, object(output.result).language, whisperTranscript(output, duration), runTime);
 }

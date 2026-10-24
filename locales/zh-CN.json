@@ -617,7 +617,6 @@
             "cancelled": "转写已取消。",
             "invalidRequest": "需要有效的转写请求。",
             "invalidId": "需要唯一的转写任务 ID。",
-            "paramsText": "参数必须是 JSON 文本。",
             "paramsObject": "参数必须是 JSON 对象。",
             "paramValue": "参数值必须是字符串。",
             "paramNull": "参数值不能包含空字符。",

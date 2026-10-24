@@ -617,7 +617,6 @@
             "cancelled": "Transcription cancelled.",
             "invalidRequest": "A transcription request is required.",
             "invalidId": "A unique transcription task ID is required.",
-            "paramsText": "Parameters must be JSON text.",
             "paramsObject": "Parameters must be a JSON object.",
             "paramValue": "Parameter values must be strings.",
             "paramNull": "Parameter values must not contain null characters.",

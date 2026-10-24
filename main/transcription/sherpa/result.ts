@@ -1,6 +1,6 @@
-import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
+import { type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ParsedRequest } from "../parameters";
-import { type NativeObject, type Piece, object, array, number, probability, range, segments, createRun } from "../result";
+import { type NativeObject, type Piece, type RunDraft, object, array, number, probability, range, segments, createRun } from "../result";
 import { VestigeErrors } from "../../../shared/failure";
 
 const qwenLanguages: Record<string, string> = {
@@ -85,7 +85,7 @@ function sherpaTranscript(output: NativeObject, duration: number): TranscriptSpa
     return tokenSegments;
 }
 
-export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number, qwen = false): Run {
+export function toRun(id: string, request: ParsedRequest, value: unknown, duration: number, runTime: number, qwen = false): RunDraft {
     const output = qwen ? normalizeQwenOutput(object(value)) : object(value);
     return createRun(id, request, output.lang, sherpaTranscript(output, duration), runTime);
 }

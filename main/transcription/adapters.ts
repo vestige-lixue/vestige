@@ -1,5 +1,5 @@
 import { type Executor } from "../../shared/transcription/executor";
-import { type Run } from "../../shared/transcription/Run";
+import { type RunDraft } from "./result";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type ExecutionContext } from "./execute";
 import { type ModelPlan } from "./ModelPlan";
@@ -14,7 +14,7 @@ export type ExecutorAdapter = {
     readonly program: string;
     readonly tools: Readonly<Partial<Record<ExecutorTool, { program: string; requiredInPackage: boolean }>>>;
     readonly resolveModel: (directory: AbsolutePath, options: Readonly<Record<string, string>>) => ModelPlan | Promise<ModelPlan>;
-    readonly execute: (context: ExecutionContext) => Promise<Run>;
+    readonly execute: (context: ExecutionContext) => Promise<RunDraft>;
 };
 
 export const executorAdapters: Readonly<Record<Executor, ExecutorAdapter>> = {

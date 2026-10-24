@@ -1,17 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { type Run } from "../../../shared/transcription/Run";
 import { type ExecutionContext } from "../execute";
 import { runProcess } from "../../util/process";
-import { parseResult } from "../result";
+import { parseResult, type RunDraft } from "../result";
 import { nativeArguments } from "./parameters";
 import { toRun } from "./result";
 import { VestigeErrors } from "../../../shared/failure";
 import { isSystemError } from "../../util/file";
 import { whisperProgress } from "./progress";
 
-export async function execute(context: ExecutionContext): Promise<Run> {
+export async function execute(context: ExecutionContext): Promise<RunDraft> {
     const { id, request, backend, model, directory, audio, duration, signal, feedback } = context;
     const { executable } = backend;
     const outputFile = join(directory, "result");

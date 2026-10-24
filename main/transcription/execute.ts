@@ -6,7 +6,9 @@ import { containsPath, parseAbsolutePath, isSystemError } from "../util/file";
 import { type Run } from "../../shared/transcription/Run";
 import { type TranscriptionResult } from "../../shared/transcription/executor";
 import { waveDuration } from "./audio";
-import { type ParsedRequest, parseRequest } from "./parameters";
+import { type ParsedRequest } from "./parameters";
+import { type Execution, type TaskLogReference } from "../../shared/transcription/Execution";
+import { createExecution } from "./execution";
 import { findExecutable, runProcess, type ProcessOutputListener } from "../util/process";
 import { executorAdapters } from "./adapters";
 import { type ModelPlan } from "./ModelPlan";
@@ -20,6 +22,7 @@ export type ExecutionFeedback = {
     output: ProcessOutputListener;
     progress: (value: number | null) => void;
     record?: (event: string, value: unknown) => void;
+    log?: TaskLogReference | null;
 };
 
 export type ExecutionContext = {
@@ -27,6 +30,7 @@ export type ExecutionContext = {
     request: ParsedRequest;
     backend: BackendLocation;
     model: ModelPlan;
+    execution: Execution;
     directory: AbsolutePath;
     audio: AbsolutePath;
     duration: number;
@@ -35,9 +39,9 @@ export type ExecutionContext = {
     feedback?: ExecutionFeedback;
 };
 
-export async function transcribe(id: string, value: unknown, paths: ExecutionPaths, signal?: AbortSignal, feedback?: ExecutionFeedback): Promise<TranscriptionResult> {
+export async function transcribe(id: string, request: ParsedRequest, paths: ExecutionPaths, signal?: AbortSignal, feedback?: ExecutionFeedback): Promise<TranscriptionResult> {
     try {
-        const run = await executeTask(id, value, paths, signal, feedback);
+        const run = await executeTask(id, { ...request, startedAt: Date.now() }, paths, signal, feedback);
         signal?.throwIfAborted();
         return { success: true, run };
     }
@@ -50,13 +54,12 @@ export async function transcribe(id: string, value: unknown, paths: ExecutionPat
     }
 }
 
-async function executeTask(id: string, value: unknown, paths: ExecutionPaths, signal?: AbortSignal, feedback?: ExecutionFeedback): Promise<Run> {
-    const request = parseRequest(value, paths.modelDirectory);
+async function executeTask(id: string, request: ParsedRequest, paths: ExecutionPaths, signal?: AbortSignal, feedback?: ExecutionFeedback): Promise<Run> {
     feedback?.record?.("Transcription request", request);
     const backend = await resolveBackend(request.executor, request.backendDirectory, paths.backendDirectory);
     feedback?.record?.("Backend", backend);
     const adapter = executorAdapters[request.executor];
-    const model = await adapter.resolveModel(request.modelDirectory, request.options);
+    const model = await adapter.resolveModel(request.modelDirectory, request.params);
     feedback?.record?.("Model plan", model);
     const ffmpeg = await findExecutable(paths.runtimeDirectory, "ffmpeg", "ffmpeg");
     feedback?.record?.("FFmpeg executable", ffmpeg);
@@ -76,11 +79,13 @@ async function executeTask(id: string, value: unknown, paths: ExecutionPaths, si
         ], directory, signal, feedback?.output);
         const duration = await waveDuration(audio);
         feedback?.record?.("Audio duration", { media: request.mediaDuration, prepared: duration });
+        const execution = createExecution(request, backend, model, ffmpeg, paths.vadModelPath, duration, feedback?.log ?? null);
         feedback?.output("stderr", `[${request.executor}] Transcribing.\n`);
-        const run = await adapter.execute({ id, request, backend, model, directory, audio, duration, vadModelPath: paths.vadModelPath, signal, feedback });
+        const run = await adapter.execute({ id, request, backend, model, execution, directory, audio, duration, vadModelPath: paths.vadModelPath, signal, feedback });
         const outside = run.transcript.flatMap((segment, index) => segment.range.end > request.mediaDuration ? [{ index, ...segment.range }] : []);
         if (outside.length) feedback?.record?.("Timestamps beyond media duration", { duration: request.mediaDuration, segments: outside });
-        return run;
+        feedback?.record?.("Execution record", execution);
+        return { ...run, execution };
     }
     finally {
         // Only remove the directory created for this invocation, inside our root.

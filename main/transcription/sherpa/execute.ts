@@ -1,17 +1,17 @@
 import { performance } from "node:perf_hooks";
 import { basename } from "node:path";
-import { type Run, type TranscriptSpan } from "../../../shared/transcription/Run";
+import { type TranscriptSpan } from "../../../shared/transcription/Run";
 import { type ExecutionContext } from "../execute";
 import { runProcess } from "../../util/process";
-import { createRun } from "../result";
+import { createRun, type RunDraft } from "../result";
 import { VestigeErrors } from "../../../shared/failure";
 import { nativeArguments } from "./parameters";
 import { needsWordSeparator, parseBatchResults, toRun } from "./result";
-import { prepareAudioParts } from "./segmentation";
+import { maximumPartDuration, prepareAudioParts } from "./segmentation";
 import { decodeWithRetry, qwenDecodeProblem } from "./retry";
 
-export async function execute(context: ExecutionContext): Promise<Run> {
-    const { id, request, backend, model, directory, signal, feedback } = context;
+export async function execute(context: ExecutionContext): Promise<RunDraft> {
+    const { id, request, backend, model, execution, directory, signal, feedback } = context;
     const { executable } = backend;
     const options = model.options;
     const modelArgs = model.files.map(file => `--${file.role}=models/${file.filename}`);
@@ -19,14 +19,17 @@ export async function execute(context: ExecutionContext): Promise<Run> {
     const fallbackTemperature = model.strategy.kind === "qwen3-asr" ? model.strategy.fallbackTemperature ?? undefined : undefined;
     const start = performance.now();
     const parts = await prepareAudioParts(context);
+    const batchSize = 4;
+    execution.plan.parts = parts.map(({ start, end }) => ({ start, end }));
+    execution.plan.segmentation = { maximumDuration: maximumPartDuration, batchSize };
     const transcript: TranscriptSpan[] = [];
     let language = "und";
     let previousText = "";
     // Bound native batching too: avoid loading the entire recording's feature
     // streams into memory while amortizing model startup across short slices.
-    for (let index = 0; index < parts.length; index += 4) {
+    for (let index = 0; index < parts.length; index += batchSize) {
         signal?.throwIfAborted();
-        const batch = parts.slice(index, index + 4);
+        const batch = parts.slice(index, index + batchSize);
         const results = await decodeWithRetry(batch, async (current, temperature) => {
             const currentOptions = temperature === undefined ? options : { ...options, "--qwen3-asr-temperature": String(temperature) };
             const args = [...nativeArguments(currentOptions), ...modelArgs, ...current.map(part => basename(part.filename))];
@@ -35,9 +38,14 @@ export async function execute(context: ExecutionContext): Promise<Run> {
             const values = parseBatchResults(output.stdout, output.stderr, current.length);
             const problem = qwen ? qwenDecodeProblem(output.stderr) : undefined;
             feedback?.record?.("Sherpa batch result", { parts: current, problem: problem ?? null });
-            return { values, problem };
+            return { values, options: { ...currentOptions }, problem };
         }, { ...context, fallbackTemperature });
-        for (const { part, value } of results) {
+        for (const { part, value, originalRange, options, reasons } of results) {
+            const split = part.start !== originalRange.start || part.end !== originalRange.end;
+            const changedOptions = Object.keys(options).length !== Object.keys(model.options).length
+                || Object.entries(options).some(([key, value]) => !Object.hasOwn(model.options, key) || model.options[key] !== value);
+            // Batch isolation alone changes no final boundary or parameter.
+            if (split || changedOptions) execution.deviations.push({ originalRange: { ...originalRange }, range: { start: part.start, end: part.end }, options: { ...options }, reasons: [...reasons] });
             const duration = part.end - part.start;
             const run = toRun(id, request, value, duration, 0, qwen);
             if (language === "und" && run.language !== "und") language = run.language;

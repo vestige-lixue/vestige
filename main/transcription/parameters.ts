@@ -6,7 +6,6 @@ import { VestigeErrors } from "../../shared/failure";
 
 export type ParsedRequest = Omit<TranscriptionRequest, "modelDirectory"> & {
     modelDirectory: AbsolutePath;
-    options: Record<string, string>;
     startedAt: number;
     config: Config;
 };
@@ -23,19 +22,12 @@ export function parseRequest(value: unknown, modelRoot: AbsolutePath): ParsedReq
             throw new VestigeErrors({ kind: "transcription-empty-path", field: key });
         }
     }
-    if (typeof request.params !== "string") throw new VestigeErrors({ kind: "transcription-params-text" });
     if (typeof request.mediaDuration !== "number" || !Number.isFinite(request.mediaDuration) || request.mediaDuration < 0) {
         throw new VestigeErrors({ kind: "transcription-invalid-request" });
     }
-    let params: unknown;
-    try {
-        params = JSON.parse(request.params);
-    }
-    catch (error) {
-        if (!(error instanceof SyntaxError)) throw error;
-        throw new VestigeErrors({ kind: "transcription-invalid-json", diagnostic: error.message }, { cause: error });
-    }
-    if (!params || typeof params !== "object" || Array.isArray(params)) {
+    const params = request.params;
+    if (!params || typeof params !== "object" || Array.isArray(params)
+        || Object.getPrototypeOf(params) !== Object.prototype && Object.getPrototypeOf(params) !== null) {
         throw new VestigeErrors({ kind: "transcription-params-object" });
     }
     for (const [key, value] of Object.entries(params)) {
@@ -49,8 +41,7 @@ export function parseRequest(value: unknown, modelRoot: AbsolutePath): ParsedReq
         modelDirectory: resolveFilePath(modelRoot, request.modelDirectory as string),
         mediaPath: parseAbsolutePath(request.mediaPath),
         mediaDuration: request.mediaDuration,
-        params: request.params,
-        options: params as Record<string, string>,
+        params: { ...params as Record<string, string> },
         startedAt,
         config: {
             executor: request.executor,

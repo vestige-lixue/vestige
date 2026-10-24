@@ -5,6 +5,7 @@ import { VestigeErrors } from "../../shared/failure";
 
 export type NativeObject = Record<string, unknown>;
 export type Piece = { text: string; range?: Range; prob: number };
+export type RunDraft = Omit<Run, "execution">;
 
 export function object(value: unknown): NativeObject {
     return value !== null && typeof value === "object" && !Array.isArray(value) ? value as NativeObject : {};
@@ -63,11 +64,11 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     }
 }
 
-export function createRun(id: string, request: ParsedRequest, language: unknown, transcript: TranscriptSpan[], runTime: number): Run {
+export function createRun(id: string, request: ParsedRequest, language: unknown, transcript: TranscriptSpan[], runTime: number): RunDraft {
     return {
         id,
         startedAt: request.startedAt,
-        config: request.config,
+        config: { ...request.config, params: { ...request.config.params } },
         language: typeof language === "string" && language.trim() ? language : "und",
         languageProb: 1,
         runTime,

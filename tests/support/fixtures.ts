@@ -4,6 +4,7 @@ import { projectVersion } from "../../shared/project/constants";
 import { type TranscriptSpan } from "../../shared/transcription/Run";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type TextPosition } from "../../shared/util/range";
+import { type Execution } from "../../shared/transcription/Execution";
 
 export function transcript(texts: readonly string[]): TranscriptSpan[] {
     return texts.map((text, index) => ({
@@ -66,17 +67,31 @@ export function referenceText(spans: readonly TranscriptSpan[], modifications: r
 }
 
 export function project(spans: TranscriptSpan[] = transcript(["hello"]), modifications: Modification[] = []): Project {
+    const duration = Math.max(1, ...spans.map(span => span.range.end));
+    const mediaPath = (process.platform === "win32" ? "C:\\media\\fixture.wav" : "/media/fixture.wav") as AbsolutePath;
+    const program = { path: "/historical/fixture", version: null, sha256: null };
+    const execution: Execution = {
+        request: { executor: "whisper.cpp", backendDirectory: "", modelDirectory: "", params: {}, mediaPath, mediaDuration: duration },
+        plan: {
+            executor: "whisper.cpp",
+            backend: { directory: "/historical/backend", program: { ...program }, tools: [] },
+            model: { directory: "/historical/model", files: [{ role: "model", path: "/historical/model/model.bin", sha256: null }] },
+            audio: { program: { ...program }, stream: "0:a:0", sampleRate: 16000, channels: 1, format: "pcm-s16le", duration },
+            options: {}, nativeDefaults: null, strategy: { kind: "native", version: 1 }, segmentation: { maximumDuration: null, batchSize: 1 }, parts: [{ start: 0, end: duration }]
+        },
+        deviations: [], log: null
+    };
     return {
         version: projectVersion,
         lastOpened: 0,
         vestiges: [{
             media: {
                 id: "00000000-0000-4000-8000-000000000001",
-                path: (process.platform === "win32" ? "C:\\media\\fixture.wav" : "/media/fixture.wav") as AbsolutePath,
+                path: mediaPath,
                 size: 1024,
                 hash: "0123456789abcdef",
                 kind: "audio",
-                duration: Math.max(1, ...spans.map(span => span.range.end)),
+                duration,
                 name: "fixture.wav"
             },
             playbackPosition: 0,
@@ -86,6 +101,7 @@ export function project(spans: TranscriptSpan[] = transcript(["hello"]), modific
                 id: "00000000-0000-4000-8000-000000000002",
                 startedAt: 0,
                 config: { executor: "whisper.cpp", backendDirectory: "", modelDirectory: "", params: {} },
+                execution,
                 language: "en",
                 languageProb: 1,
                 runTime: 0,

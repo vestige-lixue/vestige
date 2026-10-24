@@ -114,6 +114,7 @@ describe("project validation contract through the real typia transform", () => {
             ...modification(spans, 2, 2, "X")
         ]);
         original.vestiges[0].runs[0].config = { ...original.vestiges[0].runs[0].config, params: { prompt: "fixture" } };
+        original.vestiges[0].runs[0].execution.request.params = { prompt: "fixture" };
         const input = { ...original, vestiges: [{ ...original.vestiges[0], media: { ...original.vestiges[0].media, path: "audio.wav" } }] };
         const before = structuredClone(input);
         const references = objectReferences(input);
@@ -231,6 +232,38 @@ describe("project validation contract through the real typia transform", () => {
             const input = project();
             expect(expectFailure({ ...input, vestiges: [{ ...input.vestiges[0], media: { ...input.vestiges[0].media, hash } }] }, "project-invalid-structure"))
                 .toMatchObject({ path: "project.vestiges[0].media.hash" });
+        }
+    });
+
+    it("round-trips execution evidence independently of missing or cross-machine logs", () => {
+        const input = project();
+        const run = input.vestiges[0].runs[0];
+        run.execution.log = { taskId: run.id, path: "/a-different-machine/deleted-task.log" };
+        run.execution.deviations = [
+            { originalRange: { start: 0, end: 1 }, range: { start: 0, end: 0.5 }, options: { temperature: "0.4" }, reasons: ["repetition"] },
+            { originalRange: { start: 0, end: 1 }, range: { start: 0.5, end: 1 }, options: {}, reasons: ["context"] }
+        ];
+        const parsed = parseProject(JSON.parse(JSON.stringify(input)));
+        expect(parsed.vestiges[0].runs[0].execution).toEqual(run.execution);
+        parsed.vestiges[0].runs[0].execution.deviations[0].options.temperature = "owned";
+        expect(run.execution.deviations[0].options.temperature).toBe("0.4");
+    });
+
+    it("rejects malformed execution scalars, mismatched requests and impossible final parts", () => {
+        const mutations: { change: (value: Project) => void; kind: string }[] = [
+            { change: value => value.vestiges[0].runs[0].execution.plan.audio.duration = Infinity, kind: "project-invalid-number" },
+            { change: value => value.vestiges[0].runs[0].execution.plan.segmentation.batchSize = 0.5, kind: "project-invalid-number" },
+            { change: value => value.vestiges[0].runs[0].execution.plan.parts[0].end = -1, kind: "project-invalid-number" },
+            { change: value => value.vestiges[0].runs[0].execution.request.params = { changed: "yes" }, kind: "project-invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.plan.parts[0].start = 0.5, kind: "project-invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 1 }, range: { start: 0.2, end: 1 }, options: {}, reasons: ["context"] }], kind: "project-invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 0.5 }, range: { start: 0, end: 0.5 }, options: {}, reasons: ["context"] }], kind: "project-invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 1 }, range: { start: 1, end: 0 }, options: {}, reasons: ["context"] }], kind: "project-reversed-range" }
+        ];
+        for (const { change, kind } of mutations) {
+            const input = project();
+            change(input);
+            expectFailure(input, kind);
         }
     });
 });

@@ -27,7 +27,7 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
         | "media-no-streams" | "media-no-duration" | "media-timeout" | "media-format"
         | "media-invalid-reference" | "media-invalid-check-id" | "media-invalid-concurrency" | "media-invalid-import"
         | "transcription-media-unavailable" | "transcription-cancelled" | "transcription-invalid-request"
-        | "transcription-invalid-id" | "transcription-params-text" | "transcription-params-object"
+        | "transcription-invalid-id" | "transcription-params-object"
         | "transcription-param-value" | "transcription-param-null"
         | "transcription-empty-result" | "transcription-truncated-output"
         | "audio-invalid-wave" | "audio-truncated-wave" | "audio-empty-wave"
@@ -71,7 +71,7 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
     kind: "transcription-empty-path";
     field: "backendDirectory" | "modelDirectory" | "mediaPath";
 } | {
-    kind: "transcription-invalid-json" | "transcription-invalid-result" | "project-invalid-json";
+    kind: "transcription-invalid-result" | "project-invalid-json";
     diagnostic: string;
 } | {
     kind: "transcription-invalid-option" | "transcription-managed-option";
