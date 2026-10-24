@@ -38,7 +38,7 @@ export type DownloadFailure = ({
 } | {
     kind: "download-conflict";
     scope: "destination" | "backend" | "runtime";
-    reason: "exists" | "mismatch" | "filename";
+    reason: "exists" | "filename";
     path: string;
     diagnostic?: string;
 } | {
@@ -46,6 +46,7 @@ export type DownloadFailure = ({
     directory: string;
     installed: boolean;
     diagnostic: string;
+    operation: FailureInfo | null;
 });
 
 export type Download = {

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { downloadChannels, type DownloadKind, type DownloadListResult, type DownloadStartResult } from "../../shared/downloads";
-import { isExpectedFailure, toFailureInfo, VestigeErrors, type OperationResult } from "../../shared/failure";
+import { toFailureInfo, VestigeErrors, type OperationResult } from "../../shared/failure";
 import { type AppPaths } from "../paths";
 import { fileOperationFailure, lstatOrNull } from "../util/fs";
 import { isSystemError } from "../util/file";
@@ -14,15 +14,12 @@ import { backendDownloads } from "../backends/catalog";
 import { type DownloadRoots, type DownloadSource } from "./types";
 import { installDownload } from "./install";
 import { aria2Transfer } from "./aria2";
-import { DownloadCleanupError } from "./cleanup";
 import { type TaskAdmission } from "../task/admission";
 
 type ActiveDownload = {
     taskId: string;
     controller: AbortController;
     completion: Promise<void>;
-    cleanup: DownloadCleanupError | null;
-    cancellation: Promise<void> | null;
 };
 
 export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths, "modelDirectory" | "backendDirectory" | "runtimeDirectory" | "runtimeCacheDirectory">, tasks: TaskOutputStore, admission: TaskAdmission): () => Promise<void> {
@@ -56,19 +53,9 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
     const latest = new Map<string, string>();
     let closing = false;
     const key = (kind: DownloadKind, id: string): string => `${kind}:${id}`;
-    const cancel = (resourceKey: string, task: ActiveDownload): Promise<void> => {
-        if (task.cancellation) return task.cancellation;
+    const cancel = (task: ActiveDownload): Promise<void> => {
         task.controller.abort();
-        task.cancellation = (async () => {
-            await task.completion;
-            if (task.cleanup) {
-                await task.cleanup.retry();
-                tasks.finish(task.taskId, task.cleanup.installed ? "succeeded" : "cancelled");
-                task.cleanup = null;
-                active.delete(resourceKey);
-            }
-        })().finally(() => task.cancellation = null);
-        return task.cancellation;
+        return task.completion;
     };
     handle(contents, downloadChannels.list, async (): Promise<DownloadListResult> => {
         try {
@@ -103,43 +90,39 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
         tasks.enqueue(taskId, "download");
         tasks.record(taskId, "Download", { kind: source.kind, id: source.id, name: source.name, directory: root });
         latest.set(resourceKey, taskId);
-        const task: ActiveDownload = { taskId, controller, completion: Promise.resolve(), cleanup: null, cancellation: null };
+        const task: ActiveDownload = { taskId, controller, completion: Promise.resolve() };
         active.set(resourceKey, task);
         const fail = (error: unknown): void => {
             const failure = toFailureInfo(error);
             tasks.record(taskId, "Error", failure);
             tasks.append(taskId, `${error instanceof Error ? error.message : String(error)}\n`);
-            if (error instanceof DownloadCleanupError) task.cleanup = error;
-            else tasks.finish(taskId, controller.signal.aborted ? "cancelled" : "failed", failure);
+            tasks.finish(taskId, controller.signal.aborted && error === controller.signal.reason ? "cancelled" : "failed", failure);
         };
         task.completion = admission.run(controller.signal, async () => {
             tasks.start(taskId);
             try {
-                await installDownload(source, { rootDirectory: root, runtimeDirectory, runtimeCacheDirectory }, aria2Transfer(runtimeDirectory, url => contents.session.resolveProxy(url)), {
+                const warning = await installDownload(source, { rootDirectory: root, runtimeDirectory, runtimeCacheDirectory }, aria2Transfer(runtimeDirectory, url => contents.session.resolveProxy(url)), {
                     append: text => tasks.append(taskId, text),
                     progress: value => tasks.progress(taskId, value)
                 }, controller.signal);
+                if (warning) {
+                    tasks.record(taskId, "Warning", warning);
+                    tasks.append(taskId, `Warning: ${JSON.stringify(warning)}\n`);
+                }
                 tasks.finish(taskId, "succeeded");
             }
             catch (error) {
                 fail(error);
             }
         }).catch(fail).finally(() => {
-            if (!task.cleanup) active.delete(resourceKey);
+            active.delete(resourceKey);
         });
         return { success: true, taskId };
     });
     handle(contents, downloadChannels.cancel, async (taskId: unknown): Promise<OperationResult> => {
         if (typeof taskId !== "string") return { success: false, error: { kind: "download-invalid-request" } };
-        try {
-            for (const [resourceKey, task] of active) if (task.taskId === taskId) await cancel(resourceKey, task);
-            return { success: true };
-        }
-        catch (error) {
-            if (isExpectedFailure(error)) return { success: false, error: error.failure };
-            if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "remove", error.path ?? null) };
-            throw error;
-        }
+        for (const task of active.values()) if (task.taskId === taskId) await cancel(task);
+        return { success: true };
     });
     handle(contents, downloadChannels.openDirectory, async (kind: unknown): Promise<OperationResult> => {
         if (kind !== "model" && kind !== "backend") return { success: false, error: { kind: "download-invalid-request" } };
@@ -173,6 +156,6 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
     return async () => {
         closing = true;
         cancelAll();
-        await Promise.allSettled([...active].map(([resourceKey, task]) => cancel(resourceKey, task)));
+        await Promise.allSettled([...active.values()].map(cancel));
     };
 }

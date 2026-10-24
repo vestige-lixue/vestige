@@ -733,7 +733,6 @@
             },
             "conflict": {
                 "exists": "The download folder already exists. Move it before downloading again: {{path}}",
-                "mismatch": "The installed backend does not match this release. Move it before downloading again: {{path}}",
                 "filename": "Different package files use the same destination: {{path}}"
             },
             "cleanup": {

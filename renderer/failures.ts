@@ -89,7 +89,8 @@ export function describeFailure(failure: FailureInfo): string {
         case "download-conflict":
             return withDiagnostic(i18n.t(`errors.download.conflict.${failure.reason}`, failure), failure);
         case "download-cleanup":
-            return withDiagnostic(i18n.t(failure.installed ? "errors.download.cleanup.installed" : "errors.download.cleanup.incomplete", failure), failure);
+            return (failure.operation ? `${describeFailure(failure.operation)}\n\n` : "")
+                + withDiagnostic(i18n.t(failure.installed ? "errors.download.cleanup.installed" : "errors.download.cleanup.incomplete", failure), failure);
         case "unexpected": case "native-spawn-failed": case "transcription-invalid-json": case "project-invalid-json":
             return failure.diagnostic;
         case "native-failed":
