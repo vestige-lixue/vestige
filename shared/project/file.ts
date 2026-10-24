@@ -17,3 +17,11 @@ export type SaveProjectResult = ({
     success: false;
     error: FailureInfo;
 });
+
+export type CheckProjectFileResult = ({
+    success: true;
+    exists: boolean;
+} | {
+    success: false;
+    error: FailureInfo;
+});

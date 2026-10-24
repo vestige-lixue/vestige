@@ -1,6 +1,6 @@
 import { type FilePathResult } from "./util/file";
 import { type TranscriptionRequest, type TranscriptionResult } from "./transcription/executor";
-import { type GetProjectResult, type SaveProjectResult } from "./project/file";
+import { type GetProjectResult, type SaveProjectResult, type CheckProjectFileResult } from "./project/file";
 import { type Project } from "./project/Project";
 import { type AbsolutePath } from "./util/path";
 import { type MediaCheckResult, type MediaReference, type MediaURLResult } from "./media/check";
@@ -60,6 +60,7 @@ export type AppAPI = {
     };
     project: {
         getProject(path: AbsolutePath): Promise<GetProjectResult>;
+        checkProjectFile(path: AbsolutePath): Promise<CheckProjectFileResult>;
         saveProject(path: AbsolutePath, project: Project): Promise<SaveProjectResult>;
         selectOpenPath(): Promise<AbsolutePath | null>;
         selectSavePath(path: AbsolutePath | null, saveAs: boolean): Promise<AbsolutePath | null>;

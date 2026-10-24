@@ -61,6 +61,7 @@ const api: AppAPI = {
     },
     project: {
         getProject: path => ipcRenderer.invoke(projectChannels.get, path),
+        checkProjectFile: path => ipcRenderer.invoke(projectChannels.checkFile, path),
         saveProject: (path, project) => ipcRenderer.invoke(projectChannels.save, path, project),
         selectOpenPath: () => ipcRenderer.invoke(projectChannels.openDialog),
         selectSavePath: (path, saveAs) => ipcRenderer.invoke(projectChannels.saveDialog, path, saveAs)

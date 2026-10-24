@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type Project } from "../../shared/project/Project";
 import { type AbsolutePath } from "../../shared/util/path";
-import { type GetProjectResult, type SaveProjectResult, type MediaPathMode } from "../../shared/project/file";
+import { type GetProjectResult, type SaveProjectResult, type CheckProjectFileResult, type MediaPathMode } from "../../shared/project/file";
 import { ProjectValidationFailure, validateProject } from "./validate";
 import { parseAbsolutePath, InvalidPathFailure, isSystemError } from "../util/file";
 import { pathKey, statOrNull, writeFileAtomic } from "../util/fs";
@@ -29,6 +29,19 @@ export async function getProject(path: unknown): Promise<GetProjectResult> {
     catch (error) {
         console.error("Could not open project:", path, error);
         if (error instanceof ProjectValidationFailure || error instanceof InvalidPathFailure || isSystemError(error)) return { success: false, error: toFailureInfo(error) };
+        throw error;
+    }
+}
+
+export async function checkProjectFile(path: unknown): Promise<CheckProjectFileResult> {
+    try {
+        const normalized = parseAbsolutePath(path);
+        const existing = await statOrNull(normalized);
+        if (existing && !existing.isFile()) throw new InvalidPathFailure({ kind: "project-path-not-file" });
+        return { success: true, exists: existing !== null };
+    }
+    catch (error) {
+        if (error instanceof InvalidPathFailure || isSystemError(error)) return { success: false, error: toFailureInfo(error) };
         throw error;
     }
 }

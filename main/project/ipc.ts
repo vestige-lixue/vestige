@@ -1,7 +1,7 @@
 import { VestigeErrors } from "../../shared/failure";
 import { selectOpenProjectPath, selectSaveProjectPath } from "../ui/fileDialogs";
 import { type BrowserWindow, type IpcMainInvokeEvent } from "electron";
-import { getProject, saveProject } from "./file";
+import { getProject, saveProject, checkProjectFile } from "./file";
 import { type Project } from "../../shared/project/Project";
 import { projectChannels } from "../../shared/ipc";
 import * as settings from "../settings/store";
@@ -14,6 +14,10 @@ export function registerProjectIPCs(window: BrowserWindow): void {
     contents.ipc.handle(projectChannels.get, (event, path: unknown) => {
         checkSender(event);
         return getProject(path);
+    });
+    contents.ipc.handle(projectChannels.checkFile, (event, path: unknown) => {
+        checkSender(event);
+        return checkProjectFile(path);
     });
     contents.ipc.handle(projectChannels.save, (event, path: unknown, project: Project) => {
         checkSender(event);
