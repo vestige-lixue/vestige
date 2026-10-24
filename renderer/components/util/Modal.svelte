@@ -1,7 +1,9 @@
-<Dialog.Root bind:open onOpenChangeComplete={handleOpenChangeComplete}>
+<Dialog.Root bind:open={() => visible, value => {
+    if (!value) void requestClose();
+}} onOpenChangeComplete={handleOpenChangeComplete}>
     <Dialog.Portal>
         <Dialog.Overlay class="modal-overlay" style={`z-index: ${layerIndex};`} onclick={() => {
-            if (clickMaskBehavior === "close") open = false;
+            if (clickMaskBehavior === "close") void requestClose();
         }}>
             <div class="titlebar-backdrop"></div>
             <div class="content-backdrop"></div>
@@ -164,9 +166,10 @@
 
 
 <script lang="ts">
-    import { onDestroy, untrack, type Snippet } from "svelte";
+    import { getContext, onDestroy, untrack, type Snippet } from "svelte";
     import * as modal from "../../states/modal.svelte";
     import { Dialog } from "bits-ui";
+    import { dialogLifecycleKey, type DialogLifecycle } from "../dialogs/lifecycle";
 
     type Props = {
         open: boolean;
@@ -180,8 +183,9 @@
         actions?: Snippet;
         onkeydown?: (event: KeyboardEvent) => void;
         onOpenAutoFocus?: () => void;
+        beforeClose?: () => boolean | Promise<boolean>;
         // Clear content data or unmount the caller only after this reports false.
-        onOpenChangeComplete: (open: boolean) => void;
+        onOpenChangeComplete?: (open: boolean) => void;
     };
 
     let {
@@ -196,23 +200,88 @@
         actions,
         onkeydown,
         onOpenAutoFocus,
+        beforeClose,
         onOpenChangeComplete
     }: Props = $props();
 
     let content = $state<HTMLDivElement | null>(null);
+    let visible = $state(untrack(() => open));
+    let phase: "open" | "checking" | "closing" | "closed" = untrack(() => open) ? "open" : "closed";
+    let closeVersion = 0;
+    let disposed = false;
     let returnFocus: Element | null = null;
+    const lifecycle = getContext<DialogLifecycle | undefined>(dialogLifecycleKey);
     const layer = Symbol();
     const layerIndex = $derived(modal.getLayerIndex(layer));
 
     $effect.pre(() => {
-        if (open) untrack(() => modal.openLayer(layer));
+        if (visible) untrack(() => modal.openLayer(layer));
     });
-    onDestroy(() => modal.closeLayer(layer));
+    $effect(() => {
+        const requested = open;
+        untrack(() => {
+            if (requested) {
+                if (phase !== "open") {
+                    closeVersion++;
+                    phase = "open";
+                    visible = true;
+                }
+            }
+            else if (phase === "open") void requestClose();
+        });
+    });
+    onDestroy(() => {
+        disposed = true;
+        closeVersion++;
+        modal.closeLayer(layer);
+    });
+
+    async function requestClose(): Promise<void> {
+        if (disposed || phase !== "open") return;
+        phase = "checking";
+        const version = ++closeVersion;
+        try {
+            // Read the current guard only for this request, never as an effect dependency.
+            const accepted = await untrack(() => beforeClose?.());
+            if (disposed || version !== closeVersion) return;
+            if (accepted === false) {
+                phase = "open";
+                open = true;
+                return;
+            }
+            approveClose();
+        }
+        catch (error) {
+            if (disposed || version !== closeVersion) return;
+            phase = "open";
+            open = true;
+            console.error("The dialog could not close.", error);
+        }
+    }
+
+    // A domain editor may already have committed before choosing to close.
+    export function approveClose(): void {
+        if (disposed || phase === "closing" || phase === "closed") return;
+        closeVersion++;
+        phase = "closing";
+        visible = false;
+        open = false;
+    }
 
     function handleOpenChangeComplete(isOpen: boolean): void {
-        if (!isOpen && !open) {
-            modal.closeLayer(layer);
+        if (isOpen) {
+            onOpenChangeComplete?.(true);
+            return;
         }
-        onOpenChangeComplete(isOpen);
+        if (visible || open || phase !== "closing") return;
+        phase = "closed";
+        modal.closeLayer(layer);
+        try {
+            onOpenChangeComplete?.(false);
+        }
+        finally {
+            // Application cleanup cannot depend on a business callback reaching onClosed.
+            lifecycle?.closed();
+        }
     }
 </script>

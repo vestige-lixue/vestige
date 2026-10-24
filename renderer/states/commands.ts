@@ -1,4 +1,6 @@
 import { tick } from "svelte";
+import { type ParseKeys } from "i18next";
+import * as i18n from "../i18n.svelte";
 import { focus, type FocusTarget } from "../focus";
 import * as project from "./project.svelte";
 import * as mediaImport from "./mediaImport.svelte";
@@ -128,7 +130,7 @@ export function interfaceBlocked(): boolean {
 
 function openTranscriptionConfig(mediaId: string): void {
     if (!mediaImport.isReady(mediaId) || transcription.isPending(transcription.getTask(mediaId))) return;
-    dialogsAPI.show({ kind: "transcription", mediaId, onClosed: () => { } });
+    dialogsAPI.show({ kind: "transcription", mediaId });
 }
 
 function openTranscriptionTasks(focusTaskId?: string): void {
@@ -138,15 +140,14 @@ function openTranscriptionTasks(focusTaskId?: string): void {
         onRetry: taskId => {
             const task = transcription.getTaskById(taskId);
             if (task) openTranscriptionConfig(task.mediaId);
-        },
-        onClosed: () => { }
+        }
     });
 }
 
 function openPanel(panel: "transcription-backends" | "transcription-models" | "transcription-presets" | "vocabulary" | "tasks" | "settings" | "licenses" | "about" | "guide"): void {
     if (panel === "tasks") openTranscriptionTasks();
     else if (panel === "transcription-presets") dialogsAPI.showTranscriptionPresets();
-    else dialogsAPI.show({ kind: panel, onClosed: () => { } });
+    else dialogsAPI.show({ kind: panel });
 }
 
 export function wordPosition(direction: -1 | 1, fromWordIndex?: number): number | null {
@@ -163,84 +164,150 @@ function adjacentMediaMove(direction: -1 | 1): MoveMediaCommand | null {
     return { kind: "moveMedia", mediaId, beforeId };
 }
 
-export function commandDisabled(command: Command): boolean {
-    switch (command.kind) {
-        case "saveProject": return !mediaImport.hasPendingImports() && (!project.projectState.project || project.projectState.path !== null);
-        case "saveProjectAs": case "closeProject": return !project.projectState.project && !mediaImport.hasPendingImports();
-        case "openTranscriptionConfig": {
-            const task = command.mediaId ? transcription.getTask(command.mediaId) : null;
-            return !settings.isReady() || !command.mediaId || !mediaImport.isReady(command.mediaId) || transcription.isPending(task);
-        }
-        case "stopTranscription": {
+type CommandOf<Kind extends Command["kind"]> = Command & { kind: Kind };
+type CommandDefinition<Kind extends Command["kind"]> = {
+    run: (command: CommandOf<Kind>) => void;
+    enabled: (command: CommandOf<Kind>) => boolean;
+    label: (command: CommandOf<Kind>) => string;
+};
+
+const always = (): boolean => true;
+const hasProject = (): boolean => !!project.projectState.project || mediaImport.hasPendingImports();
+const hasPlayback = (): boolean => !!player.getURL();
+const label = (key: ParseKeys): (() => string) => () => i18n.t(key);
+const panelLabels = {
+    "transcription-backends": "transcription.backends.actions.manage",
+    "transcription-models": "transcription.models.actions.manage",
+    "transcription-presets": "transcription.presets.actions.manage",
+    vocabulary: "transcription.vocabulary.title", tasks: "transcription.tasks.title", settings: "settings.title",
+    licenses: "licenses.title", about: "menu.other.about", guide: "guide.title"
+} satisfies Record<OpenPanelCommand["panel"], ParseKeys>;
+
+function seekWord(time: number | null): void {
+    if (time === null) return;
+    const playing = player.isPlaying();
+    // Pausing captures the current transport position before the new seek is requested.
+    playerAPI.setPlaying({ pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback]);
+    projectAPI.seekPlayback(time);
+}
+
+const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
+    newProject: { run: () => void projectAPI.create(), enabled: always, label: label("menu.project.new") },
+    openProject: { run: () => void projectAPI.open(), enabled: always, label: label("menu.project.open") },
+    saveProject: {
+        run: () => void projectAPI.save(),
+        enabled: () => mediaImport.hasPendingImports() || !!project.projectState.project && project.projectState.path === null,
+        label: label("common.save")
+    },
+    saveProjectAs: { run: () => void projectAPI.save(true), enabled: hasProject, label: label("menu.project.saveAs") },
+    closeProject: { run: () => void projectAPI.close(), enabled: hasProject, label: label("common.close") },
+    quitApp: {
+        run: () => void projectAPI.close().then(closed => {
+            if (closed) window.api.quit();
+        }),
+        enabled: always, label: label("menu.other.quit")
+    },
+    importMedia: { run: () => void projectAPI.selectMediaForImport(), enabled: always, label: label("menu.media.import") },
+    openPanel: { run: command => openPanel(command.panel), enabled: always, label: command => i18n.t(panelLabels[command.panel]) },
+    openTranscriptionConfig: {
+        run: command => openTranscriptionConfig(command.mediaId!),
+        enabled: command => settings.isReady() && !!command.mediaId && mediaImport.isReady(command.mediaId)
+            && !transcription.isPending(transcription.getTask(command.mediaId)),
+        label: label("transcription.actions.new")
+    },
+    stopTranscription: {
+        run: command => transcriptionAPI.stop(command.mediaId!),
+        enabled: command => {
             const status = command.mediaId ? transcription.getTask(command.mediaId)?.status : null;
-            return status !== "running" && status !== "queued";
+            return status === "running" || status === "queued";
+        },
+        label: command => {
+            const status = command.mediaId ? transcription.getTask(command.mediaId)?.status : null;
+            return i18n.t(status === "queued" ? "transcription.actions.cancelQueued"
+                : status === "stopping" ? "transcription.tasks.status.stopping" : "transcription.actions.stop");
         }
-        case "reviewTranscriptionError": return !command.mediaId || transcription.getTask(command.mediaId)?.status !== "failed";
-        case "openTranscriptionTask": return !command.mediaId || !transcription.getTask(command.mediaId);
-        case "selectMedia": return !mediaImport.isReady(command.mediaId);
-        case "playSelectedMedia": case "seekSelectedMedia": return !player.getURL();
-        case "seekWord": return !player.getURL() || !Number.isFinite(command.time);
-        case "selectAdjacentMedia": return mediaSelection.adjacent(command.direction, true) === null;
-        case "moveSelectedMedia": return adjacentMediaMove(command.direction) === null;
-        case "seekAdjacentWord": return !player.getURL() || wordPosition(command.direction, command.fromWordIndex) === null;
-        default: return false;
+    },
+    reviewTranscriptionError: {
+        run: command => openTranscriptionTasks(transcription.getTask(command.mediaId!)?.id),
+        enabled: command => !!command.mediaId && transcription.getTask(command.mediaId)?.status === "failed",
+        label: label("transcription.actions.reviewFailure")
+    },
+    openTranscriptionTask: {
+        run: command => openTranscriptionTasks(transcription.getTask(command.mediaId!)?.id),
+        enabled: command => !!command.mediaId && !!transcription.getTask(command.mediaId), label: label("transcription.tasks.title")
+    },
+    selectMedia: {
+        run: command => projectAPI.selectMedia(command.mediaId), enabled: command => mediaImport.isReady(command.mediaId),
+        label: command => mediaImport.getName(command.mediaId)
+    },
+    renameMedia: { run: command => projectAPI.renameMedia(command.mediaId, command.name), enabled: always, label: label("media.renameHint") },
+    moveMedia: {
+        run: command => projectAPI.moveMedia(command.mediaId, command.beforeId), enabled: always,
+        label: command => mediaImport.getName(command.mediaId)
+    },
+    removeMedia: { run: command => projectAPI.removeMedia(command.mediaId), enabled: always, label: label("media.actions.remove") },
+    retryMediaImportError: { run: command => projectAPI.retryMedia(command.mediaId), enabled: always, label: label("common.retry") },
+    relocateMedia: { run: command => projectAPI.relinkMedia(command.mediaId), enabled: always, label: label("media.reference.actions.relocate") },
+    ignoreMediaImportError: { run: command => projectAPI.ignoreMedia(command.mediaId), enabled: always, label: label("media.reference.actions.ignore") },
+    reviewMediaImportError: { run: command => projectAPI.reviewMedia(command.mediaId), enabled: always, label: label("media.import.failure.title") },
+    playSelectedMedia: {
+        run: () => playerAPI.togglePlaying(), enabled: hasPlayback,
+        label: () => i18n.t(player.isPlaying() ? "player.actions.pause" : "player.actions.play")
+    },
+    cyclePlaybackMode: { run: () => playerAPI.cycleMode(), enabled: always, label: () => i18n.t(`player.modes.${player.getMode()}`) },
+    focus: {
+        // Closing menus must release focus before the target receives it.
+        run: command => void tick().then(() => focus(command.target)), enabled: always, label: label("player.actions.focusSlider")
+    },
+    setPlaybackSpeed: { run: command => playerAPI.setSpeed(command.speed), enabled: always, label: command => `${command.speed}×` },
+    savePlaybackSpeed: { run: () => playerAPI.saveSpeed(), enabled: always, label: label("common.save") },
+    restorePlaybackSpeed: { run: () => playerAPI.restoreSpeed(), enabled: always, label: label("player.actions.restoreSpeed") },
+    setPlaybackVolume: { run: command => playerAPI.setVolume(command.volume), enabled: always, label: command => `${command.volume * 100}%` },
+    toggleVolumeStabilization: {
+        run: () => playerAPI.toggleVolumeStabilization(), enabled: always,
+        label: () => i18n.t(player.isVolumeStabilizationEnabled() ? "player.actions.disableStabilization" : "player.actions.enableStabilization")
+    },
+    seekSelectedMedia: { run: command => projectAPI.seekPlayback(command.time, command.mode), enabled: hasPlayback, label: label("player.actions.focusSlider") },
+    selectAdjacentMedia: {
+        run: command => projectAPI.selectMedia(mediaSelection.adjacent(command.direction, true)),
+        enabled: command => mediaSelection.adjacent(command.direction, true) !== null,
+        label: command => i18n.t(command.direction === -1 ? "player.actions.previousMedia" : "player.actions.nextMedia")
+    },
+    moveSelectedMedia: {
+        run: command => {
+            const move = adjacentMediaMove(command.direction);
+            if (move) projectAPI.moveMedia(move.mediaId, move.beforeId);
+        },
+        enabled: command => adjacentMediaMove(command.direction) !== null,
+        label: command => i18n.t(command.direction === -1 ? "media.actions.moveEarlier" : "media.actions.moveLater")
+    },
+    seekWord: { run: command => seekWord(command.time), enabled: command => hasPlayback() && Number.isFinite(command.time), label: label("player.actions.focusSlider") },
+    seekAdjacentWord: {
+        run: command => seekWord(wordPosition(command.direction, command.fromWordIndex)),
+        enabled: command => hasPlayback() && wordPosition(command.direction, command.fromWordIndex) !== null,
+        label: command => i18n.t(command.direction === -1 ? "player.actions.previousWord" : "player.actions.nextWord")
+    },
+    openDevTools: { run: () => window.api.openDevTools(), enabled: always, label: label("menu.other.developerTools") },
+    openProjectRepository: {
+        run: () => {
+            window.open("https://github.com/vestige-lixue/vestige", "_blank");
+        },
+        enabled: always, label: label("menu.other.repository")
     }
+};
+
+function definition<Kind extends Command["kind"]>(kind: Kind): CommandDefinition<Kind> {
+    return definitions[kind];
+}
+
+export function commandDisabled(command: Command): boolean {
+    return !definition(command.kind).enabled(command);
+}
+
+export function commandLabel(command: Command): string {
+    return definition(command.kind).label(command);
 }
 
 export function runCommand(command: Command): void {
-    if (interfaceBlocked() || commandDisabled(command)) return;
-    switch (command.kind) {
-        case "newProject": void projectAPI.create(); break;
-        case "openProject": void projectAPI.open(); break;
-        case "saveProject": void projectAPI.save(); break;
-        case "saveProjectAs": void projectAPI.save(true); break;
-        case "closeProject": void projectAPI.close(); break;
-        case "quitApp": void projectAPI.close().then(closed => {
-            if (closed) window.api.quit();
-        }); break;
-        case "importMedia": void projectAPI.selectMediaForImport(); break;
-        case "openPanel": openPanel(command.panel); break;
-        case "openTranscriptionConfig": openTranscriptionConfig(command.mediaId!); break;
-        case "stopTranscription": transcriptionAPI.stop(command.mediaId!); break;
-        case "reviewTranscriptionError": openTranscriptionTasks(transcription.getTask(command.mediaId!)?.id); break;
-        case "openTranscriptionTask": openTranscriptionTasks(transcription.getTask(command.mediaId!)?.id); break;
-        case "selectMedia": projectAPI.selectMedia(command.mediaId); break;
-        case "renameMedia": projectAPI.renameMedia(command.mediaId, command.name); break;
-        case "moveMedia": projectAPI.moveMedia(command.mediaId, command.beforeId); break;
-        case "removeMedia": projectAPI.removeMedia(command.mediaId); break;
-        case "retryMediaImportError": projectAPI.retryMedia(command.mediaId); break;
-        case "relocateMedia": projectAPI.relinkMedia(command.mediaId); break;
-        case "ignoreMediaImportError": projectAPI.ignoreMedia(command.mediaId); break;
-        case "reviewMediaImportError": projectAPI.reviewMedia(command.mediaId); break;
-        case "playSelectedMedia": playerAPI.togglePlaying(); break;
-        case "cyclePlaybackMode": playerAPI.cycleMode(); break;
-        case "focus":
-            // Closing menus must release focus before the target receives it.
-            void tick().then(() => focus(command.target));
-            break;
-        case "setPlaybackSpeed": playerAPI.setSpeed(command.speed); break;
-        case "savePlaybackSpeed": playerAPI.saveSpeed(); break;
-        case "restorePlaybackSpeed": playerAPI.restoreSpeed(); break;
-        case "setPlaybackVolume": playerAPI.setVolume(command.volume); break;
-        case "toggleVolumeStabilization": playerAPI.toggleVolumeStabilization(); break;
-        case "seekSelectedMedia": projectAPI.seekPlayback(command.time, command.mode); break;
-        case "selectAdjacentMedia": projectAPI.selectMedia(mediaSelection.adjacent(command.direction, true)); break;
-        case "moveSelectedMedia": {
-            const move = adjacentMediaMove(command.direction);
-            if (move) projectAPI.moveMedia(move.mediaId, move.beforeId);
-            break;
-        }
-        case "seekWord": case "seekAdjacentWord": {
-            const time = command.kind === "seekWord" ? command.time : wordPosition(command.direction, command.fromWordIndex);
-            if (time !== null) {
-                const playing = player.isPlaying();
-                // Pausing captures the current transport position before the new seek is requested.
-                playerAPI.setPlaying({ pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback]);
-                projectAPI.seekPlayback(time);
-            }
-            break;
-        }
-        case "openDevTools": window.api.openDevTools(); break;
-        case "openProjectRepository": window.open("https://github.com/vestige-lixue/vestige", "_blank"); break;
-    }
+    if (!interfaceBlocked() && !commandDisabled(command)) definition(command.kind).run(command);
 }

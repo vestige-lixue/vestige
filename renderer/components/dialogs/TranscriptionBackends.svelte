@@ -1,6 +1,4 @@
-<Modal bind:open={() => open, value => {
-    if (value || beforeClose?.() !== false) open = value;
-}} width="720px" height="80%" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
+<Modal bind:open {beforeClose} width="720px" height="80%" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={open => {
     if (!open) onClosed();
 }}>
     <Dialog.Title class="modal-title">{i18n.t("transcription.backends.title")}</Dialog.Title>

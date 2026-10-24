@@ -53,7 +53,7 @@
                     tabindex={tabStop === 3 ? 0 : -1} onfocus={() => focusedTarget = 3} />
                 <Tooltip
                     text={i18n.t(transcriptionCommand.kind === "openTranscriptionConfig" ? "transcription.actions.new" : "transcription.tasks.title")}
-                    shortcut={transcriptionCommand.kind === "openTranscriptionConfig" ? `${modKeyText}+B` : `${modKeyText}+T`}
+                    shortcut={shortcut(transcriptionCommand)}
                     disabled={commandDisabled(transcriptionCommand)}
                     tabindex={tabStop === 4 ? 0 : -1}
                     onfocus={() => focusedTarget = 4}
@@ -181,6 +181,7 @@
 
 
 <script lang="ts">
+    import { shortcut } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as project from "../../states/project.svelte";
@@ -196,7 +197,6 @@
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
     import Tooltip from "../util/Tooltip.svelte";
 
-    const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
     const { mediaId, dragging = false }: { mediaId: string; dragging?: boolean } = $props();
     const item = $derived(mediaImport.get(mediaId));
     const issue = $derived(item && mediaImport.isIssue(item) ? item : null);

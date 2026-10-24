@@ -1,5 +1,5 @@
 <nav>
-    <Tooltip text={i18n.t("transcription.vocabulary.title")} shortcut={`${modKeyText}+L`} onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
+    <Tooltip text={i18n.t("transcription.vocabulary.title")} shortcut={shortcut({ kind: "openPanel", panel: "vocabulary" })} onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
         {#snippet child({ props })}
             <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -7,7 +7,7 @@
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text={i18n.t("transcription.tasks.title")} shortcut={`${modKeyText}+T`} onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
+    <Tooltip text={i18n.t("transcription.tasks.title")} shortcut={shortcut({ kind: "openPanel", panel: "tasks" })} onclick={() => runCommand({ kind: "openPanel", panel: "tasks" })}>
         {#snippet child({ props })}
             <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -18,7 +18,7 @@
             </button>
         {/snippet}
     </Tooltip>
-    <Tooltip text={i18n.t("settings.title")} shortcut={`${modKeyText}+,`} onclick={() => runCommand({ kind: "openPanel", panel: "settings" })}>
+    <Tooltip text={i18n.t("settings.title")} shortcut={shortcut({ kind: "openPanel", panel: "settings" })} onclick={() => runCommand({ kind: "openPanel", panel: "settings" })}>
         {#snippet child({ props })}
             <button {...props} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -70,6 +70,7 @@
 
 
 <script lang="ts">
+    import { shortcut } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
     import * as transcription from "../../states/transcription.svelte";
     import Tooltip from "../util/Tooltip.svelte";
@@ -78,6 +79,5 @@
     import taskBlankIcon from "../../../resources/icons/carbon--task-blank.svg?raw";
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
 
-    const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
     const taskCount = $derived(transcription.tasks.filter(transcription.isPending).length);
 </script>

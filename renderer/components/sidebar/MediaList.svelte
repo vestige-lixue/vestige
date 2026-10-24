@@ -10,7 +10,7 @@
             <div class="empty-state">
                 <LocalizedText text={i18n.t("media.empty.description")} slots={{ action: importAction, shortcut: importShortcut }} />
                 {#snippet importAction()}<button class="link-button focusable" onclick={() => runCommand({ kind: "importMedia" })}>{i18n.t("media.empty.importAction")}</button>{/snippet}
-                {#snippet importShortcut()}<kbd>{modKeyText}+I</kbd>{/snippet}
+                {#snippet importShortcut()}<kbd>{shortcut({ kind: "importMedia" })}</kbd>{/snippet}
             </div>
         {/if}
     {/each}
@@ -76,6 +76,7 @@
 
 
 <script lang="ts">
+    import { shortcut } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
     import LocalizedText from "../util/LocalizedText.svelte";
     import * as mediaImport from "../../states/mediaImport.svelte";
@@ -84,6 +85,5 @@
     import MediaItem from "./MediaItem.svelte";
     import { mediaReorder, type MediaReorderPreview } from "./mediaReorder";
 
-    const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
     let reorder = $state<MediaReorderPreview | null>(null);
 </script>

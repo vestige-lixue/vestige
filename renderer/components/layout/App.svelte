@@ -35,6 +35,7 @@
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
     import { onMount } from "svelte";
+    import * as keybindings from "../../keybindings";
     import { Tooltip } from "bits-ui";
     import Menu from "./Menu.svelte";
     import Player from "../player/Player.svelte";
@@ -57,16 +58,18 @@
     });
 
     onMount(() => {
+        const stopKeybindings = keybindings.mount();
         void settingsAPI.initialize();
         const stopTranscription = transcriptionAPI.startLifecycle();
         const stopProject = projectAPI.startLifecycle(async () => {
             if (await settingsAPI.save()) return true;
             if (!dialogs.state.dialogs.some(dialog => dialog.kind === "settings" && dialog.open)) {
-                dialogsAPI.show({ kind: "settings", onClosed: () => {} });
+                dialogsAPI.show({ kind: "settings" });
             }
             return false;
         });
         return () => {
+            stopKeybindings();
             stopTranscription();
             stopProject();
             settingsAPI.dispose();

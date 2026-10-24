@@ -1,8 +1,5 @@
-<Modal bind:open={() => visible, value => {
-    if (value) visible = true;
-    else void close();
-}} width="min(90%, 800px)" escBehavior="close" clickMaskBehavior="close" onkeydown={handleKeydown} onOpenChangeComplete={value => {
-    if (!value && !visible) onClosed();
+<Modal bind:open beforeClose={beforeClose} width="min(90%, 800px)" escBehavior="close" clickMaskBehavior="close" onkeydown={handleKeydown} onOpenChangeComplete={value => {
+    if (!value) onClosed();
 }}>
     <Dialog.Title class="modal-title">{i18n.t("transcription.config.title")}</Dialog.Title>
     <Dialog.Description class="modal-description">{project.getMedia(mediaId)?.name ?? ""}</Dialog.Description>
@@ -31,7 +28,7 @@
         <TextButton disabled={pending} onclick={() => void (initialized ? commit() : initialize())}>{i18n.t("common.retry")}</TextButton>
     {/if}
     {#snippet actions()}
-        <TextButton class="primary" disabled={startDisabled} onclick={() => void close(true)}>
+        <TextButton class="primary" disabled={startDisabled} onclick={requestStart}>
             {i18n.t("transcription.config.submit")}
         </TextButton>
     {/snippet}
@@ -68,7 +65,7 @@
 
 <script lang="ts">
     import TextButton from "../util/TextButton.svelte";
-    import { onMount, untrack } from "svelte";
+    import { onMount } from "svelte";
     import * as i18n from "../../i18n.svelte";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
@@ -90,12 +87,11 @@
 
     type Props = { open: boolean; dialogId: string; mediaId: string; onClosed: () => void };
     let { open = $bindable(), dialogId, mediaId, onClosed }: Props = $props();
-    let visible = $state(untrack(() => open));
     let config = $state<Config>(defaultConfig());
     let selectedName = $state("");
     let initialized = $state(false);
     let pending = $state(false);
-    let closing = false;
+    let startOnClose = false;
     let alive = true;
     let commitTask: Promise<boolean> | null = null;
     let validate = $state<(requireDirectory?: boolean, report?: boolean) => boolean>();
@@ -114,10 +110,6 @@
         };
     });
     $effect(() => {
-        if (open) visible = true;
-        else if (visible && !pending) untrack(() => void close());
-    });
-    $effect(() => {
         if (selectedName && !presets.some(preset => preset.name === selectedName && configsEqual(preset.config, config))) selectedName = "";
     });
 
@@ -125,12 +117,12 @@
         // Dropdowns consume Enter before it bubbles here, including the press that closes their list.
         if (event.key !== "Enter" || event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.repeat
             || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-        if (!open || !visible || startDisabled || dialogs.state.dialogs.at(-1)?.id !== dialogId) return;
+        if (!open || startDisabled || dialogs.state.dialogs.at(-1)?.id !== dialogId) return;
         const target = event.target;
         if (target !== event.currentTarget && (!(target instanceof HTMLInputElement) || target.type !== "text"
             || target.disabled || target.readOnly || !target.matches(".combobox-input, .parameters input"))) return;
         event.preventDefault();
-        void close(true);
+        requestStart();
     }
 
     async function initialize(): Promise<void> {
@@ -169,19 +161,16 @@
         return operation;
     }
 
-    async function close(startTranscription = false): Promise<void> {
-        if (closing || pending || !visible) return;
-        if (startTranscription && (validate?.(true) !== true || project.projectState.locked)) return;
-        closing = true;
-        try {
-            if (await commit() && (!startTranscription || transcriptionAPI.start(mediaId, config))) {
-                visible = false;
-                open = false;
-            }
-            else open = true;
-        }
-        finally {
-            closing = false;
-        }
+    function requestStart(): void {
+        if (!open || startDisabled) return;
+        startOnClose = true;
+        open = false;
+    }
+
+    async function beforeClose(): Promise<boolean> {
+        const startTranscription = startOnClose;
+        startOnClose = false;
+        if (pending || startTranscription && (validate?.(true) !== true || project.projectState.locked)) return false;
+        return await commit() && (!startTranscription || !!transcriptionAPI.start(mediaId, config));
     }
 </script>

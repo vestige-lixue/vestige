@@ -7,7 +7,7 @@
         </div>
         <Tooltip
             text={project.projectState.path ?? i18n.t("project.unsaved.hint")}
-            shortcut={project.projectState.path === null ? `${modKeyText}+S` : undefined}
+            shortcut={project.projectState.path === null ? shortcut({ kind: "saveProject" }) : undefined}
             side="bottom"
             sideOffset={15}
             onclick={project.projectState.path === null ? () => runCommand({ kind: "saveProject" }) : undefined}
@@ -83,6 +83,7 @@
 
 
 <script lang="ts">
+    import { shortcut } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
     import * as project from "../../states/project.svelte";
     import { runCommand } from "../../states/commands";
@@ -96,7 +97,6 @@
     let { reservedWidth = $bindable(0) }: Props = $props();
 
     const title = $derived((project.getFileName() ?? i18n.t("project.unsaved.name")).replace(/\.vestige$/i, ""));
-    const modKeyText = window.api.platform === "darwin" ? "⌘" : "Ctrl";
 
     $effect(() => {
         if (!project.projectState.project) reservedWidth = 0;

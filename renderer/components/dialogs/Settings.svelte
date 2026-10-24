@@ -1,8 +1,5 @@
-<Modal bind:open={() => visible, value => {
-    if (value) visible = true;
-    else void close();
-}} width="750px" height="80%" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={value => {
-    if (!value && !visible) onClosed();
+<Modal bind:open {beforeClose} width="750px" height="80%" escBehavior="close" clickMaskBehavior="close" onOpenChangeComplete={value => {
+    if (!value) onClosed();
 }}>
     <Dialog.Title class="modal-title">{i18n.t("settings.title")}</Dialog.Title>
     {#if mounted}
@@ -39,36 +36,15 @@
     import Modal from "../util/Modal.svelte";
     import SettingsContent from "../settings/SettingsContent.svelte";
     import { toFailureInfo } from "../../../shared/failure";
-    import { onMount, tick, untrack } from "svelte";
+    import { onMount, tick } from "svelte";
 
     let { open = $bindable(), dialogId, onClosed }: { open: boolean; dialogId: string; onClosed: () => void } = $props();
-    let visible = $state(untrack(() => open));
     let beforeClose = $state<() => Promise<boolean>>();
-    let closing = false;
     let mounted = $state(false);
-
-    $effect(() => {
-        if (open) visible = true;
-        else if (visible) untrack(() => void close());
-    });
 
     onMount(() => {
         // Let Bits UI commit its dialog refs before starting the async boundary.
         void tick().then(() => mounted = true);
     });
 
-    async function close(): Promise<void> {
-        if (closing || !visible) return;
-        closing = true;
-        try {
-            if (await beforeClose?.() !== false) {
-                visible = false;
-                open = false;
-            }
-            else open = true;
-        }
-        finally {
-            closing = false;
-        }
-    }
 </script>

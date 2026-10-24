@@ -94,7 +94,7 @@ export type DialogDescriptor = (
     MediaImportErrorDialog |
     MediaRefImportErrorDialog
 ) & {
-    onClosed: () => void;
+    onClosed?: () => void;
     parentId?: string;
 };
 

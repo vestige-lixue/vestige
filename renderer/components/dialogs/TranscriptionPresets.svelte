@@ -1,16 +1,13 @@
-<Modal bind:open={() => visible, value => {
-    if (!value) void close();
-}} class="transcription-presets" width="800px" height="85%" escBehavior="close" clickMaskBehavior="close"
+<Modal bind:this={modal} bind:open {beforeClose} class="transcription-presets" width="800px" height="85%" escBehavior="close" clickMaskBehavior="close"
     onOpenChangeComplete={value => {
-        if (!value && !visible) onClosed();
+        if (!value) onClosed();
     }}>
     <Dialog.Title class="modal-title">{i18n.t("transcription.presets.title")}</Dialog.Title>
     {#if mounted}
         <svelte:boundary>
             <PresetsEditor {dialogId} {selectedName} onApply={onApply ? (name, config) => {
                 onApply(name, config);
-                visible = false;
-                open = false;
+                modal?.approveClose();
             } : undefined} bind:beforeClose />
             {#snippet pending()}<div>{i18n.t("transcription.presets.loading")}</div>{/snippet}
             {#snippet failed(error, reset)}
@@ -42,27 +39,12 @@
 
     type Props = { open: boolean; dialogId: string; selectedName?: string; onApply?: (name: string, config: Config) => void; onClosed: () => void };
     let { open = $bindable(), dialogId, selectedName, onApply, onClosed }: Props = $props();
-    // Programmatic parent closure must not leave an orphan editor behind.
-    let visible = $derived(open);
     let mounted = $state(false);
     let beforeClose = $state<() => Promise<boolean>>();
-    let closing = false;
+    let modal = $state<{ approveClose: () => void }>();
 
     onMount(() => {
         void tick().then(() => mounted = true);
     });
 
-    async function close(): Promise<void> {
-        if (closing || !visible) return;
-        closing = true;
-        try {
-            if (await beforeClose?.() !== false) {
-                visible = false;
-                open = false;
-            }
-        }
-        finally {
-            closing = false;
-        }
-    }
 </script>
