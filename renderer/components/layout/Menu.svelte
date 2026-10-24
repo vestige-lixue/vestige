@@ -229,6 +229,7 @@
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
+    import { dismissOutside } from "../../dom";
     import { flushSync, onDestroy, onMount, tick, untrack } from "svelte";
     import { IsUsingKeyboard, Menubar } from "bits-ui";
     import ProjectStatus from "./ProjectStatus.svelte";
@@ -385,11 +386,12 @@
     }
 
     function handlePointerdown(event: PointerEvent): void {
-        if (!menu.get() || !(event.target instanceof Element)
-            || event.target.closest("[data-menubar-trigger], [data-menubar-content], [data-menubar-sub-content]")) return;
-        pointerDismissed = true;
-        // Release the focus trap before the pressed control handles the same event.
-        flushSync(() => menu.set(""));
+        if (!menu.get()) return;
+        dismissOutside(event, target => !(target instanceof Element)
+            || target.closest("[data-menubar-trigger], [data-menubar-content], [data-menubar-sub-content]") !== null, () => {
+                pointerDismissed = true;
+                flushSync(() => menu.set(""));
+            });
     }
 
     onMount(() => registerMenu({

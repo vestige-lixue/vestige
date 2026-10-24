@@ -26,9 +26,7 @@
         position: relative;
         align-self: stretch;
         min-height: 0;
-        padding: 0 8px;
         overflow-y: auto;
-        margin-bottom: auto;
         display: flex;
         flex-flow: column nowrap;
         gap: 8px;

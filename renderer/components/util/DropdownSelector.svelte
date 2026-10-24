@@ -78,6 +78,7 @@
 <script lang="ts">
     import { Select } from "bits-ui";
     import * as modal from "../../states/modal.svelte";
+    import { observeFontSize } from "../../dom";
     import checkmark from "../../../resources/icons/carbon--checkmark.svg?raw";
 
     type Props = {
@@ -109,12 +110,6 @@
     $effect(() => {
         const element = trigger;
         if (!open || !element) return;
-        const syncFontSize = (): void => {
-            fontSize = getComputedStyle(element).fontSize;
-        };
-        syncFontSize();
-        const observer = new ResizeObserver(syncFontSize);
-        observer.observe(element);
-        return () => observer.disconnect();
+        return observeFontSize(element, size => fontSize = size);
     });
 </script>

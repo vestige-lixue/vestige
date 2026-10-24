@@ -187,6 +187,7 @@
     import * as project from "../../states/project.svelte";
     import * as transcription from "../../states/transcription.svelte";
     import { formatDuration } from "../../format";
+    import { focusIndex } from "../../dom";
     import { commandDisabled, runCommand, type Command } from "../../states/commands";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import Spinner from "../util/Spinner.svelte";
@@ -239,14 +240,11 @@
             if (!project.projectState.locked) runCommand({ kind: "selectMedia", mediaId });
             return;
         }
-        if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         const targets = [event.currentTarget, ...event.currentTarget.querySelectorAll<HTMLElement>("[tabindex]:not(:disabled):not([data-disabled])")];
-        const index = targets.indexOf(event.target);
-        if (index < 0) return;
+        const next = focusIndex(event, targets.indexOf(event.target), targets.length, "horizontal");
+        if (next === null) return;
         event.preventDefault();
-        const direction = event.key === "ArrowRight" ? 1 : -1;
-        targets[(index + direction + targets.length) % targets.length]?.focus();
+        targets[next]?.focus();
     }
 
 </script>

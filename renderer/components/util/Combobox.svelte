@@ -104,6 +104,7 @@
     import { tick, type Snippet } from "svelte";
     import { Combobox as BitsCombobox } from "bits-ui";
     import * as modal from "../../states/modal.svelte";
+    import { observeFontSize } from "../../dom";
     import checkmark from "../../../resources/icons/carbon--checkmark.svg?raw";
 
     type Props = {
@@ -136,12 +137,6 @@
     $effect(() => {
         const element = container;
         if (!open || !element) return;
-        const syncFontSize = (): void => {
-            fontSize = getComputedStyle(element).fontSize;
-        };
-        syncFontSize();
-        const observer = new ResizeObserver(syncFontSize);
-        observer.observe(element);
-        return () => observer.disconnect();
+        return observeFontSize(element, size => fontSize = size);
     });
 </script>

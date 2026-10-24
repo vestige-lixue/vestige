@@ -33,8 +33,8 @@
                     {#snippet text()}
                         <div class="runDetails">
                             <div><b>{i18n.t("transcription.config.executor.label")}</b><span>{run.config.executor}</span></div>
-                            <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{directoryName(run.config.backendDirectory)}</span></div>
-                            <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{directoryName(run.config.modelDirectory)}</span></div>
+                            <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{displayDirectoryName(run.config.backendDirectory)}</span></div>
+                            <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{displayDirectoryName(run.config.modelDirectory)}</span></div>
                         </div>
                     {/snippet}
                     {#snippet child({ props })}
@@ -148,6 +148,7 @@
     import { Popover } from "bits-ui";
     import { flushSync, onDestroy, tick, untrack } from "svelte";
     import * as i18n from "../../i18n.svelte";
+    import { dismissOutside, focusIndex, observeFontSize } from "../../dom";
     import * as project from "../../states/project.svelte";
     import * as dialogs from "../../states/dialogs.svelte";
     import * as modal from "../../states/modal.svelte";
@@ -195,13 +196,7 @@
     $effect(() => {
         const element = anchor;
         if (!open || !element) return;
-        const syncFontSize = (): void => {
-            fontSize = getComputedStyle(element).fontSize;
-        };
-        syncFontSize();
-        const observer = new ResizeObserver(syncFontSize);
-        observer.observe(element);
-        return () => observer.disconnect();
+        return observeFontSize(element, size => fontSize = size);
     });
 
     function formatStartedAt(value: number): string {
@@ -209,7 +204,7 @@
         return `${date.getFullYear().toString().padStart(4, "0")}.${date.getMonth() + 1}.${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
     }
 
-    function directoryName(path: string): string {
+    function displayDirectoryName(path: string): string {
         const parts = path.split(path.startsWith("/") ? /\// : /[\\/]/).filter(Boolean);
         return parts.at(-1) ?? path;
     }
@@ -236,10 +231,11 @@
     }
 
     function handlePointerdown(event: PointerEvent): void {
-        if (!open || !(event.target instanceof Node) || content?.contains(event.target) || trigger?.contains(event.target)) return;
-        pointerDismissed = true;
-        // Release the focus trap before the pressed control handles the same event.
-        flushSync(() => open = false);
+        if (!open) return;
+        dismissOutside(event, target => !!(content?.contains(target) || trigger?.contains(target)), () => {
+            pointerDismissed = true;
+            flushSync(() => open = false);
+        });
     }
 
     function handleKeydown(event: KeyboardEvent): void {
@@ -259,10 +255,11 @@
             const run = vestige?.runs[index];
             if (run) selectRun(run.id);
         }
-        else if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Home" || event.key === "End") {
+        else {
+            const next = focusIndex(event, index, rows.length, "vertical", true);
+            if (next === null) return;
             event.preventDefault();
-            focusRun(event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1
-                : (index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length);
+            focusRun(next);
         }
     }
 </script>

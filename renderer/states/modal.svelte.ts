@@ -1,5 +1,8 @@
 import { SvelteSet } from "svelte/reactivity";
 
+// Each layer reserves one position for its overlay and one for its content.
+const layerBase = 12915;
+const layerStep = 2;
 const layers = new SvelteSet<symbol>();
 let restoringFocus: HTMLElement | null = null;
 
@@ -33,9 +36,9 @@ export function closeLayer(layer: symbol): void {
 }
 
 export function getLayerIndex(layer: symbol): number {
-    return 12915 + Math.max(0, [...layers].indexOf(layer)) * 2;
+    return layerBase + Math.max(0, [...layers].indexOf(layer)) * layerStep;
 }
 
 export function getTopLayer(): number {
-    return 12915 + layers.size * 2;
+    return layerBase + layers.size * layerStep;
 }

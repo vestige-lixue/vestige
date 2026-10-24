@@ -401,6 +401,7 @@
     import { type AudioLevels } from "../../audio/levels";
     import { sliderToVolume, volumeToSlider } from "../../audio/volume";
     import { formatDuration } from "../../format";
+    import { focusIndex } from "../../dom";
     import { shortcut, seekProgress, cancelProgressNavigation } from "../../keybindings";
 
     import * as i18n from "../../i18n.svelte";
@@ -496,15 +497,12 @@
     const tabStop = $derived(buttonDisabled[focusedButton] ? buttonDisabled.findIndex(disabled => !disabled) : focusedButton);
 
     function handleButtonKeydown(event: KeyboardEvent): void {
-        if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         if (!(event.currentTarget instanceof HTMLDivElement) || !(event.target instanceof HTMLButtonElement)) return;
         const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
-        const index = buttons.indexOf(event.target);
-        if (index < 0) return;
+        const next = focusIndex(event, buttons.indexOf(event.target), buttons.length, "horizontal");
+        if (next === null) return;
         event.preventDefault();
-        const direction = event.key === "ArrowRight" ? 1 : -1;
-        buttons[(index + direction + buttons.length) % buttons.length]?.focus();
+        buttons[next]?.focus();
     }
 
     function handleProgressKeydown(event: KeyboardEvent): void {
