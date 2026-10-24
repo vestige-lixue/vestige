@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, open, realpath, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, realpath } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { type Documentation, parseDocumentLink } from "../../shared/documentation";
 import { type AbsolutePath } from "../../shared/util/path";
-import { containsPath, parseAbsolutePath, isSystemError } from "../util/file";
+import { containsPath, parseAbsolutePath } from "../util/file";
+import { errorCode, writeFileAtomic } from "../util/fs";
 
 const documentNames = ["README.en.md", "README.zh-cn.md", "params.en.md", "params.zh-cn.md"] as const;
 const maximumBytes = 1024 * 1024;
@@ -29,24 +29,11 @@ async function readBounded(path: string): Promise<Buffer> {
     }
 }
 
-async function writeAtomic(path: string, content: string | Buffer): Promise<void> {
-    const temporary = `${path}.${randomUUID()}.tmp`;
-    try {
-        await writeFile(temporary, content, { flag: "wx" });
-        await rename(temporary, path);
-    }
-    finally {
-        await unlink(temporary).catch(error => {
-            if (!isSystemError(error) || error.code !== "ENOENT") throw error;
-        });
-    }
-}
-
 export async function initializeDocumentation(root: AbsolutePath, source: AbsolutePath): Promise<void> {
     await mkdir(root, { recursive: true });
     for (const name of documentNames) {
         const template = await readBounded(join(source, name));
-        await writeAtomic(join(root, name), template);
+        await writeFileAtomic(join(root, name), template, { sync: false, mode: undefined });
     }
 }
 
@@ -67,7 +54,7 @@ async function readFile(root: AbsolutePath, path: string): Promise<Documentation
         return { path: checked, content: (await readBounded(checked)).toString("utf8").replace(/^\uFEFF/, "") };
     }
     catch (error) {
-        if (!isSystemError(error) || error.code !== "ENOENT") throw error;
+        if (errorCode(error) !== "ENOENT") throw error;
         throw new Error(`Documentation was not found: ${path}`);
     }
 }

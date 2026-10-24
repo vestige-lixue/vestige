@@ -2,6 +2,8 @@ import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, parseAbsolutePath } from "../util/file";
+import { errorCode, lstatOrNull, pathKey } from "../util/fs";
+import { type AppPaths } from "../paths";
 import { filesIn, prepareArchive } from "./archive";
 import { downloadFiles, fileHash, linkOrCopy } from "./files";
 import { type DownloadReporter, type DownloadTransfer, type RuntimeDownload } from "./types";
@@ -22,10 +24,7 @@ function waitForRuntime(completion: Promise<void>, signal: AbortSignal): Promise
 }
 
 async function readRuntime(directory: AbsolutePath, runtime: RuntimeDownload, signal: AbortSignal): Promise<RuntimeManifest | null> {
-    const exists = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return null;
-        throw error;
-    });
+    const exists = await lstatOrNull(directory);
     if (!exists) return null;
     if (!exists.isDirectory() || exists.isSymbolicLink()) throw new Error(`Invalid runtime cache: ${directory}`);
     const manifest: RuntimeManifest = JSON.parse(await readFile(join(directory, "runtime.json"), "utf8"));
@@ -44,12 +43,13 @@ async function readRuntime(directory: AbsolutePath, runtime: RuntimeDownload, si
 async function prepareRuntime(runtime: RuntimeDownload, cache: AbsolutePath, staging: AbsolutePath, runtimeDirectory: AbsolutePath, transfer: DownloadTransfer, reporter: DownloadReporter, signal: AbortSignal): Promise<RuntimeManifest> {
     if (!/^[a-f\d]{64}$/.test(runtime.file.sha256) || !Number.isSafeInteger(runtime.file.size) || runtime.file.size <= 0) throw new Error("Invalid runtime archive metadata.");
     const directory = parseAbsolutePath(join(cache, runtime.file.sha256));
+    const key = pathKey(directory);
     // Serialize shared components across simultaneous backend downloads. Cancellation
     // of a waiter leaves the owner running; cancellation of the owner permits a retry.
-    while (pending.has(directory)) await waitForRuntime(pending.get(directory)!, signal);
+    while (pending.has(key)) await waitForRuntime(pending.get(key)!, signal);
     signal.throwIfAborted();
     let release!: () => void;
-    pending.set(directory, new Promise<void>(resolve => release = resolve));
+    pending.set(key, new Promise<void>(resolve => release = resolve));
     try {
         reporter.append(`Checking runtime ${runtime.name}\n`);
         const cached = await readRuntime(directory, runtime, signal);
@@ -75,7 +75,7 @@ async function prepareRuntime(runtime: RuntimeDownload, cache: AbsolutePath, sta
             await rename(prepared, directory);
         }
         catch (error) {
-            if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+            if (!["EEXIST", "ENOTEMPTY", "EPERM"].includes(errorCode(error) ?? "")) throw error;
             // Another application process may have completed the same component.
             const existing = await readRuntime(directory, runtime, signal);
             if (!existing) throw error;
@@ -84,13 +84,13 @@ async function prepareRuntime(runtime: RuntimeDownload, cache: AbsolutePath, sta
         return manifest;
     }
     finally {
-        pending.delete(directory);
+        pending.delete(key);
         release();
     }
 }
 
-export async function installRuntimes(runtimes: RuntimeDownload[], root: AbsolutePath, staging: AbsolutePath, prepared: AbsolutePath, runtimeDirectory: AbsolutePath, transfer: DownloadTransfer, reporter: DownloadReporter, signal: AbortSignal): Promise<void> {
-    const cache = parseAbsolutePath(join(root, ".runtimes"));
+export async function installRuntimes(runtimes: RuntimeDownload[], paths: Pick<AppPaths, "runtimeDirectory" | "runtimeCacheDirectory">, staging: AbsolutePath, prepared: AbsolutePath, transfer: DownloadTransfer, reporter: DownloadReporter, signal: AbortSignal): Promise<void> {
+    const { runtimeDirectory, runtimeCacheDirectory: cache } = paths;
     for (const runtime of runtimes) {
         const manifest = await prepareRuntime(runtime, cache, staging, runtimeDirectory, transfer, reporter, signal);
         for (const file of manifest.files) {
@@ -104,7 +104,7 @@ export async function installRuntimes(runtimes: RuntimeDownload[], root: Absolut
                 await linkOrCopy(source, destination);
             }
             catch (error) {
-                if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+                if (errorCode(error) !== "EEXIST") throw error;
                 if (!(await lstat(destination)).isFile() || await fileHash(destination, signal) !== file.sha256) throw new Error(`Conflicting runtime filename: ${file.path}`);
             }
         }

@@ -12,13 +12,9 @@ import { execute as executeSherpa } from "./sherpa/execute";
 import { execute as executeWhisper } from "./whisper/execute";
 import { TranscriptionFailure } from "./failure";
 import { resolveBackend, type BackendLocation } from "../backends/resolve";
+import { type AppPaths } from "../paths";
 
-export type ExecutionPaths = {
-    runtimeDirectory: AbsolutePath;
-    modelDirectory: AbsolutePath;
-    backendDirectory: AbsolutePath;
-    temporaryDirectory: AbsolutePath;
-};
+export type ExecutionPaths = Pick<AppPaths, "runtimeDirectory" | "modelDirectory" | "backendDirectory" | "temporaryDirectory" | "vadModelPath">;
 
 export type ExecutionFeedback = {
     output: ProcessOutputListener;
@@ -33,7 +29,7 @@ export type ExecutionContext = {
     directory: AbsolutePath;
     audio: AbsolutePath;
     duration: number;
-    runtimeDirectory: AbsolutePath;
+    vadModelPath: AbsolutePath;
     signal?: AbortSignal;
     feedback?: ExecutionFeedback;
 };
@@ -79,7 +75,7 @@ async function executeTask(id: string, value: unknown, paths: ExecutionPaths, si
         feedback?.record?.("Audio duration", { media: request.mediaDuration, prepared: duration });
         const execute = request.executor === "sherpa-onnx" ? executeSherpa : executeWhisper;
         feedback?.output("stderr", `[${request.executor}] Transcribing.\n`);
-        const run = await execute({ id, request, backend, directory, audio, duration, runtimeDirectory: paths.runtimeDirectory, signal, feedback });
+        const run = await execute({ id, request, backend, directory, audio, duration, vadModelPath: paths.vadModelPath, signal, feedback });
         const outside = run.transcript.flatMap((segment, index) => segment.range.end > request.mediaDuration ? [{ index, ...segment.range }] : []);
         if (outside.length) feedback?.record?.("Timestamps beyond media duration", { duration: request.mediaDuration, segments: outside });
         return run;

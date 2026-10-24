@@ -1,18 +1,11 @@
 import { setLocale } from "./ui/i18n";
-import { app, shell, BrowserWindow, nativeTheme, screen } from "electron";
+import { app, BrowserWindow, nativeTheme, screen } from "electron";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import iconBlack from "../resources/logos/logo-square-black.png?asset";
-import iconWhite from "../resources/logos/logo-square-white.png?asset";
-import windowsIconBlack from "../resources/logos/logo-square-black.ico?asset";
-import windowsIconWhite from "../resources/logos/logo-square-white.ico?asset";
 import { registerTranscriptionIPCs } from "./transcription/ipc";
 import { registerProjectIPCs } from "./project/ipc";
 import { registerWindowLifecycle } from "./lifecycle";
 import { appChannels } from "../shared/ipc";
-import { type EditAction } from "../shared/app";
-import { parseAbsolutePath } from "./util/file";
 import { registerFileIPCs } from "./file/ipc";
 import { registerMediaScheme, registerMediaProtocol } from "./file/source";
 import * as settings from "./settings/store";
@@ -24,49 +17,42 @@ import { registerDocumentationIPCs } from "./documentation/ipc";
 import { registerDownloadIPCs } from "./downloads/ipc";
 import { initializeDocumentation } from "./documentation/file";
 import { captureConsole, LogDirectory } from "./logging";
-import { VestigeErrors } from "../shared/failure";
+import { createAppPaths } from "./paths";
+import { registerAppIPCs } from "./app";
+import { getWindowIcon, registerWindowBehavior } from "./ui/window";
 
 app.setName("Vestige");
 registerMediaScheme();
 
-function developmentDataPath(projectPath: string, profile = "default"): string {
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(profile)) {
-        throw new Error("VESTIGE_PROFILE must contain 1-64 letters, digits, underscores, or hyphens, and start with a letter or digit.");
-    }
-    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(profile)) {
-        throw new Error("VESTIGE_PROFILE must not be a Windows reserved device name.");
-    }
-    return join(projectPath, ".local", "profiles", profile);
-}
-
 // Set both paths before ready, so development also isolates Chromium state.
-const dataPath = app.isPackaged ? app.getPath("userData") : developmentDataPath(app.getAppPath(), process.env["VESTIGE_PROFILE"]);
-const sessionPath = join(dataPath, "chromium");
-mkdirSync(sessionPath, { recursive: true });
-app.setPath("userData", dataPath);
-app.setPath("sessionData", sessionPath);
-const logs = new LogDirectory(join(dataPath, "logs"));
+const paths = createAppPaths({
+    packaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    resourcesPath: process.resourcesPath,
+    userDataPath: app.getPath("userData"),
+    temporaryPath: app.getPath("temp"),
+    profile: process.env["VESTIGE_PROFILE"]
+});
+mkdirSync(paths.sessionDirectory, { recursive: true });
+app.setPath("userData", paths.dataDirectory);
+app.setPath("sessionData", paths.sessionDirectory);
+const logs = new LogDirectory(paths.logsDirectory);
 const applicationLog = logs.create("application");
 const restoreConsole = captureConsole(applicationLog);
-applicationLog?.record("Environment", { version: app.getVersion(), platform: process.platform, arch: process.arch, versions: process.versions, dataPath });
+applicationLog?.record("Environment", { version: app.getVersion(), platform: process.platform, arch: process.arch, versions: process.versions, dataPath: paths.dataDirectory });
 process.on("uncaughtExceptionMonitor", error => applicationLog?.record("Uncaught exception", error));
 process.once("exit", code => {
     restoreConsole();
     applicationLog?.close(`exit ${code}`);
 });
-settings.initialize(dataPath);
+settings.initialize(paths.dataDirectory);
 setLocale(settings.get().settings.language);
 settings.subscribe(snapshot => setLocale(snapshot.settings.language));
 
-function openExternal(url: string): void {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(console.error);
-}
-
-function getWindowIcon(): string {
-    const dark = process.platform === "linux" ? nativeTheme.shouldUseDarkColors : nativeTheme.shouldUseDarkColorsForSystemIntegratedUI;
-    if (process.platform === "win32") return dark ? windowsIconWhite : windowsIconBlack;
-    return dark ? iconWhite : iconBlack;
-}
+mkdirSync(paths.modelDirectory, { recursive: true });
+mkdirSync(paths.backendDirectory, { recursive: true });
+// Refresh the bundled documents once per application launch; all windows share this work.
+const documentationReady = initializeDocumentation(paths.documentationDirectory, paths.documentationSourceDirectory).catch(console.error);
 
 function createWindow(): void {
     const windowState = settings.get().settings.window;
@@ -98,47 +84,32 @@ function createWindow(): void {
         }
     });
 
-    const resourcesDirectory = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources");
-    const runtimeDirectory = parseAbsolutePath(join(resourcesDirectory, "bin"));
-    const modelDirectory = parseAbsolutePath(join(dataPath, "models"));
-    const backendDirectory = parseAbsolutePath(join(dataPath, "backends"));
-    mkdirSync(modelDirectory, { recursive: true });
-    mkdirSync(backendDirectory, { recursive: true });
-    const documentationReady = initializeDocumentation(parseAbsolutePath(dataPath), parseAbsolutePath(join(resourcesDirectory, "docs"))).catch(console.error);
-    mainWindow.webContents.on("console-message", details => {
-        applicationLog?.record(`renderer ${details.level} ${details.sourceId}:${details.lineNumber}`, details.message);
-    });
-    mainWindow.webContents.on("render-process-gone", (_event, details) => applicationLog?.record("Renderer exited", details));
+    registerWindowBehavior(mainWindow, app.isPackaged, applicationLog);
     const tasks = registerTaskOutputIPCs(mainWindow.webContents, logs);
-    registerDocumentationIPCs(mainWindow.webContents, parseAbsolutePath(dataPath), documentationReady);
-    const stopDownloads = registerDownloadIPCs(mainWindow.webContents, { model: modelDirectory, backend: backendDirectory }, runtimeDirectory, tasks);
-    registerFileIPCs(mainWindow, runtimeDirectory, modelDirectory, backendDirectory);
-    mainWindow.webContents.ipc.on(appChannels.edit, (event, action: unknown) => {
-        if (event.senderFrame !== mainWindow.webContents.mainFrame || typeof action !== "string"
-            || !["selectAll", "undo", "redo", "cut", "copy", "paste"].includes(action)) return;
-        mainWindow.webContents[action as EditAction]();
+    registerDocumentationIPCs(mainWindow.webContents, paths.documentationDirectory, documentationReady);
+    const stopDownloads = registerDownloadIPCs(mainWindow.webContents, {
+        modelDirectory: paths.modelDirectory,
+        backendDirectory: paths.backendDirectory,
+        runtimeDirectory: paths.runtimeDirectory,
+        runtimeCacheDirectory: paths.runtimeCacheDirectory
+    }, tasks);
+    registerFileIPCs(mainWindow, {
+        runtimeDirectory: paths.runtimeDirectory,
+        modelDirectory: paths.modelDirectory,
+        backendDirectory: paths.backendDirectory
     });
-    mainWindow.webContents.ipc.handle(appChannels.clearLogs, event => {
-        if (event.senderFrame !== mainWindow.webContents.mainFrame) throw new VestigeErrors({ kind: "ipc-not-main-frame" });
-        logs.clear();
-    });
+    registerAppIPCs(mainWindow.webContents, logs);
     registerProjectIPCs(mainWindow);
     const rememberWindow = registerSettingsIPCs(mainWindow);
     registerWindowTheme(mainWindow);
     registerWindowLifecycle(mainWindow, stopDownloads);
     registerTranscriptionIPCs(mainWindow.webContents, {
-        runtimeDirectory,
-        modelDirectory,
-        backendDirectory,
-        temporaryDirectory: parseAbsolutePath(join(app.getPath("temp"), "vestige-transcription"))
+        runtimeDirectory: paths.runtimeDirectory,
+        modelDirectory: paths.modelDirectory,
+        backendDirectory: paths.backendDirectory,
+        temporaryDirectory: paths.temporaryDirectory,
+        vadModelPath: paths.vadModelPath
     }, tasks);
-
-    if (process.platform !== "darwin") {
-        mainWindow.removeMenu();
-        const updateWindowIcon = (): void => mainWindow.setIcon(getWindowIcon());
-        nativeTheme.on("updated", updateWindowIcon);
-        mainWindow.once("closed", () => nativeTheme.off("updated", updateWindowIcon));
-    }
 
     let rendererReady = false, windowReady = false;
     const showWindow = (): void => {
@@ -156,55 +127,6 @@ function createWindow(): void {
     mainWindow.once("ready-to-show", () => {
         windowReady = true;
         showWindow();
-    });
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        openExternal(url);
-        return { action: "deny" };
-    });
-    mainWindow.webContents.on("will-navigate", (event, url) => {
-        if (url !== mainWindow.webContents.getURL()) {
-            event.preventDefault();
-            openExternal(url);
-        }
-    });
-
-    mainWindow.webContents.ipc.on(appChannels.openDevTools, event => {
-        if (event.senderFrame !== mainWindow.webContents.mainFrame) return;
-        mainWindow.webContents.openDevTools({ mode: "detach" });
-    });
-
-    mainWindow.webContents.ipc.on(appChannels.quit, event => {
-        if (event.senderFrame !== mainWindow.webContents.mainFrame) return;
-        app.quit();
-    });
-
-    mainWindow.webContents.on("before-input-event", (event, input) => {
-        const command = input.control || input.meta;
-        // Disable native reload/close/quit shortcuts while keeping page key events.
-        mainWindow.webContents.setIgnoreMenuShortcuts(
-            command && (input.code === "KeyR" || input.code === "KeyW" || input.key.toLowerCase() === "q")
-        );
-
-        if (input.type !== "keyDown") return;
-
-        if (input.code === "F12" && !input.control && !input.meta && !input.alt && !input.shift) {
-            event.preventDefault();
-            if (!input.isAutoRepeat) {
-                if (!app.isPackaged && !mainWindow.webContents.isDevToolsOpened()) {
-                    mainWindow.webContents.openDevTools({ mode: "undocked" });
-                }
-                else mainWindow.webContents.toggleDevTools();
-            }
-            return;
-        }
-
-        const zoomCommand = !input.alt && (process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta);
-        if (
-            (zoomCommand && (input.code === "Minus" || (input.code === "Equal" && input.shift)))
-         || (app.isPackaged && input.code === "KeyI" && ((input.control && input.shift) || (input.meta && input.alt)))
-        ) {
-            event.preventDefault();
-        }
     });
 
     // HMR support, do not remove

@@ -22,12 +22,12 @@ export function speechRanges(diagnostic: string, duration: number): Range[] {
 }
 
 async function detectSpeech(context: ExecutionContext): Promise<Range[]> {
-    const { audio, directory, backend, runtimeDirectory, signal, feedback, duration } = context;
+    const { audio, directory, backend, vadModelPath, signal, feedback, duration } = context;
     const executable = parseAbsolutePath(join(dirname(backend.executable), `sherpa-onnx-vad${process.platform === "win32" ? ".exe" : ""}`));
     try {
         signal?.throwIfAborted();
         // Keep non-ASCII application paths out of the native model argument.
-        await copyFile(join(runtimeDirectory, "..", "vad", "silero_vad.onnx"), join(directory, "vad.onnx"));
+        await copyFile(vadModelPath, join(directory, "vad.onnx"));
         const args = ["--silero-vad-model=vad.onnx", "--vad-provider=cpu", "--vad-num-threads=1",
             "--silero-vad-min-silence-duration=0.3", "--silero-vad-max-speech-duration=20", basename(audio), "vad-speech.wav"];
         feedback?.record?.("Sherpa VAD command", { executable, args, directory });

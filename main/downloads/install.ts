@@ -2,6 +2,8 @@ import { copyFile, lstat, mkdir, mkdtemp, readFile, rename, writeFile } from "no
 import { dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, parseAbsolutePath } from "../util/file";
+import { errorCode, lstatOrNull } from "../util/fs";
+import { type AppPaths } from "../paths";
 import { type DownloadSource, type DownloadReporter, type DownloadTransfer, type DownloadPayload } from "./types";
 import { filesIn, prepareArchive } from "./archive";
 import { DownloadCleanupError, removeDownloadStaging } from "./cleanup";
@@ -9,21 +11,12 @@ import { downloadFiles, fileHash, linkOrCopy } from "./files";
 import { installRuntimes } from "./runtimes";
 
 async function assertAbsent(path: string): Promise<void> {
-    try {
-        await lstat(path);
-    }
-    catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-        throw error;
-    }
+    if (!await lstatOrNull(path)) return;
     throw new Error(`Download directory already exists. Move it before downloading again: ${path}`);
 }
 
 async function canRepair(target: AbsolutePath, source: DownloadSource, payload: DownloadPayload): Promise<boolean> {
-    const directory = await lstat(target).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return null;
-        throw error;
-    });
+    const directory = await lstatOrNull(target);
     if (!directory) return false;
     if (source.kind !== "backend" || !payload.runtimes?.length || !payload.archive || !directory.isDirectory() || directory.isSymbolicLink()) {
         await assertAbsent(target);
@@ -49,10 +42,7 @@ async function publishRepair(prepared: AbsolutePath, target: AbsolutePath, signa
     for (const file of files) {
         signal.throwIfAborted();
         const destination = parseAbsolutePath(join(target, relative(prepared, file)));
-        const existing = await lstat(destination).catch((error: NodeJS.ErrnoException) => {
-            if (error.code === "ENOENT") return null;
-            throw error;
-        });
+        const existing = await lstatOrNull(destination);
         if (existing && (!existing.isFile() || await fileHash(file, signal) !== await fileHash(destination, signal))) throw new Error(`Conflicting runtime file. Move the backend before downloading again: ${destination}`);
     }
     for (const file of files) {
@@ -63,7 +53,7 @@ async function publishRepair(prepared: AbsolutePath, target: AbsolutePath, signa
             await linkOrCopy(file, destination);
         }
         catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !(await lstat(destination)).isFile()
+            if (errorCode(error) !== "EEXIST" || !(await lstat(destination)).isFile()
                 || await fileHash(file, signal) !== await fileHash(destination, signal)) throw error;
         }
     }
@@ -71,12 +61,12 @@ async function publishRepair(prepared: AbsolutePath, target: AbsolutePath, signa
 
 export async function installDownload(
     source: DownloadSource,
-    root: AbsolutePath,
-    runtimeDirectory: AbsolutePath,
+    paths: Pick<AppPaths, "runtimeDirectory" | "runtimeCacheDirectory"> & { rootDirectory: AbsolutePath },
     transfer: DownloadTransfer,
     reporter: DownloadReporter,
     signal: AbortSignal
 ): Promise<void> {
+    const { rootDirectory: root, runtimeDirectory, runtimeCacheDirectory } = paths;
     const target = parseAbsolutePath(join(root, source.id));
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(source.id) || target === root || !containsPath(root, target)) throw new Error("Invalid download destination.");
     await mkdir(root, { recursive: true });
@@ -108,7 +98,7 @@ export async function installDownload(
                 await copyFile(join(staging, file.destination), destination);
             }
         }
-        if (payload.runtimes?.length) await installRuntimes(payload.runtimes, root, staging, prepared, runtimeDirectory, transfer, reporter, signal);
+        if (payload.runtimes?.length) await installRuntimes(payload.runtimes, { runtimeDirectory, runtimeCacheDirectory }, staging, prepared, transfer, reporter, signal);
         if (repair) await publishRepair(prepared, target, signal);
         else {
             await writeFile(join(prepared, "NOTICE"), payload.notice, "utf8");

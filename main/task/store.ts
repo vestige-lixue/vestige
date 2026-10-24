@@ -10,6 +10,7 @@ const activeLimit = 128;
 type TaskRecord = {
     snapshot: TaskSnapshot;
     raw: string;
+    dirty: boolean;
     log?: LogFile | null;
     timer?: ReturnType<typeof setTimeout>;
 };
@@ -28,7 +29,7 @@ export class TaskOutputStore {
         const previous = this.tasks.get(id);
         if (previous?.timer) clearTimeout(previous.timer);
         this.tasks.delete(id);
-        const task: TaskRecord = { raw: "", snapshot: { id, sequence: ++this.sequence, status: "running", progress: null, output: "", error: null } };
+        const task: TaskRecord = { raw: "", dirty: false, snapshot: { id, sequence: ++this.sequence, status: "running", progress: null, output: "", error: null } };
         task.log = this.logs?.create(kind, id);
         this.tasks.set(id, task);
         this.publish({ ...task.snapshot });
@@ -39,9 +40,7 @@ export class TaskOutputStore {
         if (!task || !text) return;
         task.log?.write(text);
         task.raw = (task.raw + text).slice(-outputLimit);
-        // Normalize only the display copy: Sherpa still needs the original stdout JSON.
-        // Keeping raw chunks together also handles escape sequences split between reads.
-        task.snapshot.output = stripVTControlCharacters(task.raw).replace(/\r\n?/g, "\n");
+        task.dirty = true;
         this.changed(task);
     }
 
@@ -67,7 +66,7 @@ export class TaskOutputStore {
         task.log?.close(status);
         if (status === "succeeded") task.snapshot.progress = 1;
         task.snapshot.sequence = ++this.sequence;
-        this.publish({ ...task.snapshot });
+        this.publish(this.snapshot(task));
         this.tasks.delete(id);
         this.tasks.set(id, task);
         // Retain recent completed output, without evicting an active task.
@@ -77,7 +76,7 @@ export class TaskOutputStore {
 
     get(id: string): TaskSnapshot | null {
         const task = this.tasks.get(id);
-        return task ? { ...task.snapshot } : null;
+        return task ? this.snapshot(task) : null;
     }
 
     dispose(): void {
@@ -94,12 +93,21 @@ export class TaskOutputStore {
         return !this.disposed && task?.snapshot.status === "running" ? task : undefined;
     }
 
+    private snapshot(task: TaskRecord): TaskSnapshot {
+        if (task.dirty) {
+            // Normalize only the display copy, combining escape sequences split across reads.
+            task.snapshot.output = stripVTControlCharacters(task.raw).replace(/\r\n?/g, "\n");
+            task.dirty = false;
+        }
+        return { ...task.snapshot };
+    }
+
     private changed(task: TaskRecord): void {
         task.snapshot.sequence = ++this.sequence;
         if (task.timer) return;
         task.timer = setTimeout(() => {
             task.timer = undefined;
-            if (!this.disposed) this.publish({ ...task.snapshot });
+            if (!this.disposed) this.publish(this.snapshot(task));
         }, 100);
         task.timer.unref();
     }

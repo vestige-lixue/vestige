@@ -1,12 +1,12 @@
 import { toFailureInfo } from "../../shared/failure";
-import { randomUUID } from "node:crypto";
-import { open, readFile, rename, rm, stat } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { type Project } from "../../shared/project/Project";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type GetProjectResult, type SaveProjectResult, type MediaPathMode } from "../../shared/project/file";
 import { ProjectValidationFailure, validateProject } from "./validate";
 import { parseAbsolutePath, InvalidPathFailure, isSystemError } from "../util/file";
+import { pathKey, statOrNull, writeFileAtomic } from "../util/fs";
 import { serializeMediaPath } from "./path";
 
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
@@ -34,29 +34,10 @@ export async function getProject(path: unknown): Promise<GetProjectResult> {
 }
 
 async function writeProject(path: AbsolutePath, text: string): Promise<SaveProjectResult> {
-    const temporary = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
-    try {
-        const existing = await stat(path).catch((error: unknown) => {
-            if (!isSystemError(error) || error.code !== "ENOENT") throw error;
-            return null;
-        });
-        if (existing && !existing.isFile()) throw new InvalidPathFailure({ kind: "project-path-not-file" });
-        const handle = await open(temporary, "wx", existing?.mode);
-        try {
-            await handle.writeFile(text, "utf8");
-            await handle.sync();
-        }
-        finally {
-            await handle.close();
-        }
-        await rename(temporary, path);
-        return { success: true };
-    }
-    finally {
-        await rm(temporary, { force: true }).catch(error => {
-            console.warn("Could not remove project temporary file:", temporary, error);
-        });
-    }
+    const existing = await statOrNull(path);
+    if (existing && !existing.isFile()) throw new InvalidPathFailure({ kind: "project-path-not-file" });
+    await writeFileAtomic(path, text, { sync: true, mode: existing?.mode });
+    return { success: true };
 }
 
 export async function saveProject(path: unknown, project: Project, compress = false, rememberPlaybackPosition = true, mediaPathMode: MediaPathMode = "project"): Promise<SaveProjectResult> {
@@ -76,7 +57,7 @@ export async function saveProject(path: unknown, project: Project, compress = fa
         };
         const text = JSON.stringify(snapshot, null, compress ? undefined : 4);
         // Case folding only serializes potentially aliasing writes; keep the actual path unchanged.
-        const key = process.platform === "win32" ? normalized.toLowerCase() : normalized;
+        const key = pathKey(normalized);
         const previous = pendingWritesQueue.get(key);
         const performWrite = (): Promise<SaveProjectResult> => writeProject(normalized, text);
         const write = (previous ?? Promise.resolve()).then(performWrite, performWrite);

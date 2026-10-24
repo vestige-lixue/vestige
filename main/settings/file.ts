@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
-import { mkdir, open, rename, rm } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
-import { dirname, join } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { type Settings } from "../../shared/settings/Settings";
 import { defaultSettings } from "../../shared/settings/defaults";
 import { validSettings } from "./validate";
+import { writeFileAtomic } from "../util/fs";
 
 export function readSettings(path: string): { settings: Settings; savedText: string | null } {
     let value: unknown;
@@ -22,21 +22,6 @@ export function readSettings(path: string): { settings: Settings; savedText: str
 }
 
 export async function writeSettings(path: string, text: string): Promise<void> {
-    const directory = dirname(path);
-    await mkdir(directory, { recursive: true });
-    const temporary = join(directory, `.settings-${randomUUID()}.tmp`);
-    try {
-        const handle = await open(temporary, "wx");
-        try {
-            await handle.writeFile(text, "utf8");
-            await handle.sync();
-        }
-        finally {
-            await handle.close();
-        }
-        await rename(temporary, path);
-    }
-    finally {
-        await rm(temporary, { force: true }).catch(console.error);
-    }
+    await mkdir(dirname(path), { recursive: true });
+    await writeFileAtomic(path, text, { sync: true, mode: undefined });
 }

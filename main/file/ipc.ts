@@ -6,14 +6,15 @@ import { dirname } from "node:path";
 import { fileChannels } from "../../shared/ipc";
 import { type DownloadKind } from "../../shared/downloads";
 import { type MediaReference, type MediaCheckResult, type MediaURLResult } from "../../shared/media/check";
-import { type AbsolutePath } from "../../shared/util/path";
+import { type AppPaths } from "../paths";
 import { parseAbsolutePath } from "../util/file";
 import { findExecutable } from "../util/process";
 import { readMedia } from "./media";
 import { getMediaURL, releaseMediaURL, releaseMediaURLs } from "./source";
 import { listDirectories } from "./directories";
 
-export function registerFileIPCs(window: BrowserWindow, runtimeDirectory: AbsolutePath, modelDirectory: AbsolutePath, backendDirectory: AbsolutePath): void {
+export function registerFileIPCs(window: BrowserWindow, paths: Pick<AppPaths, "runtimeDirectory" | "modelDirectory" | "backendDirectory">): void {
+    const { runtimeDirectory, modelDirectory, backendDirectory } = paths;
     const contents = window.webContents;
     const directoryRoots = { backend: backendDirectory, model: modelDirectory };
     const checks = new Map<string, AbortController>();

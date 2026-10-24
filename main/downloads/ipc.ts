@@ -1,10 +1,11 @@
 import { shell, type WebContents, type IpcMainInvokeEvent } from "electron";
 import { randomUUID } from "node:crypto";
-import { lstat, mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { downloadChannels, type Download, type DownloadKind } from "../../shared/downloads";
 import { toFailureInfo } from "../../shared/failure";
-import { type AbsolutePath } from "../../shared/util/path";
+import { type AppPaths } from "../paths";
+import { lstatOrNull } from "../util/fs";
 import { type TaskOutputStore } from "../task/store";
 import { modelDownloads } from "../models/catalog";
 import { backendDownloads } from "../backends/catalog";
@@ -21,7 +22,9 @@ type ActiveDownload = {
     cancellation: Promise<void> | null;
 };
 
-export function registerDownloadIPCs(contents: WebContents, roots: DownloadRoots, runtimeDirectory: AbsolutePath, tasks: TaskOutputStore): () => Promise<void> {
+export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths, "modelDirectory" | "backendDirectory" | "runtimeDirectory" | "runtimeCacheDirectory">, tasks: TaskOutputStore): () => Promise<void> {
+    const { runtimeDirectory, runtimeCacheDirectory } = paths;
+    const roots: DownloadRoots = { model: paths.modelDirectory, backend: paths.backendDirectory };
     const sources: DownloadSource[] = [
         ...modelDownloads.map(model => ({ kind: "model" as const, id: model.id, name: model.name, estimatedBytes: model.estimatedBytes, resolve: async () => model })),
         ...backendDownloads(async (url, signal) => {
@@ -59,11 +62,11 @@ export function registerDownloadIPCs(contents: WebContents, roots: DownloadRoots
         return Promise.all(sources.map(async ({ kind, id, name, estimatedBytes, requiredFiles }) => {
             const taskId = latest.get(key(kind, id));
             const task = taskId ? tasks.get(taskId) : null;
-            const installed = await lstat(join(roots[kind], id)).then(async info => info.isDirectory()
-                && (await Promise.all((requiredFiles ?? []).map(name => lstat(join(roots[kind], id, name)).then(file => file.isFile() && file.size > 0)))).every(Boolean)).catch((error: NodeJS.ErrnoException) => {
-                if (error.code === "ENOENT") return false;
-                throw error;
-            });
+            const directory = await lstatOrNull(join(roots[kind], id));
+            const installed = !!directory?.isDirectory() && (await Promise.all((requiredFiles ?? []).map(async name => {
+                const file = await lstatOrNull(join(roots[kind], id, name));
+                return !!file?.isFile() && file.size > 0;
+            }))).every(Boolean);
             // A previous success must not prevent downloading a package the user has moved or deleted.
             return { kind, id, name, estimatedBytes, installed, taskId: task && (installed || task.status !== "succeeded") ? task.id : null };
         }));
@@ -84,7 +87,7 @@ export function registerDownloadIPCs(contents: WebContents, roots: DownloadRoots
         latest.set(resourceKey, taskId);
         const task: ActiveDownload = { taskId, controller, completion: Promise.resolve(), cleanup: null, cancellation: null };
         active.set(resourceKey, task);
-        task.completion = installDownload(source, root, runtimeDirectory, aria2Transfer(runtimeDirectory, url => contents.session.resolveProxy(url)), {
+        task.completion = installDownload(source, { rootDirectory: root, runtimeDirectory, runtimeCacheDirectory }, aria2Transfer(runtimeDirectory, url => contents.session.resolveProxy(url)), {
             append: text => tasks.append(taskId, text),
             progress: value => tasks.progress(taskId, value)
         }, controller.signal).then(() => {

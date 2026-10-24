@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, parseAbsolutePath } from "../util/file";
+import { errorCode, pathKey } from "../util/fs";
 import { type DownloadFile, type DownloadReporter, type DownloadTransfer } from "./types";
 
 export async function fileHash(file: AbsolutePath, signal: AbortSignal): Promise<string> {
@@ -17,7 +18,7 @@ export async function linkOrCopy(source: AbsolutePath, destination: AbsolutePath
         await link(source, destination);
     }
     catch (error) {
-        if (!["EXDEV", "EPERM", "EACCES", "ENOTSUP", "ENOSYS", "EMLINK"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+        if (!["EXDEV", "EPERM", "EACCES", "ENOTSUP", "ENOSYS", "EMLINK"].includes(errorCode(error) ?? "")) throw error;
         await copyFile(source, destination, constants.COPYFILE_EXCL);
     }
 }
@@ -31,7 +32,7 @@ export async function downloadFiles(files: DownloadFile[], staging: AbsolutePath
         return { ...file, destination };
     });
     if (!downloads.length) throw new Error("No files to download.");
-    if (new Set(downloads.map(file => file.destination.toLowerCase())).size !== downloads.length) throw new Error("Duplicate download destination.");
+    if (new Set(downloads.map(file => pathKey(file.destination))).size !== downloads.length) throw new Error("Duplicate download destination.");
     for (const file of downloads) await mkdir(dirname(file.destination), { recursive: true });
     reporter.progress(null);
     await transfer(downloads, staging, reporter, signal);

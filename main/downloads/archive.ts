@@ -2,6 +2,7 @@ import { chmod, copyFile, lstat, mkdir, readdir, realpath } from "node:fs/promis
 import { basename, dirname, join, relative } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { containsPath, parseAbsolutePath } from "../util/file";
+import { pathKey } from "../util/fs";
 import { findExecutable, runProcess } from "../util/process";
 import { type DownloadReporter } from "./types";
 import { fileHash, linkOrCopy } from "./files";
@@ -32,8 +33,8 @@ export async function filesIn(directory: AbsolutePath, boundary = directory): Pr
 
 export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePath, programs: string[], runtimeDirectory: AbsolutePath, reporter: DownloadReporter, signal: AbortSignal, selection: { libraries?: boolean; exclude?: string[] } = {}): Promise<AbsolutePath> {
     if (!programs.length || [...programs, ...selection.exclude ?? []].some(program => !program || basename(program) !== program || /[\\/:]/.test(program))) throw new Error("Invalid required archive filenames.");
-    const required = new Set(programs.map(program => process.platform === "win32" ? program.toLowerCase() : program));
-    const excluded = new Set((selection.exclude ?? []).map(name => process.platform === "win32" ? name.toLowerCase() : name));
+    const required = new Set(programs.map(program => pathKey(program)));
+    const excluded = new Set((selection.exclude ?? []).map(name => pathKey(name)));
     if ([...required].some(name => excluded.has(name))) throw new Error("Required archive file is excluded.");
     const zip = /\.(?:zip|whl)$/i.test(archive) && process.platform !== "win32";
     const tool = await findExecutable(runtimeDirectory, "archive", zip ? "unzip" : "tar");
@@ -58,7 +59,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
             await mkdir(dirname(destination), { recursive: true });
             await copyFile(file, destination);
         }
-        const key = process.platform === "win32" ? name.toLowerCase() : name;
+        const key = pathKey(name);
         if (excluded.has(key) || !required.has(key) && (selection.libraries === false || !/\.(?:dll|dylib|so(?:\.[\d.]+)?|metallib)$/i.test(name))) continue;
         const previous = copied.get(key);
         if (previous) {
@@ -78,7 +79,7 @@ export async function prepareArchive(archive: AbsolutePath, staging: AbsolutePat
         if (process.platform !== "win32") await chmod(join(ready, name), 0o755);
     }
     for (const program of programs) {
-        if (!copied.has(process.platform === "win32" ? program.toLowerCase() : program)) throw new Error(`Archive does not contain ${program}.`);
+        if (!copied.has(pathKey(program))) throw new Error(`Archive does not contain ${program}.`);
     }
     return ready;
 }
