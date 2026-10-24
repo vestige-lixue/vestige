@@ -33,6 +33,3 @@ export type TranscriptionResult = ({
     success: false;
     error: FailureInfo;
 });
-
-export const executorChannel = "transcription:transcribe";
-export const cancelExecutorChannel = "transcription:cancel";

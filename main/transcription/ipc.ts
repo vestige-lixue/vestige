@@ -1,5 +1,6 @@
 import { type WebContents } from "electron";
-import { type TranscriptionResult, executorChannel, cancelExecutorChannel } from "../../shared/transcription/executor";
+import { type TranscriptionResult } from "../../shared/transcription/executor";
+import { transcriptionChannels } from "../../shared/transcription/ipc";
 import { type ExecutionPaths, transcribe } from "./execute";
 import { type TaskOutputStore } from "../task/store";
 import { handle, listen } from "../util/ipc";
@@ -48,7 +49,7 @@ export function registerTranscriptionIPCs(contents: WebContents, paths: Executio
             active.delete(id);
         }
     };
-    handle(contents, executorChannel, (id: unknown, request: unknown): Promise<TranscriptionResult> | TranscriptionResult => {
+    handle(contents, transcriptionChannels.transcribe, (id: unknown, request: unknown): Promise<TranscriptionResult> | TranscriptionResult => {
         if (closing) return { success: false, error: { kind: "transcription-cancelled" } };
         const previous = typeof id === "string" ? tasks.get(id) : null;
         if (typeof id !== "string" || !id || id.length > 128 || active.has(id) || previous && isTaskPending(previous.status)) return { success: false, error: { kind: "transcription-invalid-id" } };
@@ -58,7 +59,7 @@ export function registerTranscriptionIPCs(contents: WebContents, paths: Executio
         active.set(id, { controller, completion });
         return completion;
     });
-    listen(contents, cancelExecutorChannel, (id: unknown) => {
+    listen(contents, transcriptionChannels.cancel, (id: unknown) => {
         if (typeof id === "string") active.get(id)?.controller.abort();
     });
     const cancelAll = (): void => {
