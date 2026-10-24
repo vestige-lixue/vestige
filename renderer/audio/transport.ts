@@ -182,13 +182,7 @@ export function getTime(transport: Transport): number {
     return transport.position;
 }
 
-function freeze(transport: Transport): void {
-    getTime(transport);
-    if (transport.run?.kind === "tail") {
-        const elapsed = (performance.now() - transport.run.at) / 1000;
-        transport.tailPosition = transport.run.position + elapsed * transport.speed;
-        transport.tailSeconds = Math.max(0, transport.run.seconds - elapsed);
-    }
+function clearRun(transport: Transport): void {
     transport.generation++;
     transport.starting = false;
     transport.run = null;
@@ -196,6 +190,16 @@ function freeze(transport: Transport): void {
     transport.timer = undefined;
     if (transport.video && transport.frame !== null) transport.video.cancelVideoFrameCallback(transport.frame);
     transport.frame = null;
+}
+
+function freeze(transport: Transport): void {
+    getTime(transport);
+    if (transport.run?.kind === "tail") {
+        const elapsed = (performance.now() - transport.run.at) / 1000;
+        transport.tailPosition = transport.run.position + elapsed * transport.speed;
+        transport.tailSeconds = Math.max(0, transport.run.seconds - elapsed);
+    }
+    clearRun(transport);
     pauseElement(transport, transport.audio);
     if (transport.video) pauseElement(transport, transport.video);
     transport.options.pauseAudio();
@@ -213,20 +217,41 @@ export function setPlaying(transport: Transport, playing: boolean): void {
 
 export function configure(transport: Transport, speed: number, offsetMs: number): void {
     const offset = offsetMs / 1000;
-    if (transport.speed === speed && transport.offset === offset) return;
-    freeze(transport);
+    if (transport.disposed || (transport.speed === speed && transport.offset === offset)) return;
+    getTime(transport);
+    const now = performance.now();
+    const run = transport.run;
+    const elapsed = run && run.kind !== "audio" ? (now - run.at) / 1000 : 0;
+    const position = run && run.kind !== "audio" ? run.position + elapsed * transport.speed : transport.position;
+    const remaining = run && run.kind !== "audio" ? Math.max(0, run.seconds - elapsed) : 0;
     transport.speed = speed;
     transport.offset = offset;
+    transport.floor = transport.position;
     transport.audio.playbackRate = speed;
     if (transport.video) transport.video.playbackRate = speed;
-    // Re-anchor without seeking the audio: a rate/offset change must not drop or replay words.
-    if (transport.tailPosition !== null) transport.tailPosition = Math.min(transport.position, duration(transport) + offset * speed);
+    // Re-anchor virtual lead/tail clocks at the new rate without pausing the
+    // elements or suspending AudioContext for each slider update.
+    if (run && run.kind !== "audio") {
+        run.at = now;
+        run.position = position;
+        run.seconds = run.kind === "lead"
+            ? Math.max(0, (transport.audio.currentTime + offset * speed - position) / speed)
+            : Math.max(0, (duration(transport) - position) / speed, Math.min(remaining, transport.options.drainSeconds()));
+    }
+    else if (transport.tailPosition !== null) {
+        transport.tailPosition = Math.min(transport.position, duration(transport) + offset * speed);
+        transport.tailSeconds = Math.max(0, (duration(transport) - transport.tailPosition) / speed,
+            Math.min(transport.tailSeconds, transport.options.drainSeconds()));
+    }
+    synchronizeVideo(transport);
     begin(transport);
 }
 
 export function seek(transport: Transport, time: number, mode: SeekMode): void {
     if (transport.disposed) return;
-    freeze(transport);
+    // Native seeks already replace the decoder position. Keep a playing media
+    // element and AudioContext running, including while preview requests coalesce.
+    clearRun(transport);
     transport.position = Math.max(0, Math.min(duration(transport), time));
     transport.floor = transport.position;
     transport.mode = mode;
@@ -254,7 +279,7 @@ function settle(transport: Transport): void {
 }
 
 function begin(transport: Transport): void {
-    if (transport.disposed || !transport.playing || transport.seeking || transport.seekedToEnd || transport.mode === "preview" || transport.starting || transport.run) return;
+    if (transport.disposed || !transport.playing || transport.seeking || transport.seekedToEnd || transport.starting || transport.run) return;
     if (transport.audio.readyState < 3 || (transport.video && transport.video.readyState < 2)) return;
     transport.starting = true;
     const generation = transport.generation;
@@ -266,7 +291,7 @@ function begin(transport: Transport): void {
         if (transport.audio.ended || transport.audio.currentTime >= duration(transport)) startTail(transport);
         else {
             const ahead = transport.audio.currentTime + transport.offset * transport.speed - transport.position;
-            if (ahead > 0.001) {
+            if (transport.audio.paused && ahead > 0.001) {
                 transport.run = { kind: "lead", at: performance.now(), position: transport.position, seconds: ahead / transport.speed };
             }
             else await startAudio(transport);
@@ -282,7 +307,7 @@ async function startAudio(transport: Transport): Promise<void> {
     transport.run = { kind: "audio" };
     transport.floor = transport.position;
     transport.waiting = false;
-    await transport.audio.play();
+    if (transport.audio.paused) await transport.audio.play();
 }
 
 function startTail(transport: Transport): void {
