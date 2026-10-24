@@ -22,7 +22,6 @@ export type MediaImportFailure = { name: string | null; path: AbsolutePath | nul
 export const state = $state({
     items: [] as ImportState[],
     importFailures: [] as MediaImportFailure[],
-    concurrency: 2,
     picking: false,
     collecting: false
 });
@@ -53,10 +52,6 @@ export function getReadyIds(): string[] {
 
 export function getImportFailures(): MediaImportFailure[] {
     return state.importFailures;
-}
-
-export function getConcurrency(): number {
-    return state.concurrency;
 }
 
 export function isPicking(): boolean {

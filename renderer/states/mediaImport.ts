@@ -1,3 +1,4 @@
+import { TaskQueue, type ScheduledTask } from "./taskQueue";
 import { type FailureInfo, VestigeErrors, toFailureInfo } from "../../shared/failure";
 import { type MediaIssueStatus } from "../../shared/media/check";
 import { type InputSource } from "../../shared/util/file";
@@ -19,23 +20,22 @@ type TaskSource = ({
     previous: mediaImport.ImportIssue;
 });
 
-type ImportTask = { source: TaskSource; controller: AbortController; started: boolean };
+type ImportTask = ScheduledTask<TaskSource>;
 
-const tasks = new Map<string, ImportTask>();
+const tasks = new TaskQueue<TaskSource>({
+    concurrency: 2,
+    run: task => run(task.id, task),
+    settled: (task, current) => {
+        if (current) mediaImport.names.delete(task.id);
+    }
+});
 const issueDialogs = new Map<string, string>();
 const failureDialogs = new Map<mediaImport.MediaImportFailure, string>();
-let running = 0;
 let collection: AbortController | null = null;
 
 export function rename(id: string, name: string): void {
     const task = tasks.get(id);
-    if (task && task.source.kind === "import") mediaImport.names.set(id, name);
-}
-
-export function setConcurrency(value: number): void {
-    if (!Number.isSafeInteger(value) || value < 1) throw new VestigeErrors({ kind: "media-invalid-concurrency" });
-    mediaImport.state.concurrency = value;
-    pump();
+    if (task && task.value.kind === "import") mediaImport.names.set(id, name);
 }
 
 export function setPicking(value: boolean): void {
@@ -84,7 +84,6 @@ export function reset(ids: string[]): void {
     collection?.abort();
     collection = null;
     mediaImport.state.collecting = false;
-    for (const task of tasks.values()) task.controller.abort();
     tasks.clear();
     mediaImport.names.clear();
     for (const dialog of [...issueDialogs.values(), ...failureDialogs.values()]) dialogsAPI.close(dialog);
@@ -93,7 +92,6 @@ export function reset(ids: string[]): void {
     mediaImport.state.importFailures = [];
     mediaImport.state.items = ids.map(id => ({ id, stage: "queued" }));
     for (const id of ids) enqueue(id, { kind: "check", path: project.getMedia(id)!.path }, "");
-    pump();
 }
 
 export function add(sources: InputSource[]): void {
@@ -102,21 +100,18 @@ export function add(sources: InputSource[]): void {
         mediaImport.state.items.push({ id, stage: "queued" });
         enqueue(id, { kind: "import", source }, typeof source === "string" ? getFileName(source) : source.name);
     }
-    pump();
 }
 
 export function retry(id: string): void {
     const item = mediaImport.get(id);
     if (!item || !mediaImport.isIssue(item)) return;
     enqueue(id, { kind: "check", path: item.path }, "");
-    pump();
 }
 
 export function relink(id: string): void {
     const item = mediaImport.get(id);
     if (!item || !mediaImport.isIssue(item)) return;
     enqueue(id, { kind: "relink", previous: item }, "");
-    pump();
 }
 
 export function ignore(id: string): void {
@@ -139,13 +134,10 @@ export function reportPlaybackFailure(id: string, status: MediaIssueStatus, erro
 }
 
 export function remove(id: string): void {
-    const task = tasks.get(id);
-    tasks.delete(id);
+    tasks.cancel(id);
     mediaImport.names.delete(id);
     closeIssue(id);
     mediaImport.state.items = mediaImport.state.items.filter(item => item.id !== id);
-    task?.controller.abort();
-    pump();
 }
 
 export function move(id: string, beforeId: string | null): boolean {
@@ -187,37 +179,26 @@ function reportFailure(id: string, status: MediaIssueStatus, error: FailureInfo,
 function enqueue(id: string, source: TaskSource, name: string): void {
     closeIssue(id);
     update({ id, stage: "queued" });
-    const task: ImportTask = { source, controller: new AbortController(), started: false };
-    tasks.set(id, task);
+    tasks.enqueue(id, source);
     mediaImport.names.set(id, name);
-}
-
-function pump(): void {
-    for (const [id, task] of tasks) {
-        if (running >= mediaImport.state.concurrency) break;
-        if (task.started) continue;
-        task.started = true;
-        running++;
-        void run(id, task);
-    }
 }
 
 async function run(id: string, task: ImportTask): Promise<void> {
     let path: AbsolutePath | null = null;
     try {
         let source: InputSource;
-        if (task.source.kind === "relink") {
+        if (task.value.kind === "relink") {
             update({ id, stage: "relocating" });
-            const selected = await window.api.file.selectMediaPath(task.source.previous.path);
-            if (tasks.get(id) !== task) return;
+            const selected = await window.api.file.selectMediaPath(task.value.previous.path);
+            if (!tasks.isCurrent(task)) return;
             if (selected === null) {
-                update(task.source.previous);
+                update(task.value.previous);
                 showIssue(id);
                 return;
             }
             source = selected;
         }
-        else source = task.source.kind === "check" ? task.source.path : task.source.source;
+        else source = task.value.kind === "check" ? task.value.path : task.value.source;
         update({ id, stage: "path" });
         if (typeof source === "string") path = source;
         else {
@@ -225,19 +206,19 @@ async function run(id: string, task: ImportTask): Promise<void> {
             if (!result.success) throw new VestigeErrors(result.error);
             path = result.path;
         }
-        if (tasks.get(id) !== task) return;
-        if (task.source.kind === "import" && /\.vestige$/i.test(path)) {
+        if (!tasks.isCurrent(task)) return;
+        if (task.value.kind === "import" && /\.vestige$/i.test(path)) {
             reportFailure(id, "unreadable", { kind: "media-format" }, path);
             return;
         }
         update({ id, stage: "reading" });
         const requestId = crypto.randomUUID();
         const cancel = (): void => window.api.file.cancelMediaRead(requestId);
-        task.controller.signal.addEventListener("abort", cancel, { once: true });
+        task.signal.addEventListener("abort", cancel, { once: true });
         const expected = project.getMedia(id);
         const result = await window.api.file.readMedia(requestId, path, expected ? { size: expected.size, hash: expected.hash } : null)
-            .finally(() => task.controller.signal.removeEventListener("abort", cancel));
-        if (tasks.get(id) !== task) return;
+            .finally(() => task.signal.removeEventListener("abort", cancel));
+        if (!tasks.isCurrent(task)) return;
         if (result.status !== "ready") {
             if (result.status !== "cancelled") reportFailure(id, result.status, result.error, path);
             return;
@@ -252,16 +233,8 @@ async function run(id: string, task: ImportTask): Promise<void> {
         if (mediaSelection.get() === null) projectAPI.selectMedia(id);
     }
     catch (error) {
-        if (tasks.get(id) !== task || task.controller.signal.aborted) return;
+        if (!tasks.isCurrent(task) || task.signal.aborted) return;
         reportFailure(id, "unreadable", toFailureInfo(error), path);
         console.error(error);
-    }
-    finally {
-        if (tasks.get(id) === task) {
-            tasks.delete(id);
-            mediaImport.names.delete(id);
-        }
-        running--;
-        pump();
     }
 }

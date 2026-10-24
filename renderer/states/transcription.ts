@@ -4,12 +4,19 @@ import { type Config } from "../../shared/transcription/Config";
 import * as mediaImport from "./mediaImport.svelte";
 import * as project from "./project.svelte";
 import * as settings from "./settings.svelte";
-import { SvelteMap } from "svelte/reactivity";
 import * as transcription from "./transcription.svelte";
 import * as settingsAPI from "./settings";
 import * as projectAPI from "./project";
+import { TaskQueue, type ScheduledTask } from "./taskQueue";
 
-const completions = new SvelteMap<string, () => void>();
+const queue = new TaskQueue<transcription.TranscriptionTask>({
+    concurrency: 0,
+    run: runTask,
+    activeChanged: count => transcription.state.activeCount = count,
+    settled: ({ value: task }) => {
+        if (transcription.getTaskById(task.id) === task && (task.status === "running" || task.status === "stopping")) task.status = "cancelled";
+    }
+});
 
 export function start(mediaId: string, config: Config): Promise<void> | null {
     const previous = transcription.getTask(mediaId);
@@ -17,7 +24,6 @@ export function start(mediaId: string, config: Config): Promise<void> | null {
     if (!settings.isReady() || !media || !mediaImport.isReady(mediaId)
         || transcription.isPending(previous)) return null;
     const id = crypto.randomUUID();
-    const completed = new Promise<void>(resolve => completions.set(id, resolve));
     transcription.tasks.push({
         id,
         mediaId,
@@ -25,8 +31,9 @@ export function start(mediaId: string, config: Config): Promise<void> | null {
         request: { ...config, params: JSON.stringify(config.params), mediaPath: media.path, mediaDuration: media.duration },
         status: "queued"
     });
-    drain();
-    return completed;
+    updateConcurrency();
+    // Queue the reactive task identity, not the object supplied to the state array.
+    return queue.enqueue(id, transcription.getTaskById(id)!).completed;
 }
 
 export function stop(mediaId: string): void {
@@ -37,15 +44,10 @@ export function stop(mediaId: string): void {
 export function stopTask(taskId: string): void {
     const task = transcription.getTaskById(taskId);
     if (!task) return;
-    if (task.status === "queued") {
-        task.status = "cancelled";
-        finish(task);
-        drain();
-        return;
-    }
-    if (task.status !== "running") return;
-    task.status = "stopping";
-    window.api.transcription.cancel(task.id);
+    if (task.status === "queued") task.status = "cancelled";
+    else if (task.status === "running") task.status = "stopping";
+    else return;
+    queue.cancel(task.id);
 }
 
 export function remove(taskId: string): void {
@@ -53,28 +55,17 @@ export function remove(taskId: string): void {
     if (!task || task.status === "running" || task.status === "stopping") return;
     if (task.status === "queued") {
         task.status = "cancelled";
-        finish(task);
+        queue.cancel(task.id);
     }
     transcription.tasks.splice(transcription.tasks.indexOf(task), 1);
-    drain();
 }
 
 export function stopAll(): void {
     for (const task of transcription.tasks) {
-        if (task.status === "queued") {
-            task.status = "cancelled";
-            finish(task);
-        }
-        else if (task.status === "running") {
-            task.status = "stopping";
-            window.api.transcription.cancel(task.id);
-        }
+        if (task.status === "queued") task.status = "cancelled";
+        else if (task.status === "running") task.status = "stopping";
     }
-}
-
-function finish(task: transcription.TranscriptionTask): void {
-    completions.get(task.id)?.();
-    completions.delete(task.id);
+    queue.clear();
 }
 
 function fail(task: transcription.TranscriptionTask, error: FailureInfo): void {
@@ -82,37 +73,32 @@ function fail(task: transcription.TranscriptionTask, error: FailureInfo): void {
     if (index >= 0) transcription.tasks[index] = { ...task, status: "failed", error };
 }
 
-function drain(): void {
-    const concurrency = Math.min(taskCapacity, settings.get()?.transcription.concurrency ?? 0);
-    while (transcription.state.activeCount < concurrency) {
-        const task = transcription.tasks.find(task => task.status === "queued");
-        if (!task) break;
-        const media = project.getMedia(task.mediaId);
-        if (!media || media.path !== task.request.mediaPath || !mediaImport.isReady(task.mediaId)) {
-            fail(task, { kind: "transcription-media-unavailable" });
-            finish(task);
-            continue;
-        }
-        task.status = "running";
-        transcription.state.activeCount++;
-        void runTask(task);
-    }
+function updateConcurrency(): void {
+    queue.setConcurrency(Math.min(taskCapacity, settings.get()?.transcription.concurrency ?? 0));
 }
 
 export function startLifecycle(): () => void {
-    return settingsAPI.subscribe(drain);
+    return settingsAPI.subscribe(updateConcurrency);
 }
 
-async function runTask(task: transcription.TranscriptionTask): Promise<void> {
-    const media = project.getMedia(task.mediaId)!;
+async function runTask(scheduled: ScheduledTask<transcription.TranscriptionTask>): Promise<void> {
+    const task = scheduled.value;
+    const media = project.getMedia(task.mediaId);
+    if (!media || media.path !== task.request.mediaPath || !mediaImport.isReady(task.mediaId)) {
+        fail(task, { kind: "transcription-media-unavailable" });
+        return;
+    }
+    task.status = "running";
     const mediaPath = task.request.mediaPath;
     const { size, hash } = media;
+    const cancel = (): void => window.api.transcription.cancel(task.id);
+    scheduled.signal.addEventListener("abort", cancel, { once: true });
     try {
         await Promise.resolve();
-        if (transcription.getTaskById(task.id) !== task || task.status !== "running" || !project.getMedia(task.mediaId)) return;
+        if (!queue.isCurrent(scheduled) || transcription.getTaskById(task.id) !== task || task.status !== "running" || !project.getMedia(task.mediaId)) return;
         const result = await window.api.transcription.transcribe(task.id, transcription.snapshotRequest(task.request));
         const current = project.getMedia(task.mediaId);
-        if (transcription.getTaskById(task.id) !== task || task.status !== "running"
+        if (!queue.isCurrent(scheduled) || transcription.getTaskById(task.id) !== task || task.status !== "running"
             || !current || current.path !== mediaPath || current.size !== size || current.hash !== hash) return;
         if (result.success) {
             projectAPI.appendRun(task.mediaId, result.run);
@@ -122,14 +108,11 @@ async function runTask(task: transcription.TranscriptionTask): Promise<void> {
     }
     catch (error) {
         console.error("Unexpected transcription failure:", error);
-        if (transcription.getTaskById(task.id) === task && task.status === "running") {
+        if (queue.isCurrent(scheduled) && transcription.getTaskById(task.id) === task && task.status === "running") {
             fail(task, toFailureInfo(error));
         }
     }
     finally {
-        if (transcription.getTaskById(task.id) === task && (task.status === "running" || task.status === "stopping")) task.status = "cancelled";
-        transcription.state.activeCount--;
-        finish(task);
-        drain();
+        scheduled.signal.removeEventListener("abort", cancel);
     }
 }
