@@ -7,6 +7,7 @@ import { defaultSettings } from "../../shared/settings/defaults";
 export type PlaybackAudio = {
     readonly element: HTMLMediaElement;
     readonly context: AudioContext;
+    readonly lookaheadFrames: number;
     readonly source: MediaElementAudioSourceNode;
     readonly master: GainNode;
     readonly meterSource: DelayNode;
@@ -49,6 +50,7 @@ export function create(element: HTMLMediaElement, volume: number, enabled: boole
 
     const audio: PlaybackAudio = {
         element, context, source, master, enabled, settings, onFailure, onLevels, onInterruption, suspension,
+        lookaheadFrames: Math.max(1, Math.round(context.sampleRate * 0.005)),
         meterSource: context.createDelay(), meter: null, meterGeneration: 0, levels: null,
         processor: null, disposed: false, playing: false, running: false, playVersion: 0, failed: false,
         resetListener: () => reset(audio),
@@ -56,7 +58,7 @@ export function create(element: HTMLMediaElement, volume: number, enabled: boole
         initialized: context.audioWorklet.addModule(processorURL).then(() => {
             if (audio.disposed) return;
             audio.processor = new AudioWorkletNode(context, "vestige-volume-stabilizer", {
-                processorOptions: { enabled: audio.enabled, settings: audio.settings }
+                processorOptions: { enabled: audio.enabled, settings: audio.settings, lookaheadFrames: audio.lookaheadFrames }
             });
             audio.processor.onprocessorerror = () => fail(audio, new Error("The volume stabilization processor failed."));
             source.disconnect();
@@ -115,7 +117,7 @@ function fail(audio: PlaybackAudio, error: unknown): void {
 function connectMeter(audio: PlaybackAudio): void {
     if (!audio.meter) return;
     // Align source measurements with the stabilizer's lookahead, only in the meter branch.
-    audio.meterSource.delayTime.value = audio.processor ? Math.round(audio.context.sampleRate * 0.005) / audio.context.sampleRate : 0;
+    audio.meterSource.delayTime.value = audio.processor ? audio.lookaheadFrames / audio.context.sampleRate : 0;
     audio.source.connect(audio.meterSource).connect(audio.meter, 0, 0);
     (audio.processor ?? audio.source).connect(audio.meter, 0, 1);
     audio.master.connect(audio.meter, 0, 2);
@@ -194,7 +196,7 @@ export function reset(audio: PlaybackAudio): void {
     if (audio.disposed) return;
     audio.processor?.port.postMessage({ type: "reset" });
     // The source delay still holds pre-seek samples while the processor clears its buffer.
-    resetMeter(audio, audio.processor ? Math.round(audio.context.sampleRate * 0.005) : 0);
+    resetMeter(audio, audio.processor ? audio.lookaheadFrames : 0);
 }
 
 export function dispose(audio: PlaybackAudio): void {

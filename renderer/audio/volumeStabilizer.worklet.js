@@ -9,16 +9,13 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
     quietFrames = 0;
     gain = 1;
     limiterGain = 1;
-    maxGain = 7.9432823;
-    gatePower = 0.00001;
-    targetLevel = 0.1;
 
     /** @param {AudioWorkletNodeOptions} options */
     constructor(options) {
         super();
-        this.enabled = Boolean(options.processorOptions?.enabled);
+        this.enabled = options.processorOptions.enabled;
         this.mix = this.enabled ? 1 : 0;
-        this.lookahead = Math.max(1, Math.round(sampleRate * 0.005));
+        this.lookahead = options.processorOptions.lookaheadFrames;
         this.size = this.lookahead + 1;
         /** @type {Float32Array[]} */
         this.dry = [];
@@ -26,26 +23,14 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         this.wet = [];
         this.peaks = new Float64Array(this.size);
         this.peakFrames = new Float64Array(this.size);
-        this.gainAttack = 1 - Math.exp(-1 / (sampleRate * 0.025));
-        this.gainRelease = 1 - Math.exp(-1 / (sampleRate * 0.8));
         this.limiterRelease = 1 - Math.exp(-1 / (sampleRate * 0.08));
         this.mixStep = 1 / (sampleRate * 0.02);
-        this.configure(options.processorOptions?.settings);
+        this.parameters = parameters(options.processorOptions.settings);
         this.port.onmessage = ({ data }) => {
             if (data?.type === "enabled" && typeof data.enabled === "boolean") this.enabled = data.enabled;
-            else if (data?.type === "settings") this.configure(data.settings);
+            else if (data?.type === "settings") this.parameters = parameters(data.settings);
             else if (data?.type === "reset") this.reset();
         };
-    }
-
-    /** @param {import("../../shared/settings/Settings").VolumeStabilizationSettings | undefined} settings */
-    configure(settings) {
-        if (!settings) return;
-        this.maxGain = 10 ** (settings.maxGainDb / 20);
-        this.gatePower = 10 ** (settings.gateThresholdDb / 10);
-        this.targetLevel = 10 ** (settings.targetLevelDb / 20);
-        this.gainAttack = 1 - Math.exp(-1 / (sampleRate * settings.gainAttackMs / 1000));
-        this.gainRelease = 1 - Math.exp(-1 / (sampleRate * settings.gainReleaseMs / 1000));
     }
 
     reset() {
@@ -67,6 +52,7 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         const output = outputs[0];
         const frames = output?.[0]?.length ?? 0;
         if (!frames) return true;
+        const { maxGain, gatePower, targetLevel, gainAttack, gainRelease } = this.parameters;
         if (this.dry.length !== output.length) {
             this.dry = Array.from({ length: output.length }, () => new Float32Array(this.size));
             this.wet = Array.from({ length: output.length }, () => new Float32Array(this.size));
@@ -88,18 +74,18 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         const levelBlend = 1 - Math.exp(-frames / (sampleRate * levelTime));
         let targetGain = this.gain;
         // The level gate controls amplification, not noise removal or speech detection.
-        if (power >= this.gatePower) {
+        if (power >= gatePower) {
             this.power = this.power === 0 || this.quietFrames > sampleRate * 0.25
                 ? power : this.power + (power - this.power) * levelBlend;
             this.quietFrames = 0;
-            targetGain = Math.max(0.0630957, Math.min(this.maxGain, this.targetLevel / Math.sqrt(this.power)));
+            targetGain = Math.max(0.0630957, Math.min(maxGain, targetLevel / Math.sqrt(this.power)));
         }
         else {
             this.quietFrames += frames;
             this.power += (power - this.power) * levelBlend;
             if (this.quietFrames > sampleRate * 0.25) targetGain = Math.min(this.gain, 1);
         }
-        const gainBlend = targetGain < this.gain ? this.gainAttack : this.gainRelease;
+        const gainBlend = targetGain < this.gain ? gainAttack : gainRelease;
         for (let i = 0; i < frames; i++) {
             this.gain += (targetGain - this.gain) * gainBlend;
             let peak = 0;
@@ -137,6 +123,17 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         // Chromium may otherwise retire a paused processor before playback resumes.
         return true;
     }
+}
+
+/** @param {import("../../shared/settings/Settings").VolumeStabilizationSettings} settings */
+function parameters(settings) {
+    return {
+        maxGain: 10 ** (settings.maxGainDb / 20),
+        gatePower: 10 ** (settings.gateThresholdDb / 10),
+        targetLevel: 10 ** (settings.targetLevelDb / 20),
+        gainAttack: 1 - Math.exp(-1 / (sampleRate * settings.gainAttackMs / 1000)),
+        gainRelease: 1 - Math.exp(-1 / (sampleRate * settings.gainReleaseMs / 1000))
+    };
 }
 
 registerProcessor("vestige-volume-stabilizer", VolumeStabilizerProcessor);

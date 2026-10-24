@@ -1,4 +1,4 @@
-type SeekMode = "preview" | "commit";
+export type SeekMode = "preview" | "commit";
 type SeekRequest = { time: number; mode: SeekMode };
 type Seeker = {
     element: HTMLMediaElement;

@@ -1,6 +1,7 @@
 import * as playback from "./playback";
 import { type VolumeStabilizationSettings } from "../../shared/settings/Settings";
 import { minAudioOffsetMs, maxAudioOffsetMs } from "../../shared/constants";
+import { monoPcm16Header } from "../../shared/audio/wave";
 
 export const beatSeconds = 60 / 90;
 export const trialSeconds = beatSeconds * 3;
@@ -26,23 +27,10 @@ export function createTrack(): Blob {
     const peak = 10 ** (-10 / 20);
     const toneSeconds = 0.036;
     const samples = Math.round(cycleSeconds * rate);
-    const data = new ArrayBuffer(44 + samples * 2);
-    const view = new DataView(data);
-    const text = (at: number, value: string): void => {
-        for (let i = 0; i < value.length; i++) view.setUint8(at + i, value.charCodeAt(i));
-    };
-    text(0, "RIFF");
-    view.setUint32(4, data.byteLength - 8, true);
-    text(8, "WAVEfmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, rate, true);
-    view.setUint32(28, rate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    text(36, "data");
-    view.setUint32(40, samples * 2, true);
+    const header = monoPcm16Header(rate, samples * 2);
+    const data = new Uint8Array(header.byteLength + samples * 2);
+    data.set(header);
+    const view = new DataView(data.buffer);
     for (let beat = 0; beat < 3; beat++) {
         const start = Math.round((beat + 1) * beatSeconds * rate);
         const frequency = beat === 2 ? 1350 : 900;
@@ -50,7 +38,7 @@ export function createTrack(): Blob {
             const t = i / rate;
             // A short sustain keeps the cue audible, with smooth edges and a -10 dBFS peak.
             const envelope = peak * Math.min(1, t / 0.0015, (toneSeconds - t) / 0.006);
-            view.setInt16(44 + (start + i) * 2, Math.round(Math.sin(2 * Math.PI * frequency * t) * envelope * 32767), true);
+            view.setInt16(header.byteLength + (start + i) * 2, Math.round(Math.sin(2 * Math.PI * frequency * t) * envelope * 32767), true);
         }
     }
     return new Blob([data], { type: "audio/wav" });

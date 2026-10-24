@@ -183,7 +183,7 @@
             pauseAudio: () => {
                 if (pipeline) playbackAudio.pause(pipeline);
             },
-            drainSeconds: () => pipeline ? (pipeline.processor ? 0.005 : 0) + pipeline.context.baseLatency + (pipeline.context.outputLatency || 0) : 0,
+            drainSeconds: () => pipeline ? (pipeline.processor ? pipeline.lookaheadFrames / pipeline.context.sampleRate : 0) + pipeline.context.baseLatency + (pipeline.context.outputLatency || 0) : 0,
             onTime: (time, remember) => {
                 if (current()) projectAPI.observePlaybackTime(id, time, remember);
             },
