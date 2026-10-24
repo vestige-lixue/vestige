@@ -93,14 +93,18 @@ whisper.cpp 通常用于运行 Whisper 系列语音识别模型，包括 Tiny、
 
 ```text
 whisper-small/
-    ggml-base.en.bin
+    model.bin
 ```
 
-将下载的模型文件（例如 ggml-small.bin）更名为 ggml-base.en.bin。Vestige 当前固定使用这个名称定位文件，它不代表只能使用 Base 英文模型。不要改变文件内容或仅通过改扩展名转换格式。
+将下载的模型文件（例如 ggml-small.bin）更名为 model.bin。Vestige 使用这个中性名称定位所选模型。不要改变文件内容或仅通过改扩展名转换格式。
+
+**本次更新：**已有的 Whisper 模型目录（包括此前在应用内下载的模型）需要将 ggml-base.en.bin 改名为 model.bin。文件内容和模型目录名保持原样，无需转换或重新下载。
 
 ### sherpa-onnx
 
 sherpa-onnx 使用离线语音识别执行器，通常运行 Paraformer、Zipformer / Transducer、CTC、SenseVoice 等适配 sherpa-onnx 的 ONNX 模型。请选择官方标注为离线识别的导出版本；任意 ONNX 文件、在线识别模型、语音合成模型不能因此直接使用。具体支持范围还取决于安装的执行器版本。
+
+应用内下载的 Sherpa 后端必须包含附属的 sherpa-onnx-vad 工具。自带后端目录可以缺少它，此时 Vestige 使用有时长上限的音频窗口，并在较安静的位置选择边界。VAD 只帮助选择分段边界，不会丢弃音频。
 
 模型文件名称与执行器参数对应：去掉参数名开头的 --，加上 .onnx。例如 Paraformer 的 model.onnx 需要更名为 paraformer.onnx。下表列出 Vestige 会识别的名称；只放入所选模型实际需要的一组文件，无需下载表中的所有文件。
 

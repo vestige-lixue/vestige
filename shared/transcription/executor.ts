@@ -2,12 +2,16 @@ import { type FailureInfo } from "../failure";
 import { type Run } from "./Run";
 import { type AbsolutePath } from "../util/path";
 
-export type Executor = "sherpa-onnx" | "whisper.cpp";
+export const executors = [
+    { id: "whisper.cpp", name: "whisper.cpp" },
+    { id: "sherpa-onnx", name: "sherpa-onnx" }
+] as const;
 
-export const executors = {
-    "whisper.cpp": { program: "whisper-cli" },
-    "sherpa-onnx": { program: "sherpa-onnx-offline" }
-} as const satisfies Record<Executor, { program: string }>;
+export type Executor = typeof executors[number]["id"];
+
+export function isExecutor(value: unknown): value is Executor {
+    return executors.some(executor => executor.id === value);
+}
 
 export type TranscriptionRequest = {
     executor: Executor;

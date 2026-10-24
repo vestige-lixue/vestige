@@ -1,6 +1,6 @@
 import { type AbsolutePath } from "../../shared/util/path";
 import { parseAbsolutePath, resolveFilePath } from "../util/file";
-import { type TranscriptionRequest } from "../../shared/transcription/executor";
+import { isExecutor, type TranscriptionRequest } from "../../shared/transcription/executor";
 import { type Config } from "../../shared/transcription/Config";
 import { VestigeErrors } from "../../shared/failure";
 
@@ -15,7 +15,7 @@ export function parseRequest(value: unknown, modelRoot: AbsolutePath): ParsedReq
     const startedAt = Date.now();
     if (!value || typeof value !== "object") throw new VestigeErrors({ kind: "transcription-invalid-request" });
     const request = value as Record<string, unknown>;
-    if (request.executor !== "sherpa-onnx" && request.executor !== "whisper.cpp") {
+    if (!isExecutor(request.executor)) {
         throw new VestigeErrors({ kind: "transcription-unknown-executor", executor: String(request.executor) });
     }
     for (const key of ["backendDirectory", "modelDirectory", "mediaPath"] as const) {

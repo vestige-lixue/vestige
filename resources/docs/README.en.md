@@ -93,14 +93,18 @@ whisper.cpp normally runs Whisper speech recognition models, including Tiny, Bas
 
 ```text
 whisper-small/
-    ggml-base.en.bin
+    model.bin
 ```
 
-Rename the downloaded model file (for example, ggml-small.bin) to ggml-base.en.bin. Vestige currently uses this fixed name to locate the file; it does not restrict the model to Base English. Do not change the file contents or assume changing its extension converts its format.
+Rename the downloaded model file (for example, ggml-small.bin) to model.bin. Vestige uses this neutral name to locate the selected model. Do not change the file contents or assume changing its extension converts its format.
+
+**This update:** existing Whisper model folders, including previously downloaded models, must rename ggml-base.en.bin to model.bin. The contents and model folder name stay the same; no conversion or new download is needed.
 
 ### sherpa-onnx
 
 sherpa-onnx uses the offline speech recognition executor for compatible ONNX models such as Paraformer, Zipformer / Transducer, CTC and SenseVoice. Choose an export documented for offline recognition. Arbitrary ONNX files, streaming recognition models and speech synthesis models cannot be used directly. Support also depends on the installed executor version.
+
+Vestige's downloadable Sherpa backends require the companion sherpa-onnx-vad tool. A custom backend folder may omit it; Vestige then uses bounded audio windows with quiet-boundary detection. VAD only helps choose segment boundaries and does not discard audio.
 
 Model file names correspond to native options: remove the leading -- and append .onnx. For example, rename a Paraformer model.onnx file to paraformer.onnx. The table lists names recognized by Vestige. Include only the components required by your model, not every file in the table.
 

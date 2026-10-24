@@ -1,5 +1,6 @@
 import { type Model } from "../../shared/models";
 import { type DownloadPayload } from "../downloads/types";
+import { modelFilename as whisperModelFilename } from "../transcription/whisper/models";
 
 export type DownloadConfiguration = Model & DownloadPayload & { estimatedBytes: number };
 
@@ -47,7 +48,7 @@ export const modelDownloads: DownloadConfiguration[] = [
         estimatedBytes,
         executor: "whisper.cpp",
         files: [
-            { url: `${whisperSource}/ggml-${variant}.bin?download=true`, destination: "ggml-base.en.bin" },
+            { url: `${whisperSource}/ggml-${variant}.bin?download=true`, destination: whisperModelFilename },
             { url: "https://raw.githubusercontent.com/openai/whisper/main/LICENSE", destination: "LICENSE" }
         ],
         notice: [
@@ -55,7 +56,7 @@ export const modelDownloads: DownloadConfiguration[] = [
             "Source and model-weight license: https://github.com/openai/whisper#license",
             "GGML conversion and distribution: Georgi Gerganov / whisper.cpp contributors",
             whisperSource.replace("/resolve/", "/tree/"),
-            `Vestige filename mapping: ggml-${variant}.bin -> ggml-base.en.bin (contents unchanged).`
+            `Vestige filename mapping: ggml-${variant}.bin -> ${whisperModelFilename} (contents unchanged).`
         ].join("\n")
     })),
     {

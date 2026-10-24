@@ -6,19 +6,17 @@ import { runProcess } from "../../util/process";
 import { createRun } from "../result";
 import { VestigeErrors } from "../../../shared/failure";
 import { nativeArguments } from "./parameters";
-import { modelArguments } from "./models";
 import { needsWordSeparator, parseBatchResults, toRun } from "./result";
 import { prepareAudioParts } from "./segmentation";
 import { decodeWithRetry, qwenDecodeProblem } from "./retry";
 
 export async function execute(context: ExecutionContext): Promise<Run> {
-    const { id, request, backend, directory, signal, feedback } = context;
+    const { id, request, backend, model, directory, signal, feedback } = context;
     const { executable } = backend;
-    const options = { ...request.options };
-    const modelArgs = await modelArguments(request.modelDirectory);
-    const qwen = [...nativeArguments(options), ...modelArgs].some(arg => arg.startsWith("--qwen3-asr-decoder="));
-    if (qwen && options["--qwen3-asr-max-new-tokens"] === undefined) options["--qwen3-asr-max-new-tokens"] = "256";
-    const fallbackTemperature = qwen && !nativeArguments(options).some(arg => /^--qwen3-asr-temperature(?:=|$)/.test(arg)) ? 0.4 : undefined;
+    const options = model.options;
+    const modelArgs = model.files.map(file => `--${file.role}=models/${file.filename}`);
+    const qwen = model.strategy.kind === "qwen3-asr";
+    const fallbackTemperature = model.strategy.kind === "qwen3-asr" ? model.strategy.fallbackTemperature ?? undefined : undefined;
     const start = performance.now();
     const parts = await prepareAudioParts(context);
     const transcript: TranscriptSpan[] = [];

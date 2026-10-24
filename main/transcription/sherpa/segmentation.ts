@@ -1,5 +1,5 @@
 import { copyFile, open } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { type Range } from "../../../shared/util/range";
 import { type AbsolutePath } from "../../../shared/util/path";
 import { parseAbsolutePath } from "../../util/file";
@@ -23,7 +23,15 @@ export function speechRanges(diagnostic: string, duration: number): Range[] {
 
 async function detectSpeech(context: ExecutionContext): Promise<Range[]> {
     const { audio, directory, backend, vadModelPath, signal, feedback, duration } = context;
-    const executable = parseAbsolutePath(join(dirname(backend.executable), `sherpa-onnx-vad${process.platform === "win32" ? ".exe" : ""}`));
+    const vad = backend.tools.vad;
+    const unavailable = (reason: unknown): Range[] => {
+        // All audio is still decoded in bounded windows. VAD only hints at cuts.
+        feedback?.record?.("Sherpa VAD unavailable", reason);
+        feedback?.output("stderr", "[sherpa-onnx] VAD unavailable; using bounded audio windows.\n");
+        return [];
+    };
+    if (!vad?.executable) return unavailable({ reason: "missing-optional-tool" });
+    const executable = vad.executable;
     try {
         signal?.throwIfAborted();
         // Keep non-ASCII application paths out of the native model argument.
@@ -36,11 +44,8 @@ async function detectSpeech(context: ExecutionContext): Promise<Range[]> {
     }
     catch (error) {
         signal?.throwIfAborted();
-        // Custom/older backends may lack the VAD CLI. All audio is still decoded
-        // in bounded windows; VAD is a boundary hint, never a discard filter.
-        feedback?.record?.("Sherpa VAD unavailable", error);
-        feedback?.output("stderr", "[sherpa-onnx] VAD unavailable; using bounded audio windows.\n");
-        return [];
+        if (vad.required) throw error;
+        return unavailable(error);
     }
 }
 

@@ -5,5 +5,4 @@ export type Backend = {
     id: string;
     name: string;
     executor: Executor;
-    program: string;
 };

@@ -1,8 +1,8 @@
 <div class="fields">
     <div class="field">
         <label for={`${id}-executor`}>{i18n.t("transcription.config.executor.label")}</label>
-        <DropdownSelector id={`${id}-executor`} items={executors} {disabled} value={config.executor} onValueChange={value => {
-            if (value === "whisper.cpp" || value === "sherpa-onnx") onchange({ ...config, executor: value });
+        <DropdownSelector id={`${id}-executor`} items={executorItems} {disabled} value={config.executor} onValueChange={value => {
+            if (isExecutor(value)) onchange({ ...config, executor: value });
         }} />
     </div>
     {#each directories as directory (directory.kind)}
@@ -64,6 +64,7 @@
     import { onMount, onDestroy } from "svelte";
     import * as i18n from "../../i18n.svelte";
     import { type Config } from "../../../shared/transcription/Config";
+    import { executors, isExecutor } from "../../../shared/transcription/executor";
     import { type DownloadKind } from "../../../shared/downloads";
     import { toFailureInfo, type FailureInfo } from "../../../shared/failure";
     import { describeFailure } from "../../failures";
@@ -87,7 +88,7 @@
     };
     let { dialogId, config, onchange, validate = $bindable(), disabled = false }: Props = $props();
     const id = $props.id();
-    const executors = [{ value: "whisper.cpp", label: "whisper.cpp" }, { value: "sherpa-onnx", label: "sherpa-onnx" }];
+    const executorItems = executors.map(({ id, name }) => ({ value: id, label: name }));
     const directories = $state<DirectoryField[]>((["backend", "model"] as const).map(kind => ({ kind, input: null, items: [], version: 0 })));
     const emptyDirectoryMessages = { backend: "transcription.config.backendDirectory.required", model: "transcription.config.modelDirectory.required" } as const;
     let browsing = $state(false);

@@ -12,10 +12,10 @@ import { isSystemError } from "../../util/file";
 import { whisperProgress } from "./progress";
 
 export async function execute(context: ExecutionContext): Promise<Run> {
-    const { id, request, backend, directory, audio, duration, signal, feedback } = context;
+    const { id, request, backend, model, directory, audio, duration, signal, feedback } = context;
     const { executable } = backend;
     const outputFile = join(directory, "result");
-    const args = [...nativeArguments(request.options), "--model", "models/ggml-base.en.bin",
+    const args = [...nativeArguments(model.options), ...model.files.flatMap(file => [`--${file.role}`, `models/${file.filename}`]),
         "--file", basename(audio), "--output-json-full", "--output-file", basename(outputFile), "--print-progress"];
     const start = performance.now();
     feedback?.record?.("Whisper command", { executable, args, directory });
