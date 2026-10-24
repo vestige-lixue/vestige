@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
-    createTextIndex, projectText, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint
+    createTextIndex, projectText, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications
 } from "../shared/transcript/text";
-import { modification, referenceText, sourcePosition, transcript } from "./support/fixtures";
-import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary } from "./support/generators";
+import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
+import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary } from "./support/generators";
 import { checkProperty } from "./support/properties";
 
 describe("text projection and editing", () => {
@@ -114,11 +114,103 @@ describe("text projection and editing", () => {
             { segmentIdx: 3, offset: 1 }, { segmentIdx: -1, offset: 0 },
             { segmentIdx: 0, offset: 0.5 }
         ]) expect(() => textOffset(index, position)).toThrow(RangeError);
-        expect(() => projectText(index, [modification(spans, 2, 1, "")])).toThrow(RangeError);
-        expect(() => projectText(index, [modification(spans, 0, 2, ""), modification(spans, 1, 2, "x")])).toThrow(RangeError);
+        expect(() => projectText(index, modification(spans, 2, 1, ""))).toThrow(RangeError);
+        expect(() => projectText(index, [...modification(spans, 0, 2, ""), ...modification(spans, 1, 2, "x")])).toThrow(RangeError);
         const projection = projectText(index, []);
         for (const [from, to] of [[-1, 0], [1, 0], [0, 3], [0, 0.5]]) {
             expect(() => editText(index, projection, from, to, "")).toThrow(RangeError);
         }
+    });
+
+    it("normalizes source-anchored operations without changing text or provenance", () => {
+        checkProperty("normalization", fc.property(normalizationArbitrary, ({ spans, modifications }) => {
+            const before = structuredClone(modifications);
+            const index = createTextIndex(spans);
+            const normalized = normalizeModifications(index, modifications);
+            expect(normalizeModifications(index, normalized)).toEqual(normalized);
+            expect(referenceText(spans, normalized)).toBe(referenceText(spans, modifications));
+            expect(projectText(index, normalized).text).toBe(referenceText(spans, modifications));
+            const deletions = normalized.filter(item => item.type === "delete").map(item => ({
+                from: sourceOffset(spans, item.range.start), to: sourceOffset(spans, item.range.end)
+            }));
+            for (let i = 0; i < deletions.length; i++) {
+                expect(deletions[i].from).toBeLessThan(deletions[i].to);
+                if (i) expect(deletions[i - 1].to).toBeLessThan(deletions[i].from);
+            }
+            let previous = -1;
+            const anchors = new Set<number>();
+            for (const item of normalized) {
+                const position = sourceOffset(spans, item.type === "insert" ? item.pos : item.range.start);
+                expect(position).toBeGreaterThanOrEqual(previous);
+                previous = position;
+                if (item.type === "insert") {
+                    expect(item.text).not.toBe("");
+                    expect(anchors.has(position)).toBe(false);
+                    anchors.add(position);
+                    expect(deletions.some(range => range.from < position && position <= range.to)).toBe(false);
+                }
+            }
+            expect(modifications).toEqual(before);
+        }));
+    });
+
+    it("preserves the original deletion when editing an adjacent insertion", () => {
+        const spans = transcript(["ab"]);
+        const index = createTextIndex(spans);
+        let value = editText(index, projectText(index, []), 2, 2, "XX");
+        value = editText(index, value, 1, 2, "");
+        expect(value.text).toBe("aXX");
+        value = editText(index, value, 2, 2, "Y");
+        expect(value.text).toBe("aXYX");
+        expect(value.modifications).toEqual([
+            { type: "insert", pos: sourcePosition(spans, 1), text: "XYX" },
+            { type: "delete", range: { start: sourcePosition(spans, 1), end: sourcePosition(spans, 2) } }
+        ]);
+    });
+
+    it("merges neighboring deletions across inserted text according to D17", () => {
+        const spans = transcript(["Outro"]);
+        const index = createTextIndex(spans);
+        let value = editText(index, projectText(index, []), 3, 4, "");
+        value = editText(index, value, 3, 3, "a");
+        value = editText(index, value, 2, 3, "");
+        expect(value.text).toBe("Ouao");
+        expect(value.modifications).toEqual([
+            { type: "insert", pos: sourcePosition(spans, 2), text: "a" },
+            { type: "delete", range: { start: sourcePosition(spans, 2), end: sourcePosition(spans, 4) } }
+        ]);
+        expect(value.pieces.find(piece => piece.sourceFrom === 2 && piece.sourceTo === 4)).toMatchObject({ from: 3, to: 3, text: "" });
+        expect(editText(index, value, 3, 3, "tr").text).toBe("Ouatro");
+    });
+
+    it("orders absorbed insertions by original anchor and preserves same-anchor order", () => {
+        const spans = transcript(["abcd"]);
+        const index = createTextIndex(spans);
+        const changes = [
+            ...modification(spans, 3, 3, "C"),
+            ...modification(spans, 1, 2, ""),
+            ...modification(spans, 2, 2, "B1"),
+            ...modification(spans, 2, 3, ""),
+            ...modification(spans, 1, 1, "A"),
+            ...modification(spans, 2, 2, "B2")
+        ];
+        const value = projectText(index, changes);
+        expect(value.text).toBe("aAB1B2Cd");
+        expect(value.modifications[0]).toEqual({ type: "insert", pos: sourcePosition(spans, 1), text: "AB1B2C" });
+        expect(normalizeModifications(index, [
+            { type: "insert", pos: sourcePosition(spans, 0), text: "" },
+            { type: "delete", range: { start: sourcePosition(spans, 0), end: sourcePosition(spans, 0) } }
+        ])).toEqual([]);
+    });
+
+    it("preserves different surviving source characters even when displayed strings match", () => {
+        const spans = transcript(["aa"]);
+        const index = createTextIndex(spans);
+        const first = editText(index, projectText(index, []), 0, 1, "");
+        const last = editText(index, projectText(index, []), 1, 2, "");
+        expect(first.text).toBe(last.text);
+        expect(first.modifications).not.toEqual(last.modifications);
+        expect(first.pieces.find(piece => piece.text === "a")?.sourceFrom).toBe(1);
+        expect(last.pieces.find(piece => piece.text === "a")?.sourceFrom).toBe(0);
     });
 });

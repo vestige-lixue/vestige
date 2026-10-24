@@ -80,6 +80,10 @@ export function validateProject(value: unknown, directory?: AbsolutePath): asser
         const textIndex = createTextIndex(runs[displayed]?.transcript ?? []);
         vestige.modifications.forEach((modification, index) => {
             const modificationPath = `${path}.modifications[${index}]`;
+            if (modification.type === "insert") {
+                position(modification.pos, modificationPath + ".pos", textIndex);
+                return;
+            }
             const { start, end } = modification.range;
             position(start, `${modificationPath}.range.start`, textIndex);
             position(end, `${modificationPath}.range.end`, textIndex);
@@ -91,7 +95,7 @@ export function validateProject(value: unknown, directory?: AbsolutePath): asser
             vestige.modifications = normalizeModifications(textIndex, vestige.modifications);
         }
         catch (cause) {
-            throw new ProjectValidationFailure({ kind: "project-invalid-structure", path: `${path}.modifications`, expected: "non-overlapping text modifications" }, { cause });
+            throw new ProjectValidationFailure({ kind: "project-invalid-structure", path: `${path}.modifications`, expected: "non-overlapping source deletions and valid insertions" }, { cause });
         }
     });
 }

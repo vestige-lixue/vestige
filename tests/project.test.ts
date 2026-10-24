@@ -40,8 +40,8 @@ describe("project validation contract through the real typia transform", () => {
                 const { from, to } = editRange(projection, edit);
                 projection = editText(index, projection, from, to, edit.text);
                 for (const item of projection.modifications) {
-                    const start = sourceOffset(spans, item.range.start);
-                    const end = sourceOffset(spans, item.range.end);
+                    const start = sourceOffset(spans, item.type === "insert" ? item.pos : item.range.start);
+                    const end = sourceOffset(spans, item.type === "insert" ? item.pos : item.range.end);
                     expect(start).toBeGreaterThanOrEqual(0);
                     expect(end).toBeGreaterThanOrEqual(start);
                     expect(end).toBeLessThanOrEqual(index.characters.length);
@@ -60,8 +60,8 @@ describe("project validation contract through the real typia transform", () => {
             { change: value => value.vestiges[0].media.duration = NaN, kind: "project-invalid-number" },
             { change: value => value.vestiges[0].runs[0].transcript[0].range = { start: 2, end: 1 }, kind: "project-reversed-range" },
             { change: value => value.vestiges.push(structuredClone(value.vestiges[0])), kind: "project-duplicate-media" },
-            { change: value => value.vestiges[0].modifications = [{ range: { start: { segmentIdx: 1, offset: 1 }, end: { segmentIdx: 1, offset: 1 } }, text: "x" }], kind: "project-invalid-number" },
-            { change: value => value.vestiges[0].modifications = [{ range: { start: { segmentIdx: 0, offset: 2 }, end: { segmentIdx: 0, offset: 1 } }, text: "" }], kind: "project-reversed-range" }
+            { change: value => value.vestiges[0].modifications = [{ type: "insert", pos: { segmentIdx: 1, offset: 1 }, text: "x" }], kind: "project-invalid-number" },
+            { change: value => value.vestiges[0].modifications = [{ type: "delete", range: { start: { segmentIdx: 0, offset: 2 }, end: { segmentIdx: 0, offset: 1 } } }], kind: "project-reversed-range" }
         ];
         for (const mutation of mutations) {
             const value = project();
@@ -80,6 +80,19 @@ describe("project validation contract through the real typia transform", () => {
 
     it("rejects overlapping modifications rather than silently accepting a different project", () => {
         const spans = transcript(["abcd"]);
-        expectFailure(project(spans, [modification(spans, 0, 3, "x"), modification(spans, 2, 4, "")]), "project-invalid-structure");
+        expectFailure(project(spans, [...modification(spans, 0, 3, "x"), ...modification(spans, 2, 4, "")]), "project-invalid-structure");
+    });
+
+    it("rejects replacement records and fields outside the insert/delete union", () => {
+        const valid = project();
+        const source = { segmentIdx: 0, offset: 0 };
+        for (const item of [
+            { range: { start: source, end: source }, text: "x" },
+            { type: "replace", range: { start: source, end: source }, text: "x" },
+            { type: "insert", pos: source, text: "x", range: { start: source, end: source } },
+            { type: "delete", range: { start: source, end: source }, text: "" }
+        ]) {
+            expectFailure({ ...valid, vestiges: [{ ...valid.vestiges[0], modifications: [item] }] }, "project-invalid-structure");
+        }
     });
 });

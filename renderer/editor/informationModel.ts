@@ -22,8 +22,8 @@ export function transcriptInformation(index: TextIndex, projection: TextProjecti
         const from = position;
         position += piece.text.length;
         const segment = piece.source.kind === "segment" ? index.transcript[piece.source.index] : null;
-        // Added text has no audio correspondence, even when it replaces original text.
-        if (!segment && piece.text) continue;
+        // Insertions have no source audio; their separate deletion piece keeps the original marker.
+        if (piece.source.kind === "modification" && projection.modifications[piece.source.index].type === "insert") continue;
         let range: Range | null = segment?.range ?? null;
         if (!segment && piece.sourceFrom < piece.sourceTo) {
             const first = textPosition(index, piece.sourceFrom).segmentIdx;
@@ -54,7 +54,7 @@ export function transcriptInformation(index: TextIndex, projection: TextProjecti
         }
         const piece = projection.pieces[low];
         if (!piece) return position;
-        // A replaced source boundary stays at the replacement's start, never inside added text.
+        // A deleted source boundary stays at the deletion marker, after additions at its anchor.
         const characters = piece.source.kind === "segment" ? offset - piece.sourceFrom : 0;
         return positions[low] + codepointToUtf16(piece.text, characters);
     }

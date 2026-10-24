@@ -15,7 +15,7 @@ export const patchesArbitrary = transcriptArbitrary.chain(spans => {
         boundaries.sort((left, right) => left - right);
         return {
             spans,
-            modifications: texts.map((text, index) => modification(spans, boundaries[index * 2], boundaries[index * 2 + 1], text))
+            modifications: texts.flatMap((text, index) => modification(spans, boundaries[index * 2], boundaries[index * 2 + 1], text))
         };
     }));
 });
@@ -56,3 +56,13 @@ export function editRange(projection: TextProjection, edit: EditSample): { from:
     }
     return { from: Math.min(left, right), to: Math.max(left, right) };
 }
+export const normalizationArbitrary = patchesArbitrary.chain(({ spans, modifications }) => {
+    const length = [...spans.map(span => span.token.text).join("")].length;
+    return fc.array(fc.record({
+        position: fc.integer({ min: 0, max: length }),
+        text: textArbitrary
+    }), { maxLength: 6 }).map(insertions => ({
+        spans,
+        modifications: [...modifications, ...insertions.flatMap(item => modification(spans, item.position, item.position, item.text))]
+    }));
+});

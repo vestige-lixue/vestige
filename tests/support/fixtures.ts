@@ -29,25 +29,39 @@ export function sourceOffset(spans: readonly TranscriptSpan[], position: TextPos
     return spans.slice(0, position.segmentIdx).reduce((sum, span) => sum + [...span.token.text].length, 0) + position.offset;
 }
 
-export function modification(spans: readonly TranscriptSpan[], from: number, to: number, text: string): Modification {
-    return { range: { start: sourcePosition(spans, from), end: sourcePosition(spans, to) }, text };
+export function modification(spans: readonly TranscriptSpan[], from: number, to: number, text: string): Modification[] {
+    return [
+        ...(from === to ? [] : [{ type: "delete" as const, range: { start: sourcePosition(spans, from), end: sourcePosition(spans, to) } }]),
+        ...(text ? [{ type: "insert" as const, pos: sourcePosition(spans, from), text }] : [])
+    ];
 }
 
 export function referenceText(spans: readonly TranscriptSpan[], modifications: readonly Modification[]): string {
     const original = [...spans.map(span => span.token.text).join("")];
-    const changes = modifications.map(item => ({
-        from: sourceOffset(spans, item.range.start),
-        to: sourceOffset(spans, item.range.end),
-        text: item.text
-    })).sort((left, right) => left.from - right.from || left.to - right.to);
-    let cursor = 0;
-    const result: string[] = [];
-    for (const change of changes) {
-        if (change.from < cursor) throw new RangeError("Reference changes overlap.");
-        result.push(original.slice(cursor, change.from).join(""), change.text);
-        cursor = change.to;
+    const deleted = new Set<number>();
+    const insertions = new Map<number, string[]>();
+    for (const item of modifications) {
+        if (item.type === "insert") {
+            const offset = sourceOffset(spans, item.pos);
+            const values = insertions.get(offset) ?? [];
+            values.push(item.text);
+            insertions.set(offset, values);
+        }
+        else {
+            const from = sourceOffset(spans, item.range.start);
+            const to = sourceOffset(spans, item.range.end);
+            if (to < from) throw new RangeError("Reference deletion is reversed.");
+            for (let offset = from; offset < to; offset++) {
+                if (deleted.has(offset)) throw new RangeError("Reference deletions overlap.");
+                deleted.add(offset);
+            }
+        }
     }
-    result.push(original.slice(cursor).join(""));
+    const result: string[] = [];
+    for (let offset = 0; offset <= original.length; offset++) {
+        result.push(...insertions.get(offset) ?? []);
+        if (offset < original.length && !deleted.has(offset)) result.push(original[offset]);
+    }
     return result.join("");
 }
 

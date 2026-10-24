@@ -25,8 +25,6 @@ export type TextPiece = {
     text: string;
 };
 
-type Patch = { from: number; to: number; text: string };
-
 export type TextProjection = {
     text: string;
     length: number;
@@ -73,38 +71,63 @@ export function textPosition(index: TextIndex, offset: number): TextPosition {
     return { segmentIdx, offset: offset - index.starts[segmentIdx] };
 }
 
-function patchOf(index: TextIndex, modification: Modification): Patch {
-    return {
-        from: textOffset(index, modification.range.start),
-        to: textOffset(index, modification.range.end),
-        text: modification.text
-    };
+function deletionOf(index: TextIndex, from: number, to: number): Modification {
+    return { type: "delete", range: { start: textPosition(index, from), end: textPosition(index, to) } };
 }
 
-function modificationOf(index: TextIndex, patch: Patch): Modification {
-    return {
-        range: { start: textPosition(index, patch.from), end: textPosition(index, patch.to) },
-        text: patch.text
-    };
+function insertionOf(index: TextIndex, position: number, text: string): Modification {
+    return { type: "insert", pos: textPosition(index, position), text };
 }
 
 export function normalizeModifications(index: TextIndex, modifications: readonly Modification[]): Modification[] {
-    const patches = modifications.map(modification => patchOf(index, modification)).sort((a, b) => a.from - b.from || a.to - b.to);
-    const normalized: Patch[] = [];
-    for (const patch of patches) {
-        if (patch.to < patch.from) throw new RangeError("Reversed modification range.");
-        const previous = normalized.at(-1);
-        if (previous && patch.from < previous.to) throw new RangeError("Overlapping modifications.");
-        if (patch.text === index.characters.slice(patch.from, patch.to).join("")) continue;
-        if (previous && previous.from === previous.to && patch.from === patch.to && previous.from === patch.from) {
-            previous.text += patch.text;
+    const deletions: { from: number; to: number }[] = [];
+    const insertions: { position: number; text: string }[] = [];
+    for (const modification of modifications) {
+        if (modification.type === "insert") {
+            const position = textOffset(index, modification.pos);
+            if (modification.text) insertions.push({ position, text: modification.text });
         }
-        else if (previous && previous.text === "" && patch.text === "" && previous.to === patch.from) {
-            previous.to = patch.to;
+        else {
+            const from = textOffset(index, modification.range.start);
+            const to = textOffset(index, modification.range.end);
+            if (to < from) throw new RangeError("Reversed modification range.");
+            if (from < to) deletions.push({ from, to });
         }
-        else normalized.push(patch);
     }
-    return normalized.map(patch => modificationOf(index, patch));
+    deletions.sort((left, right) => left.from - right.from || left.to - right.to);
+    const merged: typeof deletions = [];
+    for (const deletion of deletions) {
+        const previous = merged.at(-1);
+        if (previous && deletion.from < previous.to) throw new RangeError("Overlapping deletions.");
+        if (previous && deletion.from === previous.to) previous.to = deletion.to;
+        else merged.push(deletion);
+    }
+    // Stable source order preserves displayed insertion order when a deletion absorbs their anchors.
+    insertions.sort((left, right) => left.position - right.position);
+    const anchored: typeof insertions = [];
+    let deletionIndex = 0;
+    for (const insertion of insertions) {
+        while (deletionIndex < merged.length && merged[deletionIndex].to < insertion.position) deletionIndex++;
+        const deletion = merged[deletionIndex];
+        const position = deletion && deletion.from <= insertion.position ? deletion.from : insertion.position;
+        const previous = anchored.at(-1);
+        if (previous && previous.position === position) previous.text += insertion.text;
+        else anchored.push({ position, text: insertion.text });
+    }
+    const normalized: Modification[] = [];
+    let insertionIndex = 0;
+    for (const deletion of merged) {
+        while (insertionIndex < anchored.length && anchored[insertionIndex].position <= deletion.from) {
+            const insertion = anchored[insertionIndex++];
+            normalized.push(insertionOf(index, insertion.position, insertion.text));
+        }
+        normalized.push(deletionOf(index, deletion.from, deletion.to));
+    }
+    for (; insertionIndex < anchored.length; insertionIndex++) {
+        const insertion = anchored[insertionIndex];
+        normalized.push(insertionOf(index, insertion.position, insertion.text));
+    }
+    return normalized;
 }
 
 export function projectText(index: TextIndex, modifications: readonly Modification[]): TextProjection {
@@ -126,59 +149,64 @@ export function projectText(index: TextIndex, modifications: readonly Modificati
         }
     }
     normalized.forEach((modification, modificationIdx) => {
-        const patch = patchOf(index, modification);
-        original(patch.from);
-        add(patch.from, patch.to, patch.text, { kind: "modification", index: modificationIdx });
-        cursor = patch.to;
+        const source = { kind: "modification" as const, index: modificationIdx };
+        if (modification.type === "insert") {
+            const position = textOffset(index, modification.pos);
+            original(position);
+            add(position, position, modification.text, source);
+        }
+        else {
+            const from = textOffset(index, modification.range.start);
+            const to = textOffset(index, modification.range.end);
+            original(from);
+            add(from, to, "", source);
+            cursor = to;
+        }
     });
     original(index.characters.length);
     return { text: pieces.map(piece => piece.text).join(""), length, pieces, modifications: normalized };
 }
 
-function sourceBoundary(index: TextIndex, projection: TextProjection, position: number, end: boolean, included: ReadonlySet<number>): number {
-    const candidates: number[] = [];
-    for (const piece of projection.pieces) {
-        if (position < piece.from || position > piece.to) continue;
-        if (piece.source.kind === "segment") candidates.push(piece.sourceFrom + position - piece.from);
-        else if (included.has(piece.source.index)) {
-            if (position === piece.from) candidates.push(piece.sourceFrom);
-            if (position === piece.to) candidates.push(piece.sourceTo);
-        }
-    }
-    if (!candidates.length) return index.characters.length;
-    return candidates.reduce((result, value) => end ? Math.max(result, value) : Math.min(result, value));
-}
-
-// from/to address the current rendered text. Persisted ranges always address the original Run.
+// from/to address displayed codepoints. Only removed original characters create new source deletions.
 export function editText(index: TextIndex, projection: TextProjection, from: number, to: number, text: string): TextProjection {
     if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < from || to > projection.length) {
         throw new RangeError("Invalid rendered text range.");
     }
-    const characters = Array.from(projection.text);
-    if (characters.slice(from, to).join("") === text) return projection;
-    const modified = projection.pieces.filter(piece => piece.source.kind === "modification");
-    let touched: TextPiece[];
-    if (from === to) {
-        // A collapsed deletion remains an editable source range, including after deleting all text.
-        touched = modified.filter(piece => piece.from === from && piece.to === from);
-        if (!touched.length) {
-            const piece = modified.find(piece => piece.from < from && from < piece.to)
-                ?? modified.find(piece => piece.to === from)
-                ?? modified.find(piece => piece.from === from);
-            touched = piece ? [piece] : [];
+    if (Array.from(projection.text).slice(from, to).join("") === text) return projection;
+    const modifications: Modification[] = [];
+    let inserted = false;
+    function insert(position: number, value: string): void {
+        if (value) modifications.push(insertionOf(index, position, value));
+    }
+    function placeInsertion(piece: TextPiece): void {
+        if (!inserted && piece.from <= from && from <= piece.to) {
+            const position = piece.sourceFrom + (piece.source.kind === "segment" ? from - piece.from : 0);
+            insert(position, text);
+            inserted = true;
         }
     }
-    else touched = modified.filter(piece => piece.from === piece.to
-        ? piece.from >= from && piece.from <= to
-        : piece.from < to && piece.to > from);
-    const renderedFrom = touched.reduce((result, piece) => Math.min(result, piece.from), from);
-    const renderedTo = touched.reduce((result, piece) => Math.max(result, piece.to), to);
-    const removed = new Set(touched.map(piece => piece.source.index));
-    const sourceFrom = touched.reduce((result, piece) => Math.min(result, piece.sourceFrom), sourceBoundary(index, projection, renderedFrom, false, removed));
-    const sourceTo = touched.reduce((result, piece) => Math.max(result, piece.sourceTo), sourceBoundary(index, projection, renderedTo, true, removed));
-    const modifications = projection.modifications.filter((_, modificationIdx) => !removed.has(modificationIdx));
-    const replacement = characters.slice(renderedFrom, from).join("") + text + characters.slice(to, renderedTo).join("");
-    modifications.push(modificationOf(index, { from: sourceFrom, to: sourceTo, text: replacement }));
+    for (const piece of projection.pieces) {
+        if (piece.source.kind === "segment") {
+            placeInsertion(piece);
+            const start = Math.max(from, piece.from);
+            const end = Math.min(to, piece.to);
+            if (start < end) modifications.push(deletionOf(index, piece.sourceFrom + start - piece.from, piece.sourceFrom + end - piece.from));
+            continue;
+        }
+        const modification = projection.modifications[piece.source.index];
+        if (modification.type === "delete") {
+            modifications.push(modification);
+            placeInsertion(piece);
+            continue;
+        }
+        const characters = Array.from(piece.text);
+        const start = Math.max(0, Math.min(characters.length, from - piece.from));
+        const end = Math.max(0, Math.min(characters.length, to - piece.from));
+        insert(piece.sourceFrom, characters.slice(0, start).join(""));
+        placeInsertion(piece);
+        insert(piece.sourceFrom, characters.slice(end).join(""));
+    }
+    if (!inserted) insert(index.characters.length, text);
     return projectText(index, modifications);
 }
 
