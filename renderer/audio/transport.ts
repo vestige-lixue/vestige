@@ -133,8 +133,8 @@ export function create(audio: HTMLMediaElement, video: HTMLVideoElement | null, 
         begin(transport);
     };
     const waiting = (): void => {
- transport.waiting = true; synchronizeVideo(transport);
-};
+        transport.waiting = true; synchronizeVideo(transport);
+    };
     const ended = (): void => {
         if (transport.disposed || transport.seeking || transport.seekedToEnd || !audio.ended) return;
         startTail(transport);

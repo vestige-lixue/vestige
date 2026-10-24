@@ -64,15 +64,15 @@ export function create(volume: number, enabled: boolean, settings: VolumeStabili
     const url = URL.createObjectURL(createTrack());
     const calibration: Calibration = { element, pipeline, url, disposed: false, ready: false, cycles: 0, lastTime: 0, lastRound: -1, count: 0, mean: 0 };
     element.onpause = () => {
- if (calibration.ready && !calibration.disposed) onStop();
-};
+        if (calibration.ready && !calibration.disposed) onStop();
+    };
     element.onwaiting = () => {
         // Native looping seeks back through the silent lead-in and briefly emits waiting.
         if (calibration.ready && !calibration.disposed && !(element.seeking && element.currentTime < beatSeconds)) onStop();
-};
+    };
     element.onerror = () => {
- if (!calibration.disposed) onError(element.error);
-};
+        if (!calibration.disposed) onError(element.error);
+    };
     element.src = url;
     return calibration;
 }

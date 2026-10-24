@@ -26,7 +26,7 @@ export function hslaToHex(value: HslaColor, alpha = true): string {
     const secondary = chroma * (1 - Math.abs(sector % 2 - 1));
     const channels = sector < 1 ? [chroma, secondary, 0] : sector < 2 ? [secondary, chroma, 0]
         : sector < 3 ? [0, chroma, secondary] : sector < 4 ? [0, secondary, chroma]
-        : sector < 5 ? [secondary, 0, chroma] : [chroma, 0, secondary];
+            : sector < 5 ? [secondary, 0, chroma] : [chroma, 0, secondary];
     const offset = lightness - chroma / 2;
     const byte = (value: number): string => Math.round(value * 255).toString(16).padStart(2, "0");
     return `#${channels.map(channel => byte(channel + offset)).join("")}${alpha ? byte(a) : ""}`;

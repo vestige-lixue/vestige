@@ -43,6 +43,12 @@ export default defineConfig(
         }
     },
     {
+        files: ["**/*.{ts,mts,cts,tsx}"],
+        rules: {
+            "@stylistic/indent": ["warn", 4]
+        }
+    },
+    {
         files: ["**/*.{js,mjs,cjs,jsx}"],
         rules: {
             "@typescript-eslint/explicit-function-return-type": "off"
