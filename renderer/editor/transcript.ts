@@ -1,6 +1,8 @@
 import { Editor, Extension, Mark, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type Mark as PMMark, type Schema } from "@tiptap/pm/model";
 import { Plugin, PluginKey, TextSelection, type Transaction, type EditorState } from "@tiptap/pm/state";
+import { compositionPlugin, compositionActive, compositionCommit } from "./composition";
+import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep } from "./projectionStep";
 import { history, undo, redo } from "@tiptap/pm/history";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
@@ -217,8 +219,6 @@ export function transcriptModifications(state: EditorState): Modification[] {
 }
 
 export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Plugin[] {
-    let composing = false;
-    let compositionTimer: ReturnType<typeof setTimeout> | undefined;
     const bridge = new Plugin<BridgeState>({
         key: bridgeKey,
         state: {
@@ -238,19 +238,16 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             return (!transaction.docChanged || canEdit()) && transaction.doc.childCount === 1 && transaction.doc.firstChild?.type.name === "paragraph";
         },
         appendTransaction(transactions, _oldState, newState) {
-            if (!transactions.some(transaction => transaction.getMeta(bridgeKey) === "compositionend"
+            if (!transactions.some(transaction => compositionCommit(transaction)
                 || transaction.docChanged && !transaction.getMeta(bridgeKey))) return null;
             const { projection, saved, dirty } = bridgeKey.getState(newState)!;
             if (projection.text !== documentText(newState.doc)) throw new Error("Transcript and modifications diverged.");
             // ProseMirror owns the composition DOM until the final input has been consumed.
-            if (composing) return null;
+            if (compositionActive(newState)) return null;
             const transaction = newState.tr.setMeta(bridgeKey, true);
             if (projection !== saved) transaction.step(new ProjectionStep(saved.modifications, projection.modifications, saved, projection));
             synchronizeMarks(index, transaction, projection, dirty);
             return transaction.steps.length || dirty.length ? transaction : null;
-        },
-        view() {
-            return { destroy: () => clearTimeout(compositionTimer) };
         },
         props: {
             handleKeyDown(view, event) {
@@ -278,20 +275,6 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 return slice.content.textBetween(0, slice.content.size, "\n", "\n");
             },
             handleDOMEvents: {
-                compositionstart() {
-                    clearTimeout(compositionTimer);
-                    composing = true;
-                    return false;
-                },
-                compositionend(view) {
-                    // Let ProseMirror consume the final DOM input before persisting and restyling it.
-                    compositionTimer = setTimeout(() => {
-                        if (view.isDestroyed || view.composing) return;
-                        composing = false;
-                        view.dispatch(view.state.tr.setMeta(bridgeKey, "compositionend"));
-                    }, 0);
-                    return false;
-                },
                 beforeinput(view, event) {
                     if (!view.editable || event.defaultPrevented || event.isComposing || view.composing) return false;
                     if (event.cancelable && /^delete(?:Content|Word|SoftLine|HardLine)(?:Backward|Forward)$/.test(event.inputType)) {
@@ -333,14 +316,8 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 const projection = transcriptProjection(state);
                 if (projection === previousProjection && time === previousTime) return previousDecorations;
                 const ranges: number[] = [];
-                let low = 0;
-                let high = intervals.length;
-                while (low < high) {
-                    const middle = (low + high) >>> 1;
-                    if (intervals[middle].start <= time) low = middle + 1;
-                    else high = middle;
-                }
-                for (let i = low - 1; i >= 0 && latestEnd[i] > time; i--) {
+                const first = firstTrue(intervals.length, index => intervals[index].start > time);
+                for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
                     const { segmentIdx, end } = intervals[i];
                     if (end <= time) continue;
                     for (const piece of sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])) {
@@ -359,7 +336,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             }
         }
     });
-    return [bridge, playback, history()];
+    return [compositionPlugin(), bridge, playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {
@@ -382,10 +359,7 @@ export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = 
                 return true;
             });
             return {
-                Enter: lineBreak, "Shift-Enter": lineBreak, "Mod-Enter": lineBreak,
-                "Mod-z": () => undo(this.editor.state, transaction => this.editor.view.dispatch(transaction)),
-                "Mod-Shift-z": () => redo(this.editor.state, transaction => this.editor.view.dispatch(transaction)),
-                "Mod-y": () => redo(this.editor.state, transaction => this.editor.view.dispatch(transaction))
+                Enter: lineBreak, "Shift-Enter": lineBreak, "Mod-Enter": lineBreak
             };
         }
     });
@@ -419,6 +393,10 @@ function transcriptEditorAt(element: HTMLElement | null): Editor | null {
     return null;
 }
 
+export function isTranscriptEditorTarget(element: HTMLElement | null): boolean {
+    return transcriptEditorAt(element) !== null;
+}
+
 export function transcriptHistoryAvailable(element: HTMLElement | null, action: "undo" | "redo"): boolean | null {
     const editor = transcriptEditorAt(element);
     return editor ? editor.isEditable && (action === "undo" ? undo : redo)(editor.state) : null;
@@ -430,7 +408,11 @@ export function handleTranscriptEdit(element: HTMLElement | null, action: EditAc
     if (!editor) return false;
     if (action === "selectAll") editor.commands.selectAll();
     else if (editor.isEditable) {
-        (action === "undo" ? undo : redo)(editor.state, transaction => editor.view.dispatch(transaction));
+        (action === "undo" ? undo : redo)(editor.state, transaction => {
+            // Undo can remove a focused event marker. Keep the next edit command inside this editor.
+            if (document.activeElement !== editor.view.dom && editor.view.dom.contains(document.activeElement)) editor.view.focus();
+            editor.view.dispatch(transaction);
+        });
     }
     return true;
 }

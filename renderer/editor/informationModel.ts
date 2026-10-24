@@ -127,3 +127,30 @@ export function transcriptInformation(index: TextIndex, projection: TextProjecti
         ...gapInformation(index, projection, duration)
     ];
 }
+
+export type InspectionInformation = TranscriptInformation | {
+    key: string;
+    kind: "events";
+    items: TranscriptInformation[];
+    range: TranscriptInformation["range"];
+};
+
+export function groupTranscriptEvents(items: TranscriptInformation[]): Map<number, InspectionInformation> {
+    const groups = new Map<number, TranscriptInformation[]>();
+    for (const item of items) {
+        if (item.kind !== "deletion" && item.kind !== "gap") continue;
+        const group = groups.get(item.from) ?? [];
+        group.push(item);
+        groups.set(item.from, group);
+    }
+    return new Map([...groups].map(([position, group]) => {
+        group.sort((left, right) => (left.range?.start ?? Infinity) - (right.range?.start ?? Infinity));
+        const information: InspectionInformation = group.length === 1 ? group[0] : {
+            key: `events/${group.map(item => item.key).join("/")}`, kind: "events", items: group,
+            range: group.reduce<TranscriptInformation["range"]>((range, item) => !item.range ? range : !range ? item.range : {
+                start: Math.min(range.start, item.range.start), end: Math.max(range.end, item.range.end)
+            }, null)
+        };
+        return [position, information];
+    }));
+}

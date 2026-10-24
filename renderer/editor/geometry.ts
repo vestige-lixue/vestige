@@ -1,3 +1,9 @@
+import { type EditorState } from "@tiptap/pm/state";
+import { type EditorView } from "@tiptap/pm/view";
+import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
+import { transcriptTokens, transcriptTokenGroup, type InspectionInformation, type TranscriptInformation } from "./informationModel";
+import { compositionPending } from "./composition";
+
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
 export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false): DOMRect[] {
     const result: DOMRect[] = [];
@@ -40,4 +46,119 @@ export function textRectangles(root: HTMLElement, range: Range, includeBreaks = 
         node = walker.nextNode();
     }
     return result;
+}
+
+export type InspectionTarget = {
+    information: InspectionInformation;
+    rectangles: DOMRect[][];
+    anchor: DOMRect;
+    keyboard: boolean;
+    pressed: boolean;
+};
+export type InspectionPointer = { x: number; y: number; pressed: boolean };
+export type Spacing = { top: number; right: number; bottom: number; left: number };
+type Point = { x: number; y: number };
+type Rectangle = { top: number; right: number; bottom: number; left: number };
+
+function distanceTo(rect: Rectangle, point: Point): number {
+    return Math.max(rect.left - point.x, 0, point.x - rect.right) ** 2 + Math.max(rect.top - point.y, 0, point.y - rect.bottom) ** 2;
+}
+
+// Pure hit rules operate on already measured rectangles; DOM access stays in the adapter below.
+export function pointerRectangle<T extends Rectangle>(rectangles: readonly T[], point: Point, spacing: Spacing): T | undefined {
+    const containing = rectangles.find(rect => point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom);
+    if (containing) return containing;
+    const withinSpacing = rectangles.some(rect => point.x >= rect.left - spacing.left && point.x <= rect.right + spacing.right
+        && point.y >= rect.top - spacing.top && point.y <= rect.bottom + spacing.bottom);
+    return withinSpacing ? rectangles.reduce((closest, rect) => distanceTo(rect, point) < distanceTo(closest, point) ? rect : closest) : undefined;
+}
+
+export function keyboardRectangle<T extends Rectangle>(rectangles: readonly T[], caret: Rectangle): T | undefined {
+    return rectangles.find(rect => caret.top < rect.bottom && caret.bottom > rect.top && caret.left >= rect.left && caret.left <= rect.right) ?? rectangles[0];
+}
+
+export type InspectionGeometry = {
+    hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, measure?: boolean) => InspectionTarget | null;
+    keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
+};
+
+export function inspectionGeometry(
+    view: EditorView, index: TextIndex, projectionOf: (state: EditorState) => TextProjection,
+    events: () => Map<string, InspectionInformation>
+): InspectionGeometry {
+    function eventMarker(target: EventTarget | null): HTMLElement | null {
+        return target instanceof Element ? target.closest<HTMLElement>(".transcript-event") : null;
+    }
+    function rectangles(item: TranscriptInformation): DOMRect[] {
+        const start = view.domAtPos(item.from + 1, 1);
+        const end = view.domAtPos(item.to + 1, -1);
+        const range = document.createRange();
+        range.setStart(start.node, start.offset);
+        range.setEnd(end.node, end.offset);
+        return textRectangles(view.dom, range);
+    }
+    function tokenRectangles(item: TranscriptInformation): DOMRect[][] {
+        return transcriptTokenGroup(index, projectionOf(view.state), item).map(rectangles);
+    }
+    function spacingOf(item: TranscriptInformation): Spacing | null {
+        const start = view.domAtPos(item.from + 1, 1).node;
+        const span = (start instanceof Element ? start : start.parentElement)?.closest(".transcript-text");
+        if (!span) return null;
+        const style = getComputedStyle(span);
+        return {
+            top: (parseFloat(style.marginTop) || 0) + (parseFloat(style.paddingTop) || 0),
+            right: (parseFloat(style.marginRight) || 0) + (parseFloat(style.paddingRight) || 0),
+            bottom: (parseFloat(style.marginBottom) || 0) + (parseFloat(style.paddingBottom) || 0),
+            left: (parseFloat(style.marginLeft) || 0) + (parseFloat(style.paddingLeft) || 0)
+        };
+    }
+    function blocked(): boolean {
+        return compositionPending(view.state) || view.composing || !document.hasFocus();
+    }
+    return {
+        hover(pointer, previous, measure = false) {
+            if (!pointer || blocked()) return null;
+            const { x, y, pressed } = pointer;
+            const element = document.elementFromPoint(x, y);
+            if (!element || !view.dom.contains(element)) return null;
+            const button = eventMarker(element);
+            if (button) {
+                const item = events().get(button.dataset.inspection!);
+                if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: false, pressed };
+            }
+            const position = view.posAtCoords({ left: x, top: y });
+            if (!position) return null;
+            const offset = position.pos - 1;
+            // At a boundary try the following token first, then the preceding token's spacing.
+            for (const item of transcriptTokens(index, projectionOf(view.state), offset).reverse()) {
+                if (offset < item.from || offset > item.to) continue;
+                const boxes = !measure && previous?.information === item ? previous.rectangles : tokenRectangles(item);
+                const rects = boxes.flat();
+                let anchor = pointerRectangle(rects, pointer, { top: 0, right: 0, bottom: 0, left: 0 });
+                if (!anchor) {
+                    const spacing = spacingOf(item);
+                    if (spacing) anchor = pointerRectangle(rects, pointer, spacing);
+                }
+                if (anchor) return { information: item, rectangles: boxes, anchor, keyboard: false, pressed };
+            }
+            return null;
+        },
+        keyboard(control, element = document.activeElement) {
+            if (blocked()) return null;
+            const button = eventMarker(element);
+            if (button && view.dom.contains(button) && button.matches(":focus-visible")) {
+                const item = events().get(button.dataset.inspection!);
+                if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: true, pressed: false };
+            }
+            if (!control || element !== view.dom || !view.state.selection.empty) return null;
+            const offset = view.state.selection.head - 1;
+            // A caret at a boundary belongs to the following character; the document end has none.
+            const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);
+            if (!item) return null;
+            const boxes = tokenRectangles(item);
+            const caret = view.coordsAtPos(view.state.selection.head);
+            const anchor = keyboardRectangle(boxes.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+            return { information: item, rectangles: boxes, anchor, keyboard: true, pressed: false };
+        }
+    };
 }

@@ -1,5 +1,6 @@
 import { type EditAction } from "../shared/app";
 import { runEdit } from "./edit";
+import { isTranscriptEditorTarget } from "./editor/transcript";
 import { interfaceBlocked, runCommand, type Command } from "./states/commands";
 import * as menu from "./states/menu.svelte";
 import * as player from "./states/player.svelte";
@@ -173,8 +174,9 @@ function keydown(event: KeyboardEvent): void {
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.key.toLowerCase();
     const editing = editingTarget(event.target);
+    const editTarget = event.target instanceof HTMLElement && (editing || isTranscriptEditorTarget(event.target)) ? event.target : null;
     const edit = mod ? event.shiftKey ? key === "z" ? "redo" : undefined : editKeys[key] : undefined;
-    if (edit && (menu.get() || editing && runEdit(event.target, edit, false))) {
+    if (edit && (menu.get() || editTarget && runEdit(editTarget, edit, false))) {
         wordNavigation = null;
         event.preventDefault();
         event.stopPropagation();

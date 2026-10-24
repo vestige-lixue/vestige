@@ -239,6 +239,7 @@
     import { commandDisabled, commandLabel, runCommand, interfaceBlocked, type Command } from "../../states/commands";
     import { type EditAction } from "../../../shared/app";
     import { editAvailable, runEdit as performEdit } from "../../edit";
+    import { isTranscriptEditorTarget } from "../../editor/transcript";
     import { shortcut, editShortcut, registerMenu } from "../../keybindings";
     import * as transcription from "../../states/transcription.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
@@ -341,7 +342,7 @@
     function rememberEditor(): void {
         if (menu.get()) return;
         const active = document.activeElement;
-        editor = active instanceof HTMLElement && (active.matches("input, textarea") || active.isContentEditable) ? active : null;
+        editor = active instanceof HTMLElement && (active.matches("input, textarea") || active.isContentEditable || isTranscriptEditorTarget(active)) ? active : null;
         canUndo = editAvailable(editor, "undo");
         canRedo = editAvailable(editor, "redo");
         editorSelection = (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) && editor.selectionStart !== null && editor.selectionEnd !== null

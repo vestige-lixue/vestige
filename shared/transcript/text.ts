@@ -1,3 +1,4 @@
+import { firstTrue } from "../util/search";
 import { type Modification } from "../Vestige";
 import { type TranscriptSpan } from "../transcription/Run";
 import { type TextPosition } from "../util/range";
@@ -63,14 +64,7 @@ export function textOffset(index: TextIndex, position: TextPosition): number {
 export function textPosition(index: TextIndex, offset: number): TextPosition {
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > index.characters.length) throw new RangeError("Invalid text offset.");
     if (offset === index.characters.length) return { segmentIdx: index.transcript.length, offset: 0 };
-    let low = 0;
-    let high = index.transcript.length;
-    while (low < high) {
-        const middle = Math.floor((low + high) / 2);
-        if (index.starts[middle] <= offset) low = middle + 1;
-        else high = middle;
-    }
-    const segmentIdx = low - 1;
+    const segmentIdx = firstTrue(index.transcript.length, position => index.starts[position] > offset) - 1;
     return { segmentIdx, offset: offset - index.starts[segmentIdx] };
 }
 
