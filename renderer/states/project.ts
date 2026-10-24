@@ -17,6 +17,7 @@ import * as dialogsAPI from "./dialogs";
 import * as playerAPI from "./player";
 import * as transcriptionAPI from "./transcription";
 import * as mediaImportAPI from "./mediaImport";
+import * as settingsAPI from "./settings";
 
 let confirmation: Promise<dialogs.SaveChoice> | null = null;
 let busy: { id: string; operation: project.ProjectOperation } | null = null;
@@ -135,10 +136,16 @@ function pauseAutosave(): void {
 
 function resumeAutosave(): void {
     if (!lifecycleStarted || autosaveTimer !== null || project.projectState.path === null) return;
-    autosaveTimer = setInterval(() => {
-        if (project.projectState.path === null || project.projectState.locked || project.projectState.saving || project.projectState.error !== null || mediaImport.hasPendingImports()) return;
-        void saveCurrent();
-    }, autosaveInterval);
+    autosaveTimer = setInterval(autosaveCurrent, autosaveInterval);
+}
+
+function autosaveCurrent(): void {
+    if (project.projectState.path === null || project.projectState.locked || project.projectState.saving || project.projectState.error !== null || mediaImport.hasPendingImports()) return;
+    void saveCurrent();
+}
+
+function clearPlaybackPositions(value: Project | null): void {
+    for (const vestige of value?.vestiges ?? []) vestige.playbackPosition = 0;
 }
 
 function createProject(): Project {
@@ -173,9 +180,6 @@ async function writeCurrent(saveAs: boolean): Promise<boolean> {
                 if (!cancelled && path !== null) {
                     if (project.projectState.locked) setOperation({ kind: "save", path, saveAs: false });
                     playerAPI.captureProgress();
-                    if (!settings.getPlayback().rememberPlaybackPosition) {
-                        for (const vestige of currentProject.vestiges) vestige.playbackPosition = 0;
-                    }
                     const snapshot = project.snapshotProject(currentProject);
                     const text = JSON.stringify(snapshot);
                     // Recreate deleted project files, even when the snapshot is unchanged.
@@ -257,6 +261,8 @@ async function prepareToLeave(): Promise<boolean> {
 }
 
 async function replaceProject(nextProject: Project | null, path: AbsolutePath | null): Promise<void> {
+    // The saved baseline was captured before this session-only normalization.
+    if (!settings.getConfirmedPlayback().rememberPlaybackPosition) clearPlaybackPositions(nextProject);
     mediaSelection.select(null);
     transcriptionAPI.stopAll();
     projectGeneration++;
@@ -409,7 +415,7 @@ export function selectMedia(id: string | null, playFromStart = false): void {
 }
 
 export function restorePlayback(): void {
-    const position = settings.getPlayback().rememberPlaybackPosition ? project.getVestige(mediaSelection.get())?.playbackPosition ?? 0 : 0;
+    const position = project.getVestige(mediaSelection.get())?.playbackPosition ?? 0;
     playerAPI.updatePlaybackTime(position, "commit");
 }
 
@@ -417,7 +423,7 @@ export function seekPlayback(time: number, mode: player.SeekMode = "commit"): vo
     const vestige = project.getVestige(mediaSelection.get());
     if (!vestige || !player.getURL() || !Number.isFinite(time)) return;
     const position = Math.max(0, Math.min(vestige.media.duration, time));
-    if (mode === "commit") vestige.playbackPosition = settings.getPlayback().rememberPlaybackPosition ? position : 0;
+    if (mode === "commit" && settings.getConfirmedPlayback().rememberPlaybackPosition) vestige.playbackPosition = position;
     // Transcript highlights derive from the same time, including explicit seeks.
     playerAPI.updatePlaybackTime(position, mode);
 }
@@ -426,7 +432,7 @@ export function observePlaybackTime(id: string, time: number, remember = false):
     const vestige = project.getVestige(id);
     if (mediaSelection.get() !== id || !vestige || !player.getURL() || !Number.isFinite(time)) return;
     const position = Math.max(0, Math.min(vestige.media.duration, time));
-    if (remember) vestige.playbackPosition = settings.getPlayback().rememberPlaybackPosition ? position : 0;
+    if (remember && settings.getConfirmedPlayback().rememberPlaybackPosition) vestige.playbackPosition = position;
     playerAPI.updatePlaybackTime(position, null);
 }
 
@@ -493,6 +499,17 @@ export function close(): Promise<boolean> {
 export function startLifecycle(saveSettingsBeforeQuit: () => Promise<boolean>): () => void {
     lifecycleStarted = true;
     mediaImportAPI.reset(project.projectState.project?.vestiges.map(vestige => vestige.media.id) ?? []);
+    let rememberPlaybackPosition: boolean | null = null;
+    const unsubscribeSettings = settingsAPI.subscribe(value => {
+        if (value === null) return;
+        const next = value.playback.rememberPlaybackPosition;
+        if (rememberPlaybackPosition === next) return;
+        rememberPlaybackPosition = next;
+        if (next) return;
+        // Only confirmed settings reach this listener; broadcast and reply share one transition.
+        clearPlaybackPositions(project.projectState.project);
+        autosaveCurrent();
+    });
     let checking: Promise<boolean> | null = null;
     const unsubscribe = window.api.beforeQuit(() => {
         if (rejectPendingImports() || rejectActiveTranscriptions()) return Promise.resolve(true);
@@ -528,6 +545,7 @@ export function startLifecycle(saveSettingsBeforeQuit: () => Promise<boolean>): 
         void playerAPI.reset().catch(reportUnexpected);
         pauseAutosave();
         unsubscribe();
+        unsubscribeSettings();
         window.removeEventListener("beforeunload", beforeUnload);
     };
 }

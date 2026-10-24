@@ -44,7 +44,11 @@ export function getEditing(): Settings["editing"] {
 }
 
 export function getPlayback(): Settings["playback"] {
-    return { ...defaultSettings.playback, ...snapshot?.settings.playback, ...pendingPatch.playback };
+    return { ...getConfirmedPlayback(), ...pendingPatch.playback };
+}
+
+export function getConfirmedPlayback(): Settings["playback"] {
+    return snapshot?.settings.playback ?? defaultSettings.playback;
 }
 
 export function getSnapshot(): SettingsSnapshot | null {
