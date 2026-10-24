@@ -161,52 +161,24 @@
     import Modal from "../util/Modal.svelte";
     import externalLink from "../../../resources/icons/cil--external-link.svg?raw";
     import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
-    import electronLicense from "../../../resources/licenses/electron.txt?raw";
-    import svelteLicense from "../../../resources/licenses/svelte.txt?raw";
-    import bitsUILicense from "../../../resources/licenses/bits-ui.txt?raw";
-    import domPurifyLicense from "../../../resources/licenses/dompurify.txt?raw";
-    import domPurifyMPLLicense from "../../../resources/licenses/dompurify-MPL.txt?raw";
-    import i18nextLicense from "../../../resources/licenses/i18next.txt?raw";
-    import markedLicense from "../../../resources/licenses/marked.txt?raw";
-    import typiaLicense from "../../../resources/licenses/typia.txt?raw";
-    import aria2License from "../../../resources/licenses/aria2.txt?raw";
-    import sherpaLicense from "../../../resources/licenses/sherpa-onnx.txt?raw";
-    import whisperCppLicense from "../../../resources/licenses/whisper.cpp.txt?raw";
-    import whisperLicense from "../../../resources/licenses/openai-whisper.txt?raw";
-    import paraformerLicense from "../../../resources/licenses/alibaba-paraformer-zh.txt?raw";
-    import paraformerNotice from "../../../resources/licenses/alibaba-paraformer-zh-NOTICE.txt?raw";
-    import ggmlLicense from "../../../resources/licenses/ggml.txt?raw";
-    import carbonLicense from "../../../resources/licenses/carbon-icons.txt?raw";
-    import remixLicense from "../../../resources/licenses/remix-icons.txt?raw";
-    import coreUILicense from "../../../resources/licenses/coreui-icons.txt?raw";
-    import ccByLicense from "../../../resources/licenses/CC-BY-4.0.txt?raw";
-    import lucideLicense from "../../../resources/licenses/lucide.txt?raw";
+    import licenseManifest from "../../../resources/licenses/sources.json";
 
     let { open = $bindable(), onClosed }: { open: boolean; onClosed: () => void } = $props();
     let expanded = $state<string[]>([]);
     let openingDirectory = $state(false);
     let directoryFailure = $state("");
 
-    const projects = [
-        { name: "Electron", license: "MIT", url: "https://github.com/electron/electron", text: electronLicense },
-        { name: "Svelte", license: "MIT", url: "https://github.com/sveltejs/svelte", text: svelteLicense },
-        { name: "Bits UI", license: "MIT", url: "https://github.com/huntabyte/bits-ui", text: bitsUILicense },
-        { name: "DOMPurify", license: "MPL-2.0 OR Apache-2.0", url: "https://github.com/cure53/DOMPurify", text: `${domPurifyMPLLicense}\n\n${domPurifyLicense}` },
-        { name: "i18next", license: "MIT", url: "https://github.com/i18next/i18next", text: i18nextLicense },
-        { name: "marked", license: "MIT", url: "https://github.com/markedjs/marked", text: markedLicense },
-        { name: "typia", license: "MIT", url: "https://github.com/samchon/typia", text: typiaLicense },
-        { name: "aria2", license: "GPL-2.0-or-later", url: "https://github.com/aria2/aria2", text: aria2License },
-        { name: "FFmpeg / ffprobe", license: "LGPL / GPL", url: "https://ffmpeg.org/", text: null },
-        { name: "sherpa-onnx", license: "Apache-2.0", url: "https://github.com/k2-fsa/sherpa-onnx", text: sherpaLicense },
-        { name: "whisper.cpp", license: "MIT", url: "https://github.com/ggml-org/whisper.cpp", text: whisperCppLicense },
-        { name: "OpenAI Whisper", license: "MIT", url: "https://github.com/openai/whisper", text: whisperLicense },
-        { name: "Alibaba Paraformer zh", license: "Apache-2.0", url: "https://www.modelscope.cn/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8358-tensorflow1", text: `${paraformerNotice}\n\n${paraformerLicense}` },
-        { name: "GGML", license: "MIT", url: "https://github.com/ggml-org/ggml", text: ggmlLicense },
-        { name: "Carbon Icons", license: "Apache-2.0", url: "https://github.com/carbon-design-system/carbon", text: carbonLicense },
-        { name: "Remix Icon", license: "Apache-2.0", url: "https://github.com/Remix-Design/RemixIcon/tree/v4.3.0", text: remixLicense },
-        { name: "CoreUI Icons Free", license: "CC-BY-4.0", url: "https://github.com/coreui/coreui-icons", text: `${coreUILicense}\n\n${ccByLicense}` },
-        { name: "Lucide Icons", license: "ISC", url: "https://lucide.dev/", text: lucideLicense }
-    ];
+    const licenseTexts = import.meta.glob<string>("../../../resources/licenses/*.txt", { query: "?raw", import: "default", eager: true });
+    const projects = licenseManifest.map(project => ({
+        name: project.name,
+        license: project.license,
+        url: project.url,
+        text: project.files.length === 0 ? null : project.files.map(({ file }) => {
+            const text = licenseTexts[`../../../resources/licenses/${file}`];
+            if (text === undefined) throw new Error(`Missing bundled license text: ${file}`);
+            return text;
+        }).join("\n\n")
+    }));
 
     function toggleProject(name: string): void {
         expanded = expanded.includes(name) ? expanded.filter(project => project !== name) : [...expanded, name];

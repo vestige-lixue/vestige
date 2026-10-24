@@ -1,92 +1,249 @@
 [
     {
-        "file": "electron.txt",
-        "source": "node_modules/electron/dist/LICENSE",
-        "version": "44.4.5"
+        "name": "Electron",
+        "license": "MIT",
+        "url": "https://github.com/electron/electron",
+        "files": [
+            {
+                "file": "electron.txt",
+                "source": "node_modules/electron/dist/LICENSE",
+                "version": "45.0.0"
+            }
+        ]
     },
     {
-        "file": "svelte.txt",
-        "source": "node_modules/svelte/LICENSE.md",
-        "version": "5.57.1"
+        "name": "Svelte",
+        "license": "MIT",
+        "url": "https://github.com/sveltejs/svelte",
+        "files": [
+            {
+                "file": "svelte.txt",
+                "source": "node_modules/svelte/LICENSE.md",
+                "version": "5.57.1"
+            }
+        ]
     },
     {
-        "file": "bits-ui.txt",
-        "source": "node_modules/bits-ui/LICENSE",
-        "version": "2.19.3"
+        "name": "Bits UI",
+        "license": "MIT",
+        "url": "https://github.com/huntabyte/bits-ui",
+        "files": [
+            {
+                "file": "bits-ui.txt",
+                "source": "node_modules/bits-ui/LICENSE",
+                "version": "2.19.3"
+            }
+        ]
     },
     {
-        "file": "i18next.txt",
-        "source": "node_modules/i18next/LICENSE",
-        "version": "26.4.2"
+        "name": "Tiptap",
+        "license": "MIT",
+        "url": "https://github.com/ueberdosis/tiptap",
+        "files": [
+            {
+                "file": "tiptap.txt",
+                "source": "node_modules/@tiptap/core/LICENSE.md",
+                "version": "3.31.3",
+                "note": "The identical license also covers node_modules/@tiptap/pm/LICENSE at version 3.31.3."
+            },
+            {
+                "file": "tiptap-pm-NOTICE.txt",
+                "source": "node_modules/@tiptap/pm/THIRD_PARTY_LICENSES.md",
+                "version": "3.31.3"
+            }
+        ]
     },
     {
-        "file": "typia.txt",
-        "source": "node_modules/typia/LICENSE",
-        "version": "12.1.1"
+        "name": "DOMPurify",
+        "license": "MPL-2.0 OR Apache-2.0",
+        "url": "https://github.com/cure53/DOMPurify",
+        "files": [
+            {
+                "file": "dompurify-MPL.txt",
+                "source": "node_modules/dompurify/LICENSE-MPL",
+                "version": "3.4.16"
+            },
+            {
+                "file": "dompurify.txt",
+                "source": "node_modules/dompurify/LICENSE",
+                "version": "3.4.16"
+            }
+        ]
     },
     {
-        "file": "openai-whisper.txt",
-        "source": "resources/models/whisper-tiny/LICENSE"
+        "name": "i18next",
+        "license": "MIT",
+        "url": "https://github.com/i18next/i18next",
+        "files": [
+            {
+                "file": "i18next.txt",
+                "source": "node_modules/i18next/LICENSE",
+                "version": "26.4.2"
+            }
+        ]
     },
     {
-        "file": "alibaba-paraformer-zh.txt",
-        "source": "resources/models/sherpa-paraformer-zh/LICENSE"
+        "name": "marked",
+        "license": "MIT",
+        "url": "https://github.com/markedjs/marked",
+        "files": [
+            {
+                "file": "marked.txt",
+                "source": "node_modules/marked/LICENSE",
+                "version": "18.1.0"
+            }
+        ]
     },
     {
-        "file": "alibaba-paraformer-zh-NOTICE.txt",
-        "source": "resources/models/sherpa-paraformer-zh/NOTICE"
+        "name": "typia",
+        "license": "MIT",
+        "url": "https://github.com/samchon/typia",
+        "files": [
+            {
+                "file": "typia.txt",
+                "source": "node_modules/typia/LICENSE",
+                "version": "12.1.1"
+            }
+        ]
     },
     {
-        "file": "lucide.txt",
-        "source": "resources/icons/lucide-LICENSE.txt"
+        "name": "hash-wasm",
+        "license": "MIT",
+        "url": "https://github.com/Daninet/hash-wasm",
+        "files": [
+            {
+                "file": "hash-wasm.txt",
+                "source": "node_modules/hash-wasm/LICENSE",
+                "version": "4.12.0"
+            }
+        ]
     },
     {
-        "file": "sherpa-onnx.txt",
-        "source": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.8/LICENSE"
+        "name": "aria2",
+        "license": "GPL-2.0-or-later",
+        "url": "https://github.com/aria2/aria2",
+        "files": [
+            {
+                "file": "aria2.txt",
+                "source": "resources/bin/aria2/licenses/aria2-1.37.0-win-64bit-build1/COPYING",
+                "version": "1.37.0"
+            }
+        ]
     },
     {
-        "file": "whisper.cpp.txt",
-        "source": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/b5130/LICENSE"
+        "name": "FFmpeg / ffprobe",
+        "license": "LGPL / GPL",
+        "url": "https://ffmpeg.org/",
+        "files": []
     },
     {
-        "file": "ggml.txt",
-        "source": "https://raw.githubusercontent.com/ggml-org/ggml/master/LICENSE"
+        "name": "sherpa-onnx",
+        "license": "Apache-2.0",
+        "url": "https://github.com/k2-fsa/sherpa-onnx",
+        "files": [
+            {
+                "file": "sherpa-onnx.txt",
+                "source": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.8/LICENSE"
+            }
+        ]
     },
     {
-        "file": "carbon-icons.txt",
-        "source": "https://raw.githubusercontent.com/carbon-design-system/carbon/main/LICENSE"
+        "name": "whisper.cpp",
+        "license": "MIT",
+        "url": "https://github.com/ggml-org/whisper.cpp",
+        "files": [
+            {
+                "file": "whisper.cpp.txt",
+                "source": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/b5130/LICENSE"
+            }
+        ]
     },
     {
-        "file": "remix-icons.txt",
-        "source": "https://unpkg.com/remixicon@4.3.0/License",
-        "version": "4.3.0"
+        "name": "OpenAI Whisper",
+        "license": "MIT",
+        "url": "https://github.com/openai/whisper",
+        "files": [
+            {
+                "file": "openai-whisper.txt",
+                "source": "https://raw.githubusercontent.com/openai/whisper/main/LICENSE"
+            }
+        ]
     },
     {
-        "file": "coreui-icons.txt",
-        "source": "https://raw.githubusercontent.com/coreui/coreui-icons/master/LICENSE"
+        "name": "Alibaba Paraformer zh",
+        "license": "Apache-2.0",
+        "url": "https://www.modelscope.cn/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8358-tensorflow1",
+        "files": [
+            {
+                "file": "alibaba-paraformer-zh-NOTICE.txt",
+                "source": "main/models/catalog.ts",
+                "note": "Vestige attribution notice for the model and ONNX distribution recorded in the sherpa-paraformer-zh catalog entry; not a verbatim upstream license."
+            },
+            {
+                "file": "alibaba-paraformer-zh.txt",
+                "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+            }
+        ]
     },
     {
-        "file": "CC-BY-4.0.txt",
-        "source": "https://creativecommons.org/licenses/by/4.0/legalcode.txt"
+        "name": "GGML",
+        "license": "MIT",
+        "url": "https://github.com/ggml-org/ggml",
+        "files": [
+            {
+                "file": "ggml.txt",
+                "source": "https://raw.githubusercontent.com/ggml-org/ggml/master/LICENSE"
+            }
+        ]
     },
     {
-        "file": "dompurify.txt",
-        "source": "node_modules/dompurify/LICENSE",
-        "version": "3.4.16"
+        "name": "Carbon Icons",
+        "license": "Apache-2.0",
+        "url": "https://github.com/carbon-design-system/carbon",
+        "files": [
+            {
+                "file": "carbon-icons.txt",
+                "source": "https://raw.githubusercontent.com/carbon-design-system/carbon/main/LICENSE"
+            }
+        ]
     },
     {
-        "file": "dompurify-MPL.txt",
-        "source": "node_modules/dompurify/LICENSE-MPL",
-        "version": "3.4.16"
+        "name": "Remix Icon",
+        "license": "Apache-2.0",
+        "url": "https://github.com/Remix-Design/RemixIcon/tree/v4.3.0",
+        "files": [
+            {
+                "file": "remix-icons.txt",
+                "source": "https://unpkg.com/remixicon@4.3.0/License",
+                "version": "4.3.0"
+            }
+        ]
     },
     {
-        "file": "marked.txt",
-        "source": "node_modules/marked/LICENSE",
-        "version": "18.1.0"
+        "name": "CoreUI Icons Free",
+        "license": "CC-BY-4.0",
+        "url": "https://github.com/coreui/coreui-icons",
+        "files": [
+            {
+                "file": "coreui-icons.txt",
+                "source": "https://raw.githubusercontent.com/coreui/coreui-icons/main/LICENSE"
+            },
+            {
+                "file": "CC-BY-4.0.txt",
+                "source": "https://creativecommons.org/licenses/by/4.0/legalcode.txt"
+            }
+        ]
     },
     {
-        "file": "aria2.txt",
-        "source": "resources/bin/aria2/licenses/aria2-1.37.0-win-64bit-build1/COPYING",
-        "version": "1.37.0"
+        "name": "Lucide Icons",
+        "license": "ISC",
+        "url": "https://lucide.dev/",
+        "files": [
+            {
+                "file": "lucide.txt",
+                "source": "https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE",
+                "note": "ISC section for the bundled files and folder-open icons; the upstream file also lists Feather-derived icons under MIT."
+            }
+        ]
     }
 ]

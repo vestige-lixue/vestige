@@ -6,7 +6,8 @@
         "../renderer/**/*.js",
         "../renderer/**/*.svelte",
         "../preload/*.d.ts",
-        "../shared/**/*", "../locales/*.json"
+        "../shared/**/*", "../locales/*.json",
+        "../resources/licenses/sources.json"
     ],
     "compilerOptions": {
         "rootDir": "..",
