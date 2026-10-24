@@ -1,6 +1,7 @@
 import typia from "typia";
 import { VestigeErrors } from "../../shared/failure";
-import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../shared/settings/Settings";
+import { type Settings, type SettingsPatch } from "../../shared/settings/Settings";
+import { type settingsSections } from "../../shared/settings/policy";
 import { validEditorFontSize, validSidebarTransparency, validVolumeSliderMinDb, validPresetNames } from "../../shared/settings/validate";
 
 // Keep public patches composable while requiring at least one field at the IPC boundary.
@@ -8,13 +9,9 @@ type NonEmptyPatch<T> = {
     [Key in keyof T]-?: Required<Pick<T, Key>> & Partial<Omit<T, Key>>;
 }[keyof T];
 
-type ValidatedSettingsPatch = NonEmptyPatch<Omit<SettingsPatch, "theme" | "transcription" | "editing" | "volumeStabilization" | "layout" | "playback"> & {
-    theme?: NonEmptyPatch<Settings["theme"]>;
-    transcription?: NonEmptyPatch<Settings["transcription"]>;
-    editing?: NonEmptyPatch<Settings["editing"]>;
-    volumeStabilization?: NonEmptyPatch<VolumeStabilizationSettings>;
-    layout?: NonEmptyPatch<NonNullable<SettingsPatch["layout"]>>;
-    playback?: NonEmptyPatch<Settings["playback"]>;
+type ValidatedSettingsPatch = NonEmptyPatch<{
+    [Key in keyof SettingsPatch]: Key extends typeof settingsSections[number]
+        ? NonEmptyPatch<NonNullable<SettingsPatch[Key]>> : SettingsPatch[Key];
 }>;
 
 // Optional TS properties allow undefined; persisted settings require defined values at every level.

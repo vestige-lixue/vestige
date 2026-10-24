@@ -76,7 +76,7 @@
 </div>
 {#if failure}
     <div class="error-message">{i18n.t("transcription.presets.saveError", { error: describeFailure(failure) })}</div>
-    <TextButton class="presetsRetry" onclick={() => void settingsAPI.save()}>{i18n.t("common.retry")}</TextButton>
+    <TextButton class="presetsRetry" onclick={() => void settingsAPI.flush()}>{i18n.t("common.retry")}</TextButton>
 {/if}
 
 
@@ -186,6 +186,7 @@
 
 
 <script lang="ts">
+    import { focusIndex } from "../../dom";
     import TextButton from "../util/TextButton.svelte";
     import { onMount, tick, untrack } from "svelte";
     import * as i18n from "../../i18n.svelte";
@@ -229,7 +230,7 @@
     $effect(() => nameInput?.setCustomValidity(nameError()));
     onMount(() => {
         beforeClose = commit;
-        const unsubscribe = settingsAPI.beforeSave(commit);
+        const unsubscribe = settingsAPI.registerDraft({ dialogId, commit });
         return () => {
             beforeClose = undefined;
             unsubscribe();
@@ -237,7 +238,7 @@
     });
 
     async function load(): Promise<Presets> {
-        if (await settingsAPI.initialize()) return settings.get()!.transcription.presets;
+        if (await settingsAPI.initialize()) return settings.getConfirmed()!.transcription.presets;
         throw new VestigeErrors(settings.getError() ?? { kind: "unexpected", diagnostic: "Settings initialization was interrupted." });
     }
 
@@ -271,7 +272,7 @@
         const text = JSON.stringify(presets);
         if (text !== lastSubmitted) {
             lastSubmitted = text;
-            updates = settingsAPI.update({ transcription: { presets } }, { save: true }).then(success => {
+            updates = settingsAPI.update({ transcription: { presets } }).then(success => {
                 if (!success && lastSubmitted === text) lastSubmitted = "";
                 return success;
             });
@@ -327,20 +328,18 @@
     }
 
     function toolbarKeydown(event: KeyboardEvent): void {
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         const toolbar = event.currentTarget as HTMLElement;
         const buttons = [...toolbar.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
-        const index = buttons.indexOf(event.target as HTMLButtonElement);
-        if (index < 0) return;
+        const next = focusIndex(event, buttons.indexOf(event.target as HTMLButtonElement), buttons.length, "horizontal");
+        if (next === null) return;
         event.preventDefault();
-        buttons[(index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+        buttons[next]?.focus();
     }
 
     function listKeydown(event: KeyboardEvent, preset: Draft): void {
-        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key) || !valid()) return;
+        const index = focusIndex(event, drafts.indexOf(preset), drafts.length, "vertical", true);
+        if (index === null || !valid()) return;
         event.preventDefault();
-        const index = event.key === "Home" ? 0 : event.key === "End" ? drafts.length - 1
-            : (drafts.indexOf(preset) + (event.key === "ArrowDown" ? 1 : -1) + drafts.length) % drafts.length;
         selected = drafts[index];
         const target = (event.currentTarget as HTMLElement).parentElement?.children[index];
         void tick().then(() => {

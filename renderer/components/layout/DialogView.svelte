@@ -10,7 +10,9 @@
     const { current }: { current: dialogs.ApplicationDialog } = $props();
     const presentation = $derived(presentDialog(current));
     const View = $derived(presentation.component);
-    setContext<DialogLifecycle>(dialogLifecycleKey, { closed: () => dialogsAPI.remove(current.id) });
+    setContext<DialogLifecycle>(dialogLifecycleKey, {
+        closed: () => dialogsAPI.remove(current.id), closeRejected: () => dialogsAPI.rejectClose(current.id)
+    });
 
     function closed(next?: () => void): void {
         if (current.open || !dialogs.state.dialogs.includes(current)) return;

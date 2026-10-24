@@ -7,6 +7,7 @@ import { type Config } from "../../shared/transcription/Config";
 import * as project from "./project.svelte";
 
 export type SaveChoice = "save" | "discard" | "cancel" | "memory" | "retry";
+export type SettingsSaveChoice = "retry" | "cancel" | "discard";
 
 export type MediaRefImportIssue = {
     status: MediaIssueStatus;
@@ -58,6 +59,12 @@ type SaveFailureDialog = {
     answer: (choice: SaveChoice) => void;
 };
 
+type SettingsSaveFailureDialog = {
+    kind: "settings-save-failure";
+    error: FailureInfo;
+    answer: (choice: SettingsSaveChoice) => void;
+};
+
 type ProjectBusyDialog = {
     kind: "project-busy";
     getOperation: () => project.ProjectOperation;
@@ -89,6 +96,7 @@ export type DialogDescriptor = (
     TranscriptionPresetsDialog |
     SaveConfirmationDialog |
     SaveFailureDialog |
+    SettingsSaveFailureDialog |
     ProjectBusyDialog |
     ProjectErrorDialog |
     MediaImportErrorDialog |

@@ -1,17 +1,24 @@
 import { type FailureInfo } from "../../shared/failure";
 import { type Settings, type SettingsPatch, type SettingsSnapshot } from "../../shared/settings/Settings";
 import { defaultSettings } from "../../shared/settings/defaults";
+import { mergeSettings } from "../../shared/settings/merge";
 
 let snapshot = $state.raw<SettingsSnapshot | null>(null);
 let error = $state<FailureInfo | null>(null);
 let pendingPatch = $state.raw<SettingsPatch>({});
+let inFlightPatch = $state.raw<SettingsPatch>({});
+const current = $derived(mergeSettings(mergeSettings(snapshot?.settings ?? defaultSettings, inFlightPatch), pendingPatch));
 
-export function get(): Settings | null {
+export function getConfirmed(): Settings | null {
     return snapshot?.settings ?? null;
 }
 
+export function getCurrent(): Settings {
+    return current;
+}
+
 export function getVolumeStabilization(): Settings["volumeStabilization"] {
-    return snapshot?.settings.volumeStabilization ?? defaultSettings.volumeStabilization;
+    return current.volumeStabilization;
 }
 
 export function isReady(): boolean {
@@ -19,7 +26,7 @@ export function isReady(): boolean {
 }
 
 export function isDirty(): boolean {
-    return Object.keys(pendingPatch).length > 0 || (snapshot?.dirty ?? false);
+    return Object.keys(pendingPatch).length > 0 || Object.keys(inFlightPatch).length > 0 || (snapshot?.dirty ?? false);
 }
 
 export function isSaving(): boolean {
@@ -31,20 +38,19 @@ export function getError(): FailureInfo | null {
 }
 
 export function getSidebarWidth(): number | null {
-    return pendingPatch.layout?.sidebarWidth ?? snapshot?.settings.layout.sidebarWidth ?? defaultSettings.layout.sidebarWidth;
+    return current.layout.sidebarWidth;
 }
 
 export function getVideoHeight(): number | null {
-    const height = pendingPatch.layout?.videoHeight;
-    return height !== undefined ? height : snapshot?.settings.layout.videoHeight ?? defaultSettings.layout.videoHeight;
+    return current.layout.videoHeight;
 }
 
 export function getEditing(): Settings["editing"] {
-    return { ...defaultSettings.editing, ...snapshot?.settings.editing, ...pendingPatch.editing };
+    return current.editing;
 }
 
 export function getPlayback(): Settings["playback"] {
-    return { ...getConfirmedPlayback(), ...pendingPatch.playback };
+    return current.playback;
 }
 
 export function getConfirmedPlayback(): Settings["playback"] {
@@ -65,6 +71,10 @@ export function getPendingPatch(): SettingsPatch {
 
 export function setPendingPatch(value: SettingsPatch): void {
     pendingPatch = value;
+}
+
+export function setInFlightPatch(value: SettingsPatch): void {
+    inFlightPatch = value;
 }
 
 export function setError(value: FailureInfo | null): void {

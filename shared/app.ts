@@ -26,7 +26,7 @@ export type AppAPI = {
     settings: {
         get(): Promise<SettingsSnapshot>;
         update(patch: SettingsPatch): Promise<SettingsResult>;
-        save(): Promise<SettingsResult>;
+        flush(revision: number): Promise<SettingsResult>;
         onChanged(listener: (snapshot: SettingsSnapshot) => void): () => void;
     };
     file: {

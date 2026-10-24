@@ -98,12 +98,12 @@
     const disabled = $derived(!initialized || pending);
     const startDisabled = $derived(disabled || project.projectState.locked || !mediaImport.isReady(mediaId));
     const failure = $derived(settings.getError());
-    const presets = $derived(mergePresets(settings.get()?.transcription.presets ?? {}));
+    const presets = $derived(mergePresets(settings.getConfirmed()?.transcription.presets ?? {}));
     const presetItems = $derived(presets.map(preset => ({ value: preset.name, label: preset.name })));
 
     onMount(() => {
         void initialize();
-        const unsubscribe = settingsAPI.beforeSave(commit);
+        const unsubscribe = settingsAPI.registerDraft({ dialogId, commit });
         return () => {
             alive = false;
             unsubscribe();
@@ -130,7 +130,7 @@
         pending = true;
         try {
             if (!await settingsAPI.initialize() || !alive) return;
-            const previous = settings.get()!.transcription.lastConfig;
+            const previous = settings.getConfirmed()!.transcription.lastConfig;
             if (previous) applyPreset(previous.presetName, previous.config);
             initialized = true;
         }
@@ -153,7 +153,7 @@
             presetName: presets.some(preset => preset.name === selectedName && configsEqual(preset.config, config)) ? selectedName : ""
         };
         pending = true;
-        const operation = settingsAPI.update({ transcription: { lastConfig } }, { save: true }).finally(() => {
+        const operation = settingsAPI.update({ transcription: { lastConfig } }).finally(() => {
             commitTask = null;
             pending = false;
         });

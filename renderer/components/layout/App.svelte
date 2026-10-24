@@ -44,11 +44,10 @@
     import ApplicationDialogs from "./ApplicationDialogs.svelte";
     import Transcript from "../transcript/Transcript.svelte";
     import * as project from "../../states/project.svelte";
-    import * as dialogs from "../../states/dialogs.svelte";
     import * as settingsAPI from "../../states/settings";
     import * as transcriptionAPI from "../../states/transcription";
     import * as projectAPI from "../../states/project";
-    import * as dialogsAPI from "../../states/dialogs";
+    import { prepareSettingsForQuit } from "../../states/settingsQuit";
 
     let availableHeight = $state(0);
 
@@ -61,13 +60,7 @@
         const stopKeybindings = keybindings.mount();
         void settingsAPI.initialize();
         const stopTranscription = transcriptionAPI.startLifecycle();
-        const stopProject = projectAPI.startLifecycle(async () => {
-            if (await settingsAPI.save()) return true;
-            if (!dialogs.state.dialogs.some(dialog => dialog.kind === "settings" && dialog.open)) {
-                dialogsAPI.show({ kind: "settings" });
-            }
-            return false;
-        });
+        const stopProject = projectAPI.startLifecycle(prepareSettingsForQuit);
         return () => {
             stopKeybindings();
             stopTranscription();

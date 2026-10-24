@@ -542,7 +542,7 @@ export function close(): Promise<boolean> {
     });
 }
 
-export function startLifecycle(saveSettingsBeforeQuit: () => Promise<boolean>): () => void {
+export function startLifecycle(prepareSettingsBeforeQuit: () => Promise<boolean>): () => void {
     lifecycleStarted = true;
     mediaImportAPI.reset(project.projectState.project?.vestiges.map(vestige => vestige.media.id) ?? []);
     let rememberPlaybackPosition: boolean | null = null;
@@ -564,7 +564,7 @@ export function startLifecycle(saveSettingsBeforeQuit: () => Promise<boolean>): 
             while (saveTask) if (!await saveTask) return true;
             return !await invokeWithLock(async () => {
                 // Validate settings before progress dialogs can capture or restore focus.
-                if (!await saveSettingsBeforeQuit()) return false;
+                if (!await prepareSettingsBeforeQuit()) return false;
                 if (!await prepareToLeave()) return false;
                 setOperation({ kind: "quit" });
                 return true;

@@ -8,6 +8,7 @@ import { type MediaPathMode } from "../project/file";
 
 import { type taskCapacity } from "../task";
 import { type audioLevelStages, type playbackModes, type informationDisplays, type volumeSliderMappings, type switchPlaybackModes } from "./options";
+import { type settingsSections } from "./policy";
 
 type StabilizationLimits = typeof volumeStabilizationLimits;
 type PlaybackSpeed = number & tags.Minimum<typeof minPlaybackSpeed> & tags.Maximum<typeof maxPlaybackSpeed>;
@@ -69,24 +70,19 @@ export type Settings = {
 };
 
 // All renderer updates share this schema; window state comes from BrowserWindow events.
+type EditableSettings = Omit<Settings, "version" | "window">;
 export type SettingsPatch = {
-    readonly language?: Settings["language"];
-    readonly compressProjectFiles?: Settings["compressProjectFiles"];
-    readonly mediaPathMode?: Settings["mediaPathMode"];
-    readonly theme?: Partial<ThemeSettings>;
-    readonly transcription?: Partial<Settings["transcription"]>;
-    readonly editing?: Partial<Settings["editing"]>;
-    readonly volumeStabilization?: Partial<VolumeStabilizationSettings>;
-    readonly layout?: {
+    readonly [Key in keyof EditableSettings]?: Key extends "layout" ? {
         readonly sidebarWidth?: NonNullable<Settings["layout"]["sidebarWidth"]>;
         readonly videoHeight?: Settings["layout"]["videoHeight"];
-    };
-    readonly playback?: Partial<Settings["playback"]>;
+    } : Key extends typeof settingsSections[number] ? Partial<EditableSettings[Key]> : EditableSettings[Key];
 };
 
 export type SettingsSnapshot = {
     readonly settings: Settings;
     readonly revision: number;
+    readonly settingsRevision: number;
+    readonly savedRevision: number;
     readonly dirty: boolean;
     readonly saving: boolean;
     readonly error: FailureInfo | null;

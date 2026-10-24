@@ -288,6 +288,12 @@
         "empty": "Your transcript will appear here."
     },
     "settings": {
+        "quitFailure": {
+            "title": "Settings could not be saved",
+            "description": "Your changes are active, but could not be written to disk: {{error}}",
+            "discard": "Discard unsaved settings and quit",
+            "cancel": "Cancel quitting"
+        },
         "title": "Settings",
         "loading": "Loading settings…",
         "saveError": "Could not save settings: {{error}}",

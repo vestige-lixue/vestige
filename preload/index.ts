@@ -32,7 +32,7 @@ const api: AppAPI = {
     settings: {
         get: () => ipcRenderer.invoke(settingsChannels.get),
         update: patch => ipcRenderer.invoke(settingsChannels.update, patch),
-        save: () => ipcRenderer.invoke(settingsChannels.save),
+        flush: revision => ipcRenderer.invoke(settingsChannels.flush, revision),
         onChanged(callback) {
             const listener = (_event: IpcRendererEvent, snapshot: SettingsSnapshot): void => callback(snapshot);
             ipcRenderer.on(settingsChannels.changed, listener);

@@ -222,6 +222,7 @@
         untrack(() => {
             if (requested) {
                 if (phase !== "open") {
+                    lifecycle?.closeRejected();
                     closeVersion++;
                     phase = "open";
                     visible = true;
@@ -234,6 +235,7 @@
         disposed = true;
         closeVersion++;
         modal.closeLayer(layer);
+        lifecycle?.closeRejected();
     });
 
     async function requestClose(): Promise<void> {
@@ -247,6 +249,7 @@
             if (accepted === false) {
                 phase = "open";
                 open = true;
+                lifecycle?.closeRejected();
                 return;
             }
             approveClose();
@@ -255,6 +258,7 @@
             if (disposed || version !== closeVersion) return;
             phase = "open";
             open = true;
+            lifecycle?.closeRejected();
             console.error("The dialog could not close.", error);
         }
     }

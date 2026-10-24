@@ -202,9 +202,7 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
     saveProjectAs: { run: () => void projectAPI.save(true), enabled: hasProject, label: label("menu.project.saveAs") },
     closeProject: { run: () => void projectAPI.close(), enabled: hasProject, label: label("common.close") },
     quitApp: {
-        run: () => void projectAPI.close().then(closed => {
-            if (closed) window.api.quit();
-        }),
+        run: () => window.api.quit(),
         enabled: always, label: label("menu.other.quit")
     },
     importMedia: { run: () => void projectAPI.selectMediaForImport(), enabled: always, label: label("menu.media.import") },

@@ -21,9 +21,9 @@ export function registerSettingsIPCs(window: BrowserWindow): () => void {
     handle(contents, settingsChannels.update, (patch: unknown) => {
         return settings.update(patch);
     });
-    handle(contents, settingsChannels.save, () => {
+    handle(contents, settingsChannels.flush, (revision: unknown) => {
         rememberWindow();
-        return settings.save();
+        return settings.flush(typeof revision === "number" ? revision : NaN);
     });
     const unsubscribe = settings.subscribe(snapshot => {
         if (!contents.isDestroyed()) contents.send(settingsChannels.changed, snapshot);

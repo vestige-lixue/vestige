@@ -74,7 +74,7 @@ function fail(task: transcription.TranscriptionTask, error: FailureInfo): void {
 }
 
 function updateConcurrency(): void {
-    queue.setConcurrency(Math.min(taskCapacity, settings.get()?.transcription.concurrency ?? 0));
+    queue.setConcurrency(Math.min(taskCapacity, settings.getConfirmed()?.transcription.concurrency ?? 0));
 }
 
 export function startLifecycle(): () => void {

@@ -1,7 +1,7 @@
 export const settingsChannels = {
     get: "settings:get",
     update: "settings:update",
-    save: "settings:save",
+    flush: "settings:flush",
     changed: "settings:changed"
 } as const;
 

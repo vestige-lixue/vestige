@@ -288,6 +288,12 @@
         "empty": "转写正文将在这里显示。"
     },
     "settings": {
+        "quitFailure": {
+            "title": "设置保存失败",
+            "description": "设置已生效，但未能写入磁盘：{{error}}",
+            "discard": "放弃未保存的设置并退出",
+            "cancel": "取消退出"
+        },
         "title": "设置",
         "loading": "正在读取设置……",
         "saveError": "保存设置时出现错误：{{error}}",

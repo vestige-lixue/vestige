@@ -17,7 +17,7 @@ void instance.init({
 });
 
 // Track only the language, so unrelated settings updates do not invalidate every label.
-const language = $derived(settings.get()?.language ?? defaultSettings.language);
+const language = $derived(settings.getConfirmed()?.language ?? defaultSettings.language);
 
 export function getLocale(): Locale {
     return language;

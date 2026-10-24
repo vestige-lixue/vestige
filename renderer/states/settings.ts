@@ -1,20 +1,27 @@
 import { toFailureInfo } from "../../shared/failure";
 import { type Settings, type SettingsPatch, type SettingsResult, type SettingsSnapshot } from "../../shared/settings/Settings";
+import { mergeSettings } from "../../shared/settings/merge";
+import { freezeSnapshot } from "../../shared/settings/snapshot";
 import { SvelteSet } from "svelte/reactivity";
+import { tick } from "svelte";
 import * as settings from "./settings.svelte";
+import * as dialogs from "./dialogs.svelte";
+import * as dialogsAPI from "./dialogs";
 
+type SettingsDraft = { dialogId: string; commit: () => Promise<boolean> };
 let initialization: Promise<boolean> | null = null;
 let unsubscribe: (() => void) | null = null;
 let generation = 0;
 let updateTask: Promise<boolean> | null = null;
+let queuedVersion = 0;
+let acceptedVersion = 0;
 const listeners = new SvelteSet<(value: Settings | null) => void>();
-const editors = new SvelteSet<() => Promise<boolean>>();
-const updates = new SvelteSet<Promise<boolean>>();
+const editors = new SvelteSet<SettingsDraft>();
 
 function notify(): void {
     for (const listener of listeners) {
         try {
-            listener(settings.get());
+            listener(settings.getConfirmed());
         }
         catch (error) {
             console.error(error);
@@ -25,34 +32,13 @@ function notify(): void {
 function accept(next: SettingsSnapshot, current: number): void {
     const snapshot = settings.getSnapshot();
     if (current !== generation || (snapshot !== null && next.revision < snapshot.revision)) return;
-    Object.freeze(next.settings.theme.light);
-    Object.freeze(next.settings.theme.dark);
-    Object.freeze(next.settings.theme);
-    for (const preset of Object.values(next.settings.transcription.presets)) {
-        Object.freeze(preset.params);
-        Object.freeze(preset);
-    }
-    Object.freeze(next.settings.transcription.presets);
-    const lastConfig = next.settings.transcription.lastConfig;
-    if (lastConfig) {
-        Object.freeze(lastConfig.config.params);
-        Object.freeze(lastConfig.config);
-        Object.freeze(lastConfig);
-    }
-    Object.freeze(next.settings.transcription);
-    Object.freeze(next.settings.editing);
-    Object.freeze(next.settings.volumeStabilization);
-    Object.freeze(next.settings.window);
-    Object.freeze(next.settings.layout);
-    Object.freeze(next.settings.playback);
-    Object.freeze(next.settings);
-    settings.setSnapshot(next);
+    settings.setSnapshot(freezeSnapshot(next));
     notify();
 }
 
 export function subscribe(listener: (value: Settings | null) => void): () => void {
     listeners.add(listener);
-    listener(settings.get());
+    listener(settings.getConfirmed());
     return () => listeners.delete(listener);
 }
 
@@ -75,7 +61,7 @@ export function initialize(): Promise<boolean> {
         if (initialization === operation) initialization = null;
     });
     initialization = operation;
-    return initialization;
+    return operation;
 }
 
 async function request(action: () => Promise<SettingsResult>): Promise<boolean> {
@@ -95,29 +81,22 @@ async function request(action: () => Promise<SettingsResult>): Promise<boolean> 
     }
 }
 
-// Updating is independent of persistence; settings forms explicitly request an immediate save.
-export function update(patch: SettingsPatch, options: { save?: boolean } = {}): Promise<boolean> {
-    // Merge only supplied fields so startup loading and older IPC replies cannot overwrite newer edits.
-    const pendingPatch = settings.getPendingPatch();
-    settings.setPendingPatch({
-        ...pendingPatch, ...patch,
-        ...(patch.theme ? { theme: { ...pendingPatch.theme, ...patch.theme } } : {}),
-        ...(patch.transcription ? { transcription: { ...pendingPatch.transcription, ...patch.transcription } } : {}),
-        ...(patch.editing ? { editing: { ...pendingPatch.editing, ...patch.editing } } : {}),
-        ...(patch.volumeStabilization ? { volumeStabilization: { ...pendingPatch.volumeStabilization, ...patch.volumeStabilization } } : {}),
-        ...(patch.layout ? { layout: { ...pendingPatch.layout, ...patch.layout } } : {}),
-        ...(patch.playback ? { playback: { ...pendingPatch.playback, ...patch.playback } } : {})
-    });
+// A successful update means main accepted this independent patch. Disk writes
+// are debounced there and report their errors in a separate snapshot field.
+export async function update(patch: SettingsPatch): Promise<boolean> {
+    if (Object.keys(patch).length === 0) return true;
+    settings.setPendingPatch(mergeSettings(settings.getPendingPatch(), structuredClone(patch)));
+    const version = ++queuedVersion;
     const current = generation;
-    const operation = flushUpdates().then(success => success && current === generation && (options.save ? persist() : true));
-    updates.add(operation);
-    void operation.finally(() => updates.delete(operation));
-    return operation;
+    while (current === generation && acceptedVersion < version) {
+        if (!await flushUpdates()) return false;
+    }
+    return current === generation;
 }
 
-export function beforeSave(commit: () => Promise<boolean>): () => void {
-    editors.add(commit);
-    return () => editors.delete(commit);
+export function registerDraft(draft: SettingsDraft): () => void {
+    editors.add(draft);
+    return () => editors.delete(draft);
 }
 
 function flushUpdates(): Promise<boolean> {
@@ -126,9 +105,17 @@ function flushUpdates(): Promise<boolean> {
     const operation = Promise.resolve().then(async () => {
         while (current === generation && Object.keys(settings.getPendingPatch()).length > 0) {
             const patch = settings.getPendingPatch();
-            if (!await request(() => window.api.settings.update(patch)) || current !== generation) return false;
-            // Coalesce changes made during IPC and keep the latest values visible.
-            if (settings.getPendingPatch() === patch) settings.setPendingPatch({});
+            const version = queuedVersion;
+            settings.setPendingPatch({});
+            settings.setInFlightPatch(patch);
+            const success = await request(() => window.api.settings.update(patch));
+            if (current !== generation) return false;
+            settings.setInFlightPatch({});
+            if (!success) {
+                settings.setPendingPatch(mergeSettings(patch, settings.getPendingPatch()));
+                return false;
+            }
+            acceptedVersion = version;
         }
         return current === generation;
     }).finally(() => {
@@ -138,19 +125,48 @@ function flushUpdates(): Promise<boolean> {
     return operation;
 }
 
-export async function save(): Promise<boolean> {
+export async function commitDrafts(): Promise<boolean> {
     const current = generation;
     if (!await initialize() || current !== generation) return false;
-    // Native window close/quit must also commit inputs that have not blurred yet.
-    for (const commit of editors) if (!await commit()) return false;
-    while (updates.size > 0) await Promise.all([...updates]);
-    if (!await flushUpdates()) return false;
-    if (current !== generation) return false;
-    return persist();
+    // Check the topmost editor first, so an invalid visible input keeps focus.
+    const order = dialogs.state.dialogs.map(dialog => dialog.id);
+    const drafts = [...editors].sort((left, right) => order.indexOf(right.dialogId) - order.indexOf(left.dialogId));
+    try {
+        for (const draft of drafts) {
+            if (current !== generation) return false;
+            if (await draft.commit()) continue;
+            const index = dialogs.state.dialogs.findIndex(dialog => dialog.id === draft.dialogId);
+            if (index >= 0) {
+                const above = dialogs.state.dialogs.slice(index + 1).reverse();
+                for (const dialog of above) {
+                    if (!await dialogsAPI.requestClose(dialog.id)) return false;
+                }
+                if (above.length > 0 && current === generation && editors.has(draft)) {
+                    await tick();
+                    // The original validation already failed. Re-run only to
+                    // restore its field focus after upper focus traps are gone.
+                    await draft.commit();
+                }
+            }
+            return false;
+        }
+        return current === generation && await flushUpdates();
+    }
+    catch (cause) {
+        if (current === generation) settings.setError(toFailureInfo(cause));
+        return false;
+    }
 }
 
-function persist(): Promise<boolean> {
-    return settings.isDirty() ? request(() => window.api.settings.save()) : Promise.resolve(true);
+export async function flush(): Promise<boolean> {
+    const current = generation;
+    if (!await commitDrafts() || current !== generation) return false;
+    return flushAccepted();
+}
+
+export function flushAccepted(): Promise<boolean> {
+    const snapshot = settings.getSnapshot();
+    return snapshot ? request(() => window.api.settings.flush(snapshot.settingsRevision)) : Promise.resolve(false);
 }
 
 export function dispose(): void {
@@ -160,9 +176,10 @@ export function dispose(): void {
     initialization = null;
     settings.setSnapshot(null);
     settings.setPendingPatch({});
+    settings.setInFlightPatch({});
     updateTask = null;
+    queuedVersion = acceptedVersion = 0;
     settings.setError(null);
     editors.clear();
-    updates.clear();
     notify();
 }

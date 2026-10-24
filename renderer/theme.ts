@@ -10,7 +10,7 @@ export async function initialize(): Promise<() => void> {
     });
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = (): void => {
-        const theme = settings.get()?.theme ?? defaultSettings.theme;
+        const theme = settings.getConfirmed()?.theme ?? defaultSettings.theme;
         const scheme = resolveThemeScheme(theme.mode, systemTheme.matches);
         const colors = resolveTheme(scheme, theme[scheme]);
         const root = document.documentElement;
