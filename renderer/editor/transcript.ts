@@ -373,6 +373,7 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
     const editor = new Editor({
         element, extensions: transcriptExtensions(index, canEdit, initial), content: contentOf(index, initial),
         injectCSS: false, enableInputRules: false, enablePasteRules: false,
+        editorProps: { attributes: { autocapitalize: "off", writingsuggestions: "false", autocorrect: "off" } },
         onTransaction({ editor }) {
             const next = transcriptModifications(editor.state);
             if (next === previous) return;
