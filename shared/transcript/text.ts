@@ -76,6 +76,24 @@ function insertionOf(index: TextIndex, position: number, text: string): Modifica
     return { type: "insert", pos: textPosition(index, position), text };
 }
 
+// Longest suffix of inserted text matching the remaining deleted prefix, in linear time.
+function suffixPrefixLength(inserted: readonly string[], original: readonly string[], from: number, to: number): number {
+    const length = Math.min(inserted.length, to - from);
+    if (!length) return 0;
+    const borders = new Array<number>(length).fill(0);
+    for (let offset = 1, border = 0; offset < length; offset++) {
+        while (border && original[from + offset] !== original[from + border]) border = borders[border - 1];
+        if (original[from + offset] === original[from + border]) border++;
+        borders[offset] = border;
+    }
+    let matched = 0;
+    for (const character of inserted) {
+        while (matched && (matched === length || character !== original[from + matched])) matched = borders[matched - 1];
+        if (character === original[from + matched]) matched++;
+    }
+    return matched;
+}
+
 export function normalizeModifications(index: TextIndex, modifications: readonly Modification[]): Modification[] {
     const deletions: { from: number; to: number }[] = [];
     const insertions: { position: number; text: string }[] = [];
@@ -114,11 +132,30 @@ export function normalizeModifications(index: TextIndex, modifications: readonly
     const normalized: Modification[] = [];
     let insertionIndex = 0;
     for (const deletion of merged) {
-        while (insertionIndex < anchored.length && anchored[insertionIndex].position <= deletion.from) {
+        while (insertionIndex < anchored.length && anchored[insertionIndex].position < deletion.from) {
             const insertion = anchored[insertionIndex++];
             normalized.push(insertionOf(index, insertion.position, insertion.text));
         }
-        normalized.push(deletionOf(index, deletion.from, deletion.to));
+        if (anchored[insertionIndex]?.position === deletion.from) {
+            const characters = Array.from(anchored[insertionIndex++].text);
+            let first = 0;
+            let end = characters.length;
+            // D18 restores the common prefix, then suffix, then inserted-suffix/deleted-prefix overlap.
+            while (first < end && deletion.from < deletion.to && characters[first] === index.characters[deletion.from]) {
+                first++; deletion.from++;
+            }
+            const position = deletion.from;
+            while (first < end && deletion.from < deletion.to && characters[end - 1] === index.characters[deletion.to - 1]) {
+                end--; deletion.to--;
+            }
+            const remaining = characters.slice(first, end);
+            const overlap = suffixPrefixLength(remaining, index.characters, deletion.from, deletion.to);
+            deletion.from += overlap;
+            // Keep this anchor before the restored prefix rather than moving it to the remaining deletion.
+            remaining.length -= overlap;
+            if (remaining.length) normalized.push(insertionOf(index, position, remaining.join("")));
+        }
+        if (deletion.from < deletion.to) normalized.push(deletionOf(index, deletion.from, deletion.to));
     }
     for (; insertionIndex < anchored.length; insertionIndex++) {
         const insertion = anchored[insertionIndex];

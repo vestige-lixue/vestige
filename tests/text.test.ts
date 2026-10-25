@@ -47,9 +47,22 @@ describe("text projection and editing", () => {
                 expect(next.text).toBe(expected.join(""));
                 expect(next.length).toBe(expected.length);
                 const pieces = textPieces(index, next);
-                expect(pieces.flatMap(piece => [...piece.text].map((text, offset) => ({
+                const actualSources = pieces.flatMap(piece => [...piece.text].map((text, offset) => ({
                     text, source: piece.source.kind === "segment" ? piece.sourceFrom + offset : null
-                })))).toEqual(provenance);
+                })));
+                let previousSource = -1;
+                for (const [position, actual] of actualSources.entries()) {
+                    expect(actual.text).toBe(provenance[position].text);
+                    if (provenance[position].source !== null) expect(actual.source).toBe(provenance[position].source);
+                    if (actual.source !== null) {
+                        expect(actual.source).toBeGreaterThan(previousSource);
+                        expect(actual.text).toBe(index.characters[actual.source]);
+                        previousSource = actual.source;
+                    }
+                }
+                // D18 may restore newly inserted characters; surviving original characters keep their identity.
+                provenance.splice(0, provenance.length, ...actualSources);
+                expect(textPieces(index, projectText(index, next.modifications))).toEqual(pieces);
                 for (let offset = 0, utf16 = 0; offset <= expected.length; offset++) {
                     expect(projectionOffset(next, offset, true)).toBe(utf16);
                     expect(projectionOffset(next, utf16, false)).toBe(offset);
@@ -141,7 +154,7 @@ describe("text projection and editing", () => {
         }
     });
 
-    it("normalizes source-anchored operations without changing text or provenance", () => {
+    it("normalizes source-anchored operations and restores matching source without changing displayed text", () => {
         checkProperty("normalization", fc.property(normalizationArbitrary, ({ spans, modifications }) => {
             const before = structuredClone(modifications);
             const index = createTextIndex(spans);
@@ -167,10 +180,42 @@ describe("text projection and editing", () => {
                     expect(anchors.has(position)).toBe(false);
                     anchors.add(position);
                     expect(deletions.some(range => range.from < position && position <= range.to)).toBe(false);
+                    const deletion = deletions.find(range => range.from === position);
+                    if (deletion) {
+                        const inserted = [...item.text];
+                        const deleted = index.characters.slice(deletion.from, deletion.to);
+                        expect(inserted[0]).not.toBe(deleted[0]);
+                        expect(inserted.at(-1)).not.toBe(deleted.at(-1));
+                        for (let length = 1; length <= Math.min(inserted.length, deleted.length); length++) {
+                            expect(inserted.slice(-length).join("")).not.toBe(deleted.slice(0, length).join(""));
+                        }
+                    }
                 }
             }
             expect(modifications).toEqual(before);
         }));
+    });
+
+    it.each([
+        { original: "Outro", from: 3, to: 4, inserted: "ar", insertion: [3, "a"] as const, deletion: null, text: "Outaro" },
+        { original: "Outro", from: 2, to: 4, inserted: "t", insertion: null, deletion: [3, 4] as const, text: "Outo" },
+        { original: "Outro", from: 2, to: 4, inserted: "r", insertion: null, deletion: [2, 3] as const, text: "Ouro" },
+        { original: "rx", from: 0, to: 2, inserted: "ar", insertion: [0, "a"] as const, deletion: [1, 2] as const, text: "ar" },
+        { original: "Outro", from: 0, to: 5, inserted: "Outro", insertion: null, deletion: null, text: "Outro" },
+        { original: "𝄞中x", from: 0, to: 3, inserted: "a𝄞中", insertion: [0, "a"] as const, deletion: [2, 3] as const, text: "a𝄞中" }
+    ])("restores D18 source boundaries for $original / $inserted", ({ original, from, to, inserted, insertion, deletion, text }) => {
+        const spans = transcript([...original]);
+        const index = createTextIndex(spans);
+        const removed = editText(index, projectText(index, []), from, to, "");
+        const value = editText(index, removed, from, from, inserted);
+        const expected = [
+            ...insertion ? modification(spans, insertion[0], insertion[0], insertion[1]) : [],
+            ...deletion ? modification(spans, deletion[0], deletion[1], "") : []
+        ];
+        expect(value.text).toBe(text);
+        expect(value.modifications).toEqual(expected);
+        expect(normalizeModifications(index, value.modifications)).toEqual(expected);
+        expect(textPieces(index, value)).toEqual(textPieces(index, projectText(index, expected)));
     });
 
     it("preserves the original deletion when editing an adjacent insertion", () => {
