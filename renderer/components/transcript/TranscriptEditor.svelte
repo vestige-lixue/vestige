@@ -109,6 +109,8 @@
         padding: 28px;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
+        font-variant-ligatures: none;
+        font-feature-settings: "liga" 0;
         cursor: text;
     }
     .editor :global(.tiptap), .editor :global(.tiptap *) {
@@ -117,6 +119,16 @@
     }
     .editor :global(.tiptap > div) {
         line-height: calc(var(--transcript-line-height) + var(--transcript-line-gap) * 2);
+    }
+    .editor :global(img.ProseMirror-separator) {
+        display: inline;
+        border: none;
+        margin: 0;
+        width: 0;
+        height: 0;
+    }
+    .editor :global(.ProseMirror-hideselection) {
+        caret-color: transparent;
     }
     .editor :global(.tiptap::selection), .editor :global(.tiptap *::selection) {
         background-color: transparent;
