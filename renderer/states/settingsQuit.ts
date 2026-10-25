@@ -9,7 +9,7 @@ export async function prepareSettingsForQuit(): Promise<boolean> {
         const error = settings.getError();
         if (!error) return false;
         const choice = await new Promise<dialogs.SettingsSaveChoice>(resolve => {
-            dialogsAPI.show({ kind: "settings-save-failure", error, answer: resolve, onClosed: () => resolve("cancel") });
+            dialogsAPI.show({ kind: "settings-save-failure", purpose: "quit", error, answer: resolve, onClosed: () => resolve("cancel") });
         });
         if (choice === "cancel") return false;
         // The caller still runs the project-save confirmation and main task cleanup.

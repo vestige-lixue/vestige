@@ -129,6 +129,7 @@ export function flush(target: number): Promise<SettingsResult> {
         catch (cause) {
             failure = isSystemError(cause) ? fileOperationFailure(cause, "write", path) : toFailureInfo(cause);
             error = failure;
+            console.error("Could not save settings:", path, cause);
         }
         finally {
             pendingSaves--;

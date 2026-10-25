@@ -4,11 +4,11 @@
         onClosed();
     }
 }}>
-    <Dialog.Title class="modal-title">{i18n.t("settings.quitFailure.title")}</Dialog.Title>
-    <Dialog.Description class="modal-description">{i18n.t("settings.quitFailure.description", { error: describeFailure(error) })}</Dialog.Description>
+    <Dialog.Title class="modal-title">{i18n.t(`settings.${purpose === "quit" ? "quitFailure" : "closeFailure"}.title`)}</Dialog.Title>
+    <Dialog.Description class="modal-description">{i18n.t(`settings.${purpose === "quit" ? "quitFailure" : "closeFailure"}.description`, { error: describeFailure(error) })}</Dialog.Description>
     {#snippet actions()}
-        <TextButton onclick={() => choose("discard")}>{i18n.t("settings.quitFailure.discard")}</TextButton>
-        <TextButton onclick={() => choose("cancel")}>{i18n.t("settings.quitFailure.cancel")}</TextButton>
+        <TextButton onclick={() => choose("discard")}>{i18n.t(purpose === "quit" ? "settings.quitFailure.discard" : "settings.closeFailure.close")}</TextButton>
+        {#if purpose === "quit"}<TextButton onclick={() => choose("cancel")}>{i18n.t("settings.quitFailure.cancel")}</TextButton>{/if}
         <TextButton class="primary" onclick={() => choose("retry")}>{i18n.t("common.retry")}</TextButton>
     {/snippet}
 </Modal>
@@ -22,8 +22,9 @@
     import { type FailureInfo } from "../../../shared/failure";
     import * as dialogs from "../../states/dialogs.svelte";
 
-    let { open = $bindable(), error, answer, onClosed }: {
+    let { open = $bindable(), purpose, error, answer, onClosed }: {
         open: boolean;
+        purpose: "close" | "quit";
         error: FailureInfo;
         answer: (choice: dialogs.SettingsSaveChoice) => void;
         onClosed: () => void;

@@ -288,6 +288,11 @@
         "empty": "转写正文将在这里显示。"
     },
     "settings": {
+        "closeFailure": {
+            "title": "设置保存失败",
+            "description": "设置已生效，但未能写入磁盘：{{error}}\n你可以重试或关闭设置窗口。退出应用时会再次检查未保存的设置。",
+            "close": "关闭设置窗口"
+        },
         "quitFailure": {
             "title": "设置保存失败",
             "description": "设置已生效，但未能写入磁盘：{{error}}",

@@ -55,7 +55,7 @@ const registry: { [Kind in DialogKind]: Presenter<Kind> } = {
     })),
     "save-confirmation": define("save-confirmation", SaveConfirmation, dialog => ({ fileName: dialog.fileName, answer: dialog.answer })),
     "save-failure": define("save-failure", SaveFailure, dialog => ({ fileName: dialog.fileName, error: dialog.error, answer: dialog.answer })),
-    "settings-save-failure": define("settings-save-failure", SettingsSaveFailure, dialog => ({ error: dialog.error, answer: dialog.answer })),
+    "settings-save-failure": define("settings-save-failure", SettingsSaveFailure, dialog => ({ purpose: dialog.purpose, error: dialog.error, answer: dialog.answer })),
     "project-busy": define("project-busy", ProjectBusy, dialog => ({ operation: dialog.getOperation() })),
     "project-error": define("project-error", ProjectError, dialog => ({ error: dialog.error })),
     "media-import-error": define("media-import-error", MediaImportError, dialog => ({ failure: dialog.failure })),

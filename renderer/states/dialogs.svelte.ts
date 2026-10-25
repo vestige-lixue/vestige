@@ -61,6 +61,7 @@ type SaveFailureDialog = {
 
 type SettingsSaveFailureDialog = {
     kind: "settings-save-failure";
+    purpose: "close" | "quit";
     error: FailureInfo;
     answer: (choice: SettingsSaveChoice) => void;
 };

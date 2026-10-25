@@ -288,6 +288,11 @@
         "empty": "Your transcript will appear here."
     },
     "settings": {
+        "closeFailure": {
+            "title": "Settings could not be saved",
+            "description": "Your changes are active, but could not be written to disk: {{error}}\nYou can retry or close Settings. Unsaved changes will be checked again when you quit.",
+            "close": "Close Settings"
+        },
         "quitFailure": {
             "title": "Settings could not be saved",
             "description": "Your changes are active, but could not be written to disk: {{error}}",

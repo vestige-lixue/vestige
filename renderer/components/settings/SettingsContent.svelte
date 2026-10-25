@@ -395,6 +395,7 @@
         type ThemeColorKey, type ThemeScheme, type ThemeSettings
     } from "../../../shared/theme";
     import * as dialogsAPI from "../../states/dialogs";
+    import * as dialogs from "../../states/dialogs.svelte";
     import * as settingsAPI from "../../states/settings";
 
     let { dialogId, beforeClose = $bindable() }: { dialogId: string; beforeClose?: () => Promise<boolean> } = $props();
@@ -708,7 +709,21 @@
         if (pending) return false;
         pending = true;
         try {
-            return await commit();
+            // Quit commits drafts directly and owns its separate D2 confirmation.
+            while (await commit()) {
+                if (await settingsAPI.flushAccepted()) return true;
+                const error = settings.getError();
+                if (!error) return false;
+                const choice = await new Promise<dialogs.SettingsSaveChoice>(resolve => {
+                    dialogsAPI.show({
+                        kind: "settings-save-failure", purpose: "close", parentId: dialogId, error,
+                        answer: resolve, onClosed: () => resolve("cancel")
+                    });
+                });
+                if (choice === "discard") return true;
+                if (choice === "cancel") return false;
+            }
+            return false;
         }
         finally {
             pending = false;
