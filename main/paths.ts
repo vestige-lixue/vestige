@@ -9,7 +9,10 @@ export type AppPaths = Readonly<{
     resourcesDirectory: AbsolutePath;
     // Tools shipped with the application, separate from downloaded CUDA runtimes.
     runtimeDirectory: AbsolutePath;
+    // Verified CUDA runtimes hard-linked into backends; kept out of the backend root so it is never listed as a backend.
     runtimeCacheDirectory: AbsolutePath;
+    // Location used before 0.4.0, migrated at startup.
+    legacyRuntimeCacheDirectory: AbsolutePath;
     modelDirectory: AbsolutePath;
     backendDirectory: AbsolutePath;
     documentationDirectory: AbsolutePath;
@@ -39,7 +42,8 @@ export function createAppPaths(options: { packaged: boolean; appPath: string; re
         logsDirectory: parseAbsolutePath(join(dataDirectory, "logs")),
         resourcesDirectory,
         runtimeDirectory: parseAbsolutePath(join(resourcesDirectory, "bin")),
-        runtimeCacheDirectory: parseAbsolutePath(join(backendDirectory, ".runtimes")),
+        runtimeCacheDirectory: parseAbsolutePath(join(dataDirectory, "runtimes")),
+        legacyRuntimeCacheDirectory: parseAbsolutePath(join(backendDirectory, ".runtimes")),
         modelDirectory: parseAbsolutePath(join(dataDirectory, "models")),
         backendDirectory,
         documentationDirectory: dataDirectory,

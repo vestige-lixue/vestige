@@ -16,13 +16,14 @@ import { registerTaskOutputIPCs } from "./task/ipc";
 import { TaskAdmission } from "./task/admission";
 import { registerDocumentationIPCs } from "./documentation/ipc";
 import { registerDownloadIPCs } from "./downloads/ipc";
-import { cleanupDownloadOrphans } from "./downloads/cleanup";
+import { cleanupDownloadOrphans, pruneRuntimeCache } from "./downloads/cleanup";
 import { initializeDocumentation } from "./documentation/file";
 import { captureConsole, LogDirectory } from "./logging";
 import { createAppPaths } from "./paths";
 import { registerAppIPCs } from "./app";
 import { getWindowIcon, registerWindowBehavior } from "./ui/window";
 import { listen } from "./util/ipc";
+import { type FailureInfo } from "../shared/failure";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -62,7 +63,10 @@ function startApplication(): void {
     // Refresh the bundled documents once per application launch; all windows share this work.
     const documentationReady = initializeDocumentation(paths.documentationDirectory, paths.documentationSourceDirectory).catch(console.error);
     const taskAdmission = new TaskAdmission();
-    const downloadsReady = cleanupDownloadOrphans({ model: paths.modelDirectory, backend: paths.backendDirectory }, failure => console.warn("Download cleanup warning:", failure));
+    const reportCleanup = (failure: FailureInfo): void => console.warn("Download cleanup warning:", failure);
+    // Orphaned staging directories may hold links into the runtime cache, so remove them before pruning it.
+    const downloadsReady = cleanupDownloadOrphans({ model: paths.modelDirectory, backend: paths.backendDirectory }, reportCleanup)
+        .then(() => pruneRuntimeCache(paths.runtimeCacheDirectory, paths.legacyRuntimeCacheDirectory, reportCleanup));
     let startupReady = false;
 
     function createWindow(): void {
