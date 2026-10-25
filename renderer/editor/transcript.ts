@@ -254,6 +254,20 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 if (event.defaultPrevented || event.isComposing || view.composing || event.altKey || event.metaKey) return false;
                 const { selection, doc } = view.state;
                 const end = doc.content.size - 1;
+                if (event.key === "Home") {
+                    if (!event.ctrlKey && selection.head !== 1) {
+                        const start = view.coordsAtPos(1);
+                        const head = view.coordsAtPos(selection.head);
+                        // Use the active end of a selection when checking its visual line.
+                        if (head.top >= start.bottom || head.bottom <= start.top) return false;
+                    }
+                    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, event.shiftKey ? selection.anchor : 1, 1)).scrollIntoView());
+                    return true;
+                }
+                if (event.key === "ArrowLeft" && selection.empty && selection.head === 1) {
+                    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 1)).scrollIntoView());
+                    return true;
+                }
                 // Navigate directly to the text endpoint, before the browser crosses trailing widgets.
                 if (event.key === "End" && event.ctrlKey && !event.shiftKey) {
                     view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, end)).scrollIntoView());
