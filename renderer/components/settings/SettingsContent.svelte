@@ -90,7 +90,7 @@
         {@const color = themeValues[scheme][key]}
         {@const picker = pickers[`${scheme}-${key}`]}
         <div class="item">
-            <label class="text">
+            <label for={`theme-${scheme}-${key}`} class="text">
                 <div class="label">{i18n.t(`settings.theme.colors.${key}`)}</div>
             </label>
             <div class="themeColorControl">
