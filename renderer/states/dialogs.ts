@@ -9,10 +9,14 @@ export function show(descriptor: dialogs.DialogDescriptor): string {
     return id;
 }
 
+export function setOpen(id: string, open: boolean): void {
+    const dialog = dialogs.state.dialogs.find(dialog => dialog.id === id);
+    if (dialog) dialog.open = open;
+}
+
 export function close(id: string): void {
     // A request only: Modal keeps the content visible until its guard approves.
-    const dialog = dialogs.state.dialogs.find(dialog => dialog.id === id);
-    if (dialog) dialog.open = false;
+    setOpen(id, false);
 }
 
 // Wait for normal guard approval and final removal; rejection keeps the dialog

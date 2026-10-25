@@ -1,4 +1,4 @@
-<View {...presentation.props} bind:open={current.open} onClosed={closed} />
+<View {...presentation.props} bind:open={() => current.open, value => dialogsAPI.setOpen(current.id, value)} onClosed={closed} />
 
 <script lang="ts">
     import { setContext } from "svelte";

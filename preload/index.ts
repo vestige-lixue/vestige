@@ -7,6 +7,18 @@ import { taskOutputChannels, type TaskSnapshot } from "../shared/task";
 import { documentationChannels } from "../shared/documentation";
 import { downloadChannels } from "../shared/downloads";
 
+const taskSubscribers = new Map<string, Set<(snapshot: TaskSnapshot) => void>>();
+ipcRenderer.on(taskOutputChannels.changed, (_event: IpcRendererEvent, snapshot: TaskSnapshot) => {
+    for (const callback of [...taskSubscribers.get(snapshot.id) ?? []]) {
+        try {
+            callback(snapshot);
+        }
+        catch (error) {
+            console.error("Task output subscriber failed:", error);
+        }
+    }
+});
+
 const api: AppAPI = {
     platform: process.platform,
     ready: () => ipcRenderer.send(appChannels.ready),
@@ -71,11 +83,14 @@ const api: AppAPI = {
     taskOutput: {
         get: id => ipcRenderer.invoke(taskOutputChannels.get, id),
         subscribe(id, callback) {
-            const listener = (_event: IpcRendererEvent, snapshot: TaskSnapshot): void => {
-                if (snapshot.id === id) callback(snapshot);
+            const callbacks = taskSubscribers.get(id) ?? new Set<(snapshot: TaskSnapshot) => void>();
+            const listener = (snapshot: TaskSnapshot): void => callback(snapshot);
+            callbacks.add(listener);
+            taskSubscribers.set(id, callbacks);
+            return () => {
+                callbacks.delete(listener);
+                if (!callbacks.size && taskSubscribers.get(id) === callbacks) taskSubscribers.delete(id);
             };
-            ipcRenderer.on(taskOutputChannels.changed, listener);
-            return () => ipcRenderer.removeListener(taskOutputChannels.changed, listener);
         }
     },
     downloads: {
