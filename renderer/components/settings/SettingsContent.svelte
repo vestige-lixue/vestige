@@ -4,10 +4,10 @@
 {@render fields(generalFields)}
 
 <div class="item">
-    <label for="clear-logs" class="text">
+    <div id="clear-logs-label" class="text">
         <div class="label">{i18n.t("settings.general.clearLogs.label")}</div>
-    </label>
-    <TextButton id="clear-logs" disabled={pending || clearingLogs} onclick={() => void clearLogs()}>
+    </div>
+    <TextButton id="clear-logs" aria-labelledby="clear-logs-label" disabled={pending || clearingLogs} onclick={() => void clearLogs()}>
         {i18n.t("settings.general.clearLogs.label")}
     </TextButton>
 </div>
