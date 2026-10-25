@@ -5,6 +5,7 @@ import { type AbsolutePath } from "../../shared/util/path";
 import * as project from "./project.svelte";
 
 export const names = new SvelteMap<string, string>();
+export const items = new SvelteMap<string, ImportState>();
 
 export type ImportState = { id: string } & ({
     stage: "queued" | "path" | "reading" | "relocating" | "ready";
@@ -20,7 +21,7 @@ export type ImportIssue = Extract<ImportState, { stage: MediaIssueStatus }>;
 export type MediaImportFailure = { name: string | null; path: AbsolutePath | null; error: FailureInfo };
 
 export const state = $state({
-    items: [] as ImportState[],
+    ids: [] as string[],
     importFailures: [] as MediaImportFailure[],
     picking: false,
     collecting: false
@@ -30,12 +31,17 @@ export function isIssue(item: ImportState): item is ImportIssue {
     return item.stage === "missing" || item.stage === "changed" || item.stage === "unreadable";
 }
 
+export function createItem(id: string): ImportState {
+    const item = $state<ImportState>({ id, stage: "queued" });
+    return item;
+}
+
 export function getIds(): string[] {
-    return state.items.map(item => item.id);
+    return state.ids;
 }
 
 export function get(id: string): ImportState | null {
-    return state.items.find(item => item.id === id) ?? null;
+    return items.get(id) ?? null;
 }
 
 export function getName(id: string): string {
@@ -52,11 +58,11 @@ export function isSelectable(id: string): boolean {
 }
 
 export function getSelectableIds(): string[] {
-    return state.items.filter(item => isSelectable(item.id)).map(item => item.id);
+    return state.ids.filter(isSelectable);
 }
 
 export function getReadyIds(): string[] {
-    return state.items.filter(item => item.stage === "ready").map(item => item.id);
+    return state.ids.filter(isReady);
 }
 
 export function getImportFailures(): MediaImportFailure[] {
@@ -72,13 +78,17 @@ export function isCollecting(): boolean {
 }
 
 export function hasPendingImports(): boolean {
-    return isCollecting() || state.items.some(item => project.getMedia(item.id) === null);
+    return isCollecting() || state.ids.some(id => project.getMedia(id) === null);
 }
 
 export function getIssue(): ImportIssue | null {
-    return state.items.find((item): item is ImportIssue => isIssue(item) && !item.ignored) ?? null;
+    for (const id of state.ids) {
+        const item = items.get(id);
+        if (item && isIssue(item) && !item.ignored) return item;
+    }
+    return null;
 }
 
 export function isRelocating(): boolean {
-    return state.items.some(item => item.stage === "relocating");
+    return state.ids.some(id => items.get(id)?.stage === "relocating");
 }

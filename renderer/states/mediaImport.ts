@@ -129,8 +129,12 @@ export function endCollection(controller: AbortController): void {
 }
 
 function update(item: mediaImport.ImportState): void {
-    const index = mediaImport.state.items.findIndex(current => current.id === item.id);
-    if (index >= 0) mediaImport.state.items[index] = item;
+    const current = mediaImport.get(item.id);
+    if (!current) return;
+    for (const key of ["error", "path", "ignored"] as const) {
+        if (!(key in item)) Reflect.deleteProperty(current, key);
+    }
+    Object.assign(current, item);
 }
 
 function closeIssue(id: string): void {
@@ -164,14 +168,17 @@ export function reset(ids: string[]): void {
     issueDialogs.clear();
     failureDialogs.clear();
     mediaImport.state.importFailures = [];
-    mediaImport.state.items = ids.map(id => ({ id, stage: "queued" }));
+    mediaImport.items.clear();
+    for (const id of ids) mediaImport.items.set(id, mediaImport.createItem(id));
+    mediaImport.state.ids = [...ids];
     for (const id of ids) enqueue(id, { kind: "check", path: project.getMedia(id)!.path }, "");
 }
 
 export function add(sources: InputSource[]): void {
     for (const source of sources) {
         const id = crypto.randomUUID();
-        mediaImport.state.items.push({ id, stage: "queued" });
+        mediaImport.items.set(id, mediaImport.createItem(id));
+        mediaImport.state.ids.push(id);
         enqueue(id, { kind: "import", source }, typeof source === "string" ? getFileName(source) : source.name);
     }
 }
@@ -185,7 +192,7 @@ export function retry(id: string): void {
 export function relink(id: string): void {
     const item = mediaImport.get(id);
     if (!item || !mediaImport.isIssue(item)) return;
-    enqueue(id, { kind: "relink", previous: item }, "");
+    enqueue(id, { kind: "relink", previous: { ...item } }, "");
 }
 
 export function ignore(id: string): void {
@@ -211,16 +218,17 @@ export function remove(id: string): void {
     tasks.cancel(id);
     mediaImport.names.delete(id);
     closeIssue(id);
-    mediaImport.state.items = mediaImport.state.items.filter(item => item.id !== id);
+    mediaImport.items.delete(id);
+    mediaImport.state.ids = mediaImport.state.ids.filter(current => current !== id);
 }
 
 export function move(id: string, beforeId: string | null): boolean {
-    const items = mediaImport.state.items;
-    const from = items.findIndex(item => item.id === id);
-    const before = beforeId === null ? items.length : items.findIndex(item => item.id === beforeId);
+    const ids = mediaImport.state.ids;
+    const from = ids.indexOf(id);
+    const before = beforeId === null ? ids.length : ids.indexOf(beforeId);
     if (from < 0 || before < 0 || from === before || from + 1 === before) return false;
-    const [item] = items.splice(from, 1);
-    items.splice(before > from ? before - 1 : before, 0, item);
+    ids.splice(from, 1);
+    ids.splice(before > from ? before - 1 : before, 0, id);
     return true;
 }
 
