@@ -26,6 +26,7 @@
 
 
 <script lang="ts">
+    import { untrack } from "svelte";
     import TextButton from "../util/TextButton.svelte";
     import * as i18n from "../../i18n.svelte";
     import * as project from "../../states/project.svelte";
@@ -35,13 +36,14 @@
     import { describeFailure } from "../../failures";
     import TaskItem from "../util/TaskItem.svelte";
 
-    let { task, ref = $bindable(null), busy = $bindable(false), onStop, onRetry, onRemove }: {
+    let { task, ref = $bindable(null), busy = $bindable(false), onStop, onRetry, onRemove, onExpandableChange }: {
         task: transcription.TranscriptionTask;
         ref?: HTMLButtonElement | null;
         busy?: boolean;
         onStop: () => void;
         onRetry: () => void;
         onRemove: () => void;
+        onExpandableChange?: (expandable: boolean) => void;
     } = $props();
     const outputTaskId = $derived(task.status === "queued" ? null : task.id);
     const output = taskOutput.observe(() => outputTaskId);
@@ -52,5 +54,11 @@
 
     $effect(() => {
         busy = transcription.isPending(task);
+    });
+    $effect(() => {
+        // Main may still have this renderer-running task in its admission queue.
+        if (task.status === "running" && output.loading && !output.snapshot) return;
+        const expandable = displayStatus !== "queued";
+        untrack(() => onExpandableChange?.(expandable));
     });
 </script>
