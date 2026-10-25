@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 const root = await realpath(dirname(fileURLToPath(import.meta.url)));
-const names = ["ffmpeg", "aria2"];
+const names = ["ffmpeg", "aria2", "vad"];
 
 function options(args) {
     const result = { platform: process.platform, arch: process.arch, only: null, dryRun: false, help: false };
@@ -25,7 +25,7 @@ function options(args) {
         }
         else throw new Error(`Unknown argument: ${argument}`);
     }
-    if (result.only !== null && !names.includes(result.only)) throw new Error(`Unknown program package: ${result.only}`);
+    if (result.only !== null && !names.includes(result.only)) throw new Error(`Unknown resource package: ${result.only}`);
     return result;
 }
 
@@ -65,6 +65,18 @@ async function resolveDownloads(platform, arch, selected) {
     }
     const suffix = platform === "win32" ? ".exe" : "";
     return Promise.all(selected.map(async name => {
+        if (name === "vad") {
+            const repo = "snakers4/silero-vad", tag = "v6.2", assetName = "silero_vad.onnx";
+            return {
+                name, repo, tag, page: `https://github.com/${repo}/tree/${tag}`,
+                programs: [], resources: [assetName], licenseURL: null,
+                downloads: [{ asset: {
+                    name: assetName, size: 2327524,
+                    digest: "sha256:1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+                    browser_download_url: `https://raw.githubusercontent.com/${repo}/${tag}/src/silero_vad/data/${assetName}`
+                }, destination: assetName }]
+            };
+        }
         if (name === "aria2") {
             if (platform !== "win32" || arch !== "x64") {
                 throw new Error(`No verified aria2 archive is configured for ${platform}/${arch}. `
@@ -102,7 +114,7 @@ async function resolveDownloads(platform, arch, selected) {
             return packageFor(name, "BtbN/FFmpeg-Builds", info,
                 `ffmpeg-master-latest-${target}-lgpl-shared.${platform === "win32" ? "zip" : "tar.xz"}`, ["ffmpeg" + suffix, "ffprobe" + suffix]);
         }
-        throw new Error(`Unknown program package: ${name}`);
+        throw new Error(`Unknown resource package: ${name}`);
     }));
 }
 
@@ -190,13 +202,14 @@ async function prepare(item, work, platform, arch) {
             await copyFile(file, destination);
             notices++;
         }
-        if (!item.programs.includes(name) && !/\.(?:dll|dylib|so(?:\.[\d.]+)?|metallib)$/i.test(name)) continue;
+        const runtime = item.programs.includes(name) || /\.(?:dll|dylib|so(?:\.[\d.]+)?|metallib)$/i.test(name);
+        if (!runtime && !item.resources?.includes(name)) continue;
         if (copied.has(name)) throw new Error(`Duplicate runtime filename in ${item.name}: ${name}`);
         copied.add(name);
         await copyFile(file, join(target, name));
-        if (platform !== "win32") await chmod(join(target, name), 0o755);
+        if (platform !== "win32" && runtime) await chmod(join(target, name), 0o755);
     }
-    for (const name of item.programs) if (!copied.has(name)) throw new Error(`${item.name} does not contain ${name}.`);
+    for (const name of [...item.programs, ...(item.resources ?? [])]) if (!copied.has(name)) throw new Error(`${item.name} does not contain ${name}.`);
     if (["ffmpeg", "aria2"].includes(item.name) && platform === process.platform && arch === process.arch) {
         for (const name of item.programs) {
             await run(join(target, name), [item.name === "aria2" ? "--version" : "-version"], { windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 });
@@ -206,6 +219,11 @@ async function prepare(item, work, platform, arch) {
         const license = await request(item.licenseURL);
         await mkdir(join(target, "licenses"), { recursive: true });
         await writeFile(join(target, "licenses", "LICENSE.txt"), await license.text());
+        notices++;
+    }
+    if (item.name === "vad") {
+        // Keep the tracked notices when replacing the downloaded model directory.
+        for (const name of ["LICENSE", "README.md"]) await copyFile(join(root, item.name, name), join(target, name));
         notices++;
     }
     if (!notices) throw new Error(`No license or distribution notices found in ${item.name}.`);
@@ -252,9 +270,9 @@ async function replaceAll(work, selected) {
 async function main() {
     const settings = options(process.argv.slice(2));
     if (settings.help) {
-        console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|aria2] [--platform win32|linux|darwin] [--arch x64|arm64]\n"
-            + "Downloads media and download tools, shared libraries and licenses. Transcription backends are downloaded in the app.\n"
-            + "Replaces the selected program directories only after all selected packages are ready; defaults to both. aria2's verified archive is Windows x64 only.");
+        console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|aria2|vad] [--platform win32|linux|darwin] [--arch x64|arm64]\n"
+            + "Downloads media and download tools, the VAD model, shared libraries and licenses. Transcription backends are downloaded in the app.\n"
+            + "Replaces the selected package directories only after all selected packages are ready; defaults to all three. aria2's verified archive is Windows x64 only.");
         return;
     }
     const selected = settings.only === null ? names : [settings.only];
@@ -270,7 +288,7 @@ async function main() {
         for (const item of packages) await prepare(item, work, settings.platform, settings.arch);
         await replaceAll(work, selected);
         installed = true;
-        console.log(`Installed native programs for ${settings.platform}/${settings.arch}.`);
+        console.log(`Installed bundled resources for ${settings.platform}/${settings.arch}.`);
     }
     finally {
         inside(root, work);
@@ -278,7 +296,7 @@ async function main() {
             if (error.code === "ENOENT") return [];
             throw error;
         });
-        if (!installed && backups.length) console.error(`Previous programs are preserved for recovery in ${join(work, "previous")}.`);
+        if (!installed && backups.length) console.error(`Previous packages are preserved for recovery in ${join(work, "previous")}.`);
         else await rm(work, { recursive: true, force: true });
     }
 }

@@ -44,7 +44,7 @@ export function createAppPaths(options: { packaged: boolean; appPath: string; re
         backendDirectory,
         documentationDirectory: dataDirectory,
         documentationSourceDirectory: parseAbsolutePath(join(resourcesDirectory, "docs")),
-        vadModelPath: parseAbsolutePath(join(resourcesDirectory, "vad", "silero_vad.onnx")),
+        vadModelPath: parseAbsolutePath(join(resourcesDirectory, "bin", "vad", "silero_vad.onnx")),
         temporaryDirectory: parseAbsolutePath(join(options.temporaryPath, "vestige-transcription"))
     });
 }

@@ -15,6 +15,10 @@ node_modules
 /resources/bin/*
 !/resources/bin/README.md
 !/resources/bin/download.mjs
+!/resources/bin/vad/
+/resources/bin/vad/*
+!/resources/bin/vad/LICENSE
+!/resources/bin/vad/README.md
 /resources/models/*
 !/resources/models/README.md
 CLAUDE.md

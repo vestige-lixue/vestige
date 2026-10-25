@@ -2,6 +2,8 @@
 
 Silero VAD v6.2, the official unquantized ONNX model, is bundled as a fixed audio preprocessing resource. It runs on CPU through the selected backend's official `sherpa-onnx-vad` executable. Sherpa executables and native runtime libraries remain downloadable backend components.
 
+Run `node resources/bin/download.mjs --only vad` from the repository root to prepare the model before development or packaging. The default downloader run also includes VAD. The model and generated `download.json` are ignored by Git; this document and the license remain tracked and are preserved during downloads.
+
 - Model: https://raw.githubusercontent.com/snakers4/silero-vad/v6.2/src/silero_vad/data/silero_vad.onnx
 - Model SHA-256: `1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3`
 - License: MIT, https://github.com/snakers4/silero-vad/blob/v6.2/LICENSE
