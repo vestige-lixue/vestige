@@ -184,7 +184,8 @@
             pauseAudio: () => {
                 if (pipeline) playbackAudio.pause(pipeline);
             },
-            drainSeconds: () => pipeline ? (pipeline.processor ? pipeline.lookaheadFrames / pipeline.context.sampleRate : 0) + pipeline.context.baseLatency + (pipeline.context.outputLatency || 0) : 0,
+            drainSeconds: () => pipeline ? playbackAudio.getDrainSeconds(pipeline) : 0,
+            audioTime: pipeline ? () => pipeline.context.currentTime : undefined,
             onTime: (time, remember) => {
                 if (current()) projectAPI.observePlaybackTime(id, time, remember);
             },
@@ -233,9 +234,14 @@
 
     $effect(() => {
         const controller = transport;
+        const pipeline = audio;
         const speed = player.getSpeed();
         const offset = settings.getPlayback().audioOffsetMs;
-        if (controller) untrack(() => playbackTransport.configure(controller, speed, offset));
+        untrack(() => {
+            if (pipeline) playbackAudio.setOffset(pipeline, offset);
+            // Positive offsets already delay the output; visual time follows the undelayed taps.
+            if (controller) playbackTransport.configure(controller, speed, pipeline ? Math.min(0, offset) : offset);
+        });
     });
 
     $effect(() => {

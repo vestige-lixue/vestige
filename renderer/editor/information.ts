@@ -11,22 +11,23 @@ import { firstTrue } from "../../shared/util/search";
 export { type InspectionInformation } from "./informationModel";
 export { type TranscriptInspection } from "./interaction";
 export type InspectionOptions = InspectionCallbacks & { duration: number };
-type PlaybackGap = { start: number; end: number; key: string };
+type PlaybackEvent = { start: number; end: number; key: string };
 
 export function informationPlugin(index: TextIndex, projectionOf: (state: EditorState) => TextProjection, playbackOf: (state: EditorState) => number, options: InspectionOptions): Plugin {
     function build(doc: PMNode, projection: TextProjection): {
         byKey: Map<string, InspectionInformation>;
         decorations: DecorationSet;
-        gaps: PlaybackGap[];
+        events: PlaybackEvent[];
+        latestEnd: number[];
     } {
         const groups = groupTranscriptEvents(transcriptEvents(index, projection, options.duration));
         const byKey = new Map<string, InspectionInformation>();
-        const gaps: PlaybackGap[] = [];
+        const events: PlaybackEvent[] = [];
         const decorations = [...groups].map(([position, information]) => {
             byKey.set(information.key, information);
             const items = information.kind === "events" ? information.items : [information];
             for (const item of items) {
-                if (item.kind === "gap" && item.range) gaps.push({ ...item.range, key: information.key });
+                if (item.range) events.push({ ...item.range, key: information.key });
             }
             // Keep the default end-of-document caret inside the last text node.
             const side = position === doc.firstChild!.content.size ? 1 : -1;
@@ -64,7 +65,10 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 return anchor;
             }, { key, side, relaxedSide: true, marks: [], ignoreSelection: true, stopEvent: () => true });
         });
-        return { byKey, decorations: DecorationSet.create(doc, decorations), gaps: gaps.sort((left, right) => left.start - right.start) };
+        events.sort((left, right) => left.start - right.start);
+        const latestEnd: number[] = [];
+        for (const event of events) latestEnd.push(Math.max(latestEnd.at(-1) ?? -Infinity, event.end));
+        return { byKey, decorations: DecorationSet.create(doc, decorations), events, latestEnd };
     }
     const cache = new WeakMap<TextProjection, ReturnType<typeof build>>();
     function informationOf(state: EditorState): ReturnType<typeof build> {
@@ -84,20 +88,31 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
         },
         props: { decorations: state => plugin.getState(state) ?? DecorationSet.empty },
         view(view) {
-            let currentKey: string | null = null;
-            let current: SVGElement | null = null;
+            const current = new Map<string, SVGElement>();
             function updatePlayback(): void {
                 if (compositionPending(view.state)) return;
                 const time = playbackOf(view.state);
-                const { gaps } = informationOf(view.state);
-                const gap = gaps[firstTrue(gaps.length, index => gaps[index].start > time) - 1];
-                const key = gap && time < gap.end ? gap.key : null;
-                if (key === currentKey && (!key || current?.isConnected)) return;
-                current?.classList.remove("current");
-                currentKey = key;
+                const { events, latestEnd } = informationOf(view.state);
+                const keys = new Set<string>();
+                const first = firstTrue(events.length, index => events[index].start > time);
+                // Separate deletions can share token times; grouped events can share one marker.
+                for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
+                    if (time < events[i].end) keys.add(events[i].key);
+                }
+                for (const [key, shape] of current) {
+                    if (keys.has(key) && shape.isConnected) continue;
+                    shape.classList.remove("current");
+                    current.delete(key);
+                }
                 // Keep the focusable widget intact; playback outlines only its inner shape.
-                current = key ? view.dom.querySelector<SVGElement>(`[data-inspection="${CSS.escape(key)}"] .transcript-event-shape`) : null;
-                current?.classList.add("current");
+                for (const key of keys) {
+                    if (current.has(key)) continue;
+                    const shape = view.dom.querySelector<SVGElement>(`[data-inspection="${CSS.escape(key)}"] .transcript-event-shape`);
+                    if (shape) {
+                        shape.classList.add("current");
+                        current.set(key, shape);
+                    }
+                }
             }
             updatePlayback();
             const geometry = inspectionGeometry(view, index, projectionOf, () => informationOf(view.state).byKey);

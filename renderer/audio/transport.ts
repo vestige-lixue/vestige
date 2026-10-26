@@ -23,6 +23,7 @@ export type Transport = {
         resumeAudio: () => Promise<void>;
         pauseAudio: () => void;
         drainSeconds: () => number;
+        audioTime?: () => number;
         onTime: (time: number, remember: boolean) => void;
         onEnded: () => void;
         onInterruption: () => void;
@@ -167,6 +168,11 @@ function duration(transport: Transport): number {
     return Number.isFinite(transport.audio.duration) ? transport.audio.duration : transport.options.duration;
 }
 
+function clock(transport: Transport): number {
+    // Virtual lead/tail playback must advance with the samples being processed.
+    return transport.options.audioTime ? transport.options.audioTime() * 1000 : performance.now();
+}
+
 function pauseElement(transport: Transport, element: HTMLMediaElement): void {
     if (!element.paused) transport.expectedPauses.set(element, (transport.expectedPauses.get(element) ?? 0) + 1);
     element.pause();
@@ -176,7 +182,7 @@ export function getTime(transport: Transport): number {
     const { run, speed } = transport;
     if (run && !transport.seeking) {
         const time = run.kind === "audio" ? transport.audio.currentTime + transport.offset * speed
-            : run.position + (performance.now() - run.at) / 1000 * speed;
+            : run.position + (clock(transport) - run.at) / 1000 * speed;
         transport.position = Math.min(duration(transport), Math.max(transport.floor, time));
     }
     return transport.position;
@@ -195,7 +201,7 @@ function clearRun(transport: Transport): void {
 function freeze(transport: Transport): void {
     getTime(transport);
     if (transport.run?.kind === "tail") {
-        const elapsed = (performance.now() - transport.run.at) / 1000;
+        const elapsed = (clock(transport) - transport.run.at) / 1000;
         transport.tailPosition = transport.run.position + elapsed * transport.speed;
         transport.tailSeconds = Math.max(0, transport.run.seconds - elapsed);
     }
@@ -219,7 +225,7 @@ export function configure(transport: Transport, speed: number, offsetMs: number)
     const offset = offsetMs / 1000;
     if (transport.disposed || (transport.speed === speed && transport.offset === offset)) return;
     getTime(transport);
-    const now = performance.now();
+    const now = clock(transport);
     const run = transport.run;
     const elapsed = run && run.kind !== "audio" ? (now - run.at) / 1000 : 0;
     const position = run && run.kind !== "audio" ? run.position + elapsed * transport.speed : transport.position;
@@ -292,7 +298,7 @@ function begin(transport: Transport): void {
         else {
             const ahead = transport.audio.currentTime + transport.offset * transport.speed - transport.position;
             if (transport.audio.paused && ahead > 0.001) {
-                transport.run = { kind: "lead", at: performance.now(), position: transport.position, seconds: ahead / transport.speed };
+                transport.run = { kind: "lead", at: clock(transport), position: transport.position, seconds: ahead / transport.speed };
             }
             else await startAudio(transport);
         }
@@ -314,7 +320,7 @@ function startTail(transport: Transport): void {
     if (transport.run?.kind === "tail" || !transport.playing) return;
     const position = transport.tailPosition ?? transport.audio.currentTime + transport.offset * transport.speed;
     const seconds = Math.max(0, (duration(transport) - position) / transport.speed, transport.tailSeconds || transport.options.drainSeconds());
-    transport.run = { kind: "tail", at: performance.now(), position, seconds };
+    transport.run = { kind: "tail", at: clock(transport), position, seconds };
 }
 
 function publish(transport: Transport, remember = false): void {
@@ -325,7 +331,7 @@ function update(transport: Transport): void {
     if (transport.disposed || !transport.playing) return;
     getTime(transport);
     const { run } = transport;
-    if (run && run.kind !== "audio" && (performance.now() - run.at) / 1000 >= run.seconds) {
+    if (run && run.kind !== "audio" && (clock(transport) - run.at) / 1000 >= run.seconds) {
         if (run.kind === "lead") {
             const generation = transport.generation;
             void startAudio(transport).catch(() => {
@@ -362,7 +368,7 @@ function synchronizeVideo(transport: Transport): void {
     const position = getTime(transport);
     const advancing = run.kind === "audio"
         ? !transport.audio.paused && !transport.waiting && transport.audio.currentTime + transport.offset * speed >= transport.floor
-        : run.position + (performance.now() - run.at) / 1000 * speed >= transport.floor;
+        : run.position + (clock(transport) - run.at) / 1000 * speed >= transport.floor;
     if (!advancing || position >= duration(transport)) {
         pauseElement(transport, video);
         if (isSettled(videoSeek) && Math.abs(video.currentTime - position) > 0.03) requestSeek(videoSeek, position, "commit");

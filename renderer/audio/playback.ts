@@ -3,6 +3,7 @@ import meterURL from "./levelMeter.worklet.js?url&no-inline";
 import { readLevels, silenceLevels, type AudioLevels, type LevelMessage } from "./levels";
 import { type VolumeStabilizationSettings } from "../../shared/settings/Settings";
 import { defaultSettings } from "../../shared/settings/defaults";
+import { minAudioOffsetMs, maxAudioOffsetMs } from "../../shared/constants";
 
 export type PlaybackAudio = {
     readonly element: HTMLMediaElement;
@@ -10,7 +11,7 @@ export type PlaybackAudio = {
     readonly lookaheadFrames: number;
     readonly source: MediaElementAudioSourceNode;
     readonly master: GainNode;
-    readonly meterSource: DelayNode;
+    readonly monitor: GainNode;
     readonly initialized: Promise<void>;
     readonly onFailure: (error: unknown) => void;
     readonly onLevels: (levels: AudioLevels | null) => void;
@@ -18,6 +19,9 @@ export type PlaybackAudio = {
     readonly resetListener: () => void;
     readonly stateListener: () => void;
     processor: AudioWorkletNode | null;
+    output: DelayNode;
+    offset: number;
+    meterTaps: { source: AudioNode; delay: DelayNode }[];
     meter: AudioWorkletNode | null;
     meterGeneration: number;
     levels: AudioLevels | null;
@@ -34,8 +38,10 @@ export type PlaybackAudio = {
 export function create(element: HTMLMediaElement, volume: number, enabled: boolean, onFailure: (error: unknown) => void, settings: VolumeStabilizationSettings = defaultSettings.volumeStabilization, onLevels: (levels: AudioLevels | null) => void = () => {}, onInterruption: () => void = () => {}): PlaybackAudio {
     const context = new AudioContext({ latencyHint: "interactive", sampleRate: 48000 });
     const master = context.createGain();
-    master.gain.value = volume;
-    master.connect(context.destination);
+    const monitor = context.createGain();
+    const output = context.createDelay(maxAudioOffsetMs / 1000);
+    master.gain.value = monitor.gain.value = volume;
+    output.connect(master).connect(context.destination);
     let source: MediaElementAudioSourceNode;
     try {
         source = context.createMediaElementSource(element);
@@ -44,14 +50,15 @@ export function create(element: HTMLMediaElement, volume: number, enabled: boole
         void context.close();
         throw error;
     }
-    source.connect(master);
+    source.connect(output);
+    source.connect(monitor);
     element.volume = 1;
     const suspension = context.suspend().catch(console.error);
 
     const audio: PlaybackAudio = {
-        element, context, source, master, enabled, settings, onFailure, onLevels, onInterruption, suspension,
+        element, context, source, master, monitor, enabled, settings, onFailure, onLevels, onInterruption, suspension,
         lookaheadFrames: Math.max(1, Math.round(context.sampleRate * 0.005)),
-        meterSource: context.createDelay(), meter: null, meterGeneration: 0, levels: null,
+        output, offset: 0, meterTaps: [], meter: null, meterGeneration: 0, levels: null,
         processor: null, disposed: false, playing: false, running: false, playVersion: 0, failed: false,
         resetListener: () => reset(audio),
         stateListener: () => observeState(audio),
@@ -62,7 +69,8 @@ export function create(element: HTMLMediaElement, volume: number, enabled: boole
             });
             audio.processor.onprocessorerror = () => fail(audio, new Error("The volume stabilization processor failed."));
             source.disconnect();
-            source.connect(audio.processor).connect(master);
+            source.connect(audio.processor).connect(audio.output);
+            audio.processor.connect(monitor);
         }).catch(error => fail(audio, error)).then(async () => {
             if (audio.disposed) return;
             await context.audioWorklet.addModule(meterURL);
@@ -104,11 +112,13 @@ function observeState(audio: PlaybackAudio): void {
 function fail(audio: PlaybackAudio, error: unknown): void {
     if (audio.disposed || audio.failed) return;
     audio.failed = true;
+    disconnectMeter(audio);
     audio.source.disconnect();
     audio.processor?.disconnect();
     audio.processor?.port.close();
     audio.processor = null;
-    audio.source.connect(audio.master);
+    audio.source.connect(audio.output);
+    audio.source.connect(audio.monitor);
     connectMeter(audio);
     resetMeter(audio, 0);
     audio.onFailure(error);
@@ -116,22 +126,31 @@ function fail(audio: PlaybackAudio, error: unknown): void {
 
 function connectMeter(audio: PlaybackAudio): void {
     if (!audio.meter) return;
-    // Align source measurements with the stabilizer's lookahead, only in the meter branch.
-    audio.meterSource.delayTime.value = audio.processor ? audio.lookaheadFrames / audio.context.sampleRate : 0;
-    audio.source.connect(audio.meterSource).connect(audio.meter, 0, 0);
-    (audio.processor ?? audio.source).connect(audio.meter, 0, 1);
-    audio.master.connect(audio.meter, 0, 2);
-    // The meter emits silence; playback still reaches the destination directly from master.
+    disconnectMeter(audio);
+    const lookahead = audio.processor ? audio.lookaheadFrames / audio.context.sampleRate : 0;
+    // All taps share the visual delay, including the samples used for clip detection.
+    audio.meterTaps = [audio.source, audio.processor ?? audio.source, audio.monitor].map((source, index) => {
+        const delay = audio.context.createDelay(-minAudioOffsetMs / 1000 + audio.lookaheadFrames / audio.context.sampleRate);
+        delay.delayTime.value = Math.max(0, -audio.offset) + (index === 0 ? lookahead : 0);
+        source.connect(delay).connect(audio.meter!, 0, index);
+        return { source, delay };
+    });
+    // The meter emits silence; only the output branch supplies audible samples.
     audio.meter.connect(audio.context.destination);
+}
+
+function disconnectMeter(audio: PlaybackAudio): void {
+    for (const tap of audio.meterTaps) {
+        tap.source.disconnect(tap.delay);
+        tap.delay.disconnect();
+    }
+    audio.meterTaps = [];
 }
 
 function failMeter(audio: PlaybackAudio, error: unknown): void {
     if (audio.disposed) return;
     if (audio.meter) {
-        audio.source.disconnect(audio.meterSource);
-        audio.meterSource.disconnect();
-        (audio.processor ?? audio.source).disconnect(audio.meter);
-        audio.master.disconnect(audio.meter);
+        disconnectMeter(audio);
         audio.meter.disconnect();
         audio.meter.port.close();
         audio.meter = null;
@@ -175,8 +194,30 @@ export function pause(audio: PlaybackAudio): void {
 export function setVolume(audio: PlaybackAudio, volume: number): void {
     if (audio.disposed) return;
     const time = audio.context.currentTime;
-    audio.master.gain.cancelAndHoldAtTime(time);
-    audio.master.gain.setTargetAtTime(volume, time, 0.015);
+    // Keep volume controls immediate even while sound is buffered for a positive offset.
+    // The monitor tap mirrors that gain before the buffer to follow visual time.
+    for (const node of [audio.master, audio.monitor]) {
+        node.gain.cancelAndHoldAtTime(time);
+        node.gain.setTargetAtTime(volume, time, 0.015);
+    }
+}
+
+export function setOffset(audio: PlaybackAudio, offsetMs: number): void {
+    const offset = offsetMs / 1000;
+    if (audio.disposed || audio.offset === offset) return;
+    audio.offset = offset;
+    // Positive offsets need future measurements, so delay sound after the meter taps.
+    // Negative offsets delay the taps instead. Both delays are wall-clock seconds.
+    audio.output.delayTime.value = Math.max(0, offset);
+    connectMeter(audio);
+    resetMeter(audio, 0);
+}
+
+export function getDrainSeconds(audio: PlaybackAudio): number {
+    const lookahead = audio.processor ? audio.lookaheadFrames / audio.context.sampleRate : 0;
+    // Allow the meter's last reporting window, including its final render quantum.
+    const meter = audio.meter ? Math.max(0, -audio.offset) + 1 / 30 + 128 / audio.context.sampleRate : 0;
+    return Math.max(0, audio.offset, meter) + lookahead + audio.context.baseLatency + (audio.context.outputLatency || 0);
 }
 
 export function setEnabled(audio: PlaybackAudio, enabled: boolean): void {
@@ -195,8 +236,16 @@ export function setSettings(audio: PlaybackAudio, settings: VolumeStabilizationS
 export function reset(audio: PlaybackAudio): void {
     if (audio.disposed) return;
     audio.processor?.port.postMessage({ type: "reset" });
-    // The source delay still holds pre-seek samples while the processor clears its buffer.
-    resetMeter(audio, audio.processor ? audio.lookaheadFrames : 0);
+    // Replacing delay nodes discards pre-seek samples in both audible and visual tails.
+    if (audio.offset > 0) {
+        (audio.processor ?? audio.source).disconnect(audio.output);
+        audio.output.disconnect();
+        audio.output = audio.context.createDelay(maxAudioOffsetMs / 1000);
+        audio.output.delayTime.value = audio.offset;
+        (audio.processor ?? audio.source).connect(audio.output).connect(audio.master);
+    }
+    connectMeter(audio);
+    resetMeter(audio, 0);
 }
 
 export function dispose(audio: PlaybackAudio): void {
@@ -205,15 +254,17 @@ export function dispose(audio: PlaybackAudio): void {
     audio.playing = false;
     audio.element.removeEventListener("seeked", audio.resetListener);
     audio.context.removeEventListener("statechange", audio.stateListener);
+    disconnectMeter(audio);
     audio.source.disconnect();
     audio.processor?.disconnect();
     audio.processor?.port.close();
     audio.processor = null;
-    audio.meterSource.disconnect();
     audio.meter?.disconnect();
     audio.meter?.port.close();
     audio.meter = null;
     audio.master.disconnect();
+    audio.monitor.disconnect();
+    audio.output.disconnect();
     audio.onLevels(null);
     void audio.context.close();
 }
