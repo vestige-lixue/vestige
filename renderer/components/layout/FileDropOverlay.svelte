@@ -108,6 +108,7 @@
     });
 
     async function collectEntry(entry: FileSystemEntry, files: File[], failures: mediaImport.MediaImportFailure[], signal: AbortSignal): Promise<void> {
+        await mediaImportAPI.waitForResume(signal);
         if (signal.aborted) return;
         try {
             if (entry.isFile) {
@@ -155,6 +156,7 @@
                 else if (item.file) files.push(item.file);
                 else failures.push({ name: null, path: null, error: { kind: "drop-unreadable", entry: "file", diagnostic: null } });
             }
+            await mediaImportAPI.waitForResume(current.signal);
             if (current.signal.aborted) return;
             projectAPI.importMedia(files);
             for (const failure of failures) mediaImportAPI.reportImportFailure(failure);

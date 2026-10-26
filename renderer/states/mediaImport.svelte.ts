@@ -31,8 +31,9 @@ export function isIssue(item: ImportState): item is ImportIssue {
     return item.stage === "missing" || item.stage === "changed" || item.stage === "unreadable";
 }
 
-export function createItem(id: string): ImportState {
-    const item = $state<ImportState>({ id, stage: "queued" });
+// Entries are replaced per key on stage changes; only fields like `ignored` change in place.
+export function createItem(value: ImportState): ImportState {
+    const item = $state(value);
     return item;
 }
 

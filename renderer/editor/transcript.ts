@@ -1,7 +1,8 @@
 import { Editor, Extension, Mark, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type Mark as PMMark, type Schema } from "@tiptap/pm/model";
-import { Plugin, PluginKey, TextSelection, type Transaction, type EditorState } from "@tiptap/pm/state";
+import { Plugin, PluginKey, type Transaction, type EditorState } from "@tiptap/pm/state";
 import { compositionPlugin, compositionActive, compositionCommit } from "./composition";
+import { caretPlugin } from "./caret";
 import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep } from "./projectionStep";
 import { history, undo, redo } from "@tiptap/pm/history";
@@ -11,7 +12,7 @@ import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
 import { informationPlugin, type InspectionOptions } from "./information";
 import {
-    createTextIndex, projectText, editText, textPieces, sourceTextPieces, projectionOffset,
+    createTextIndex, projectText, editText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
     type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
@@ -192,12 +193,15 @@ function synchronizeMarks(index: TextIndex, transaction: Transaction, projection
     }
 }
 
-function dirtyRanges(previous: DirtyRange[], transaction: Transaction): DirtyRange[] {
-    const ranges = previous.map(range => ({ from: transaction.mapping.map(range.from, -1), to: transaction.mapping.map(range.to, 1) }));
-    transaction.mapping.maps.forEach((map, index) => {
-        const after = transaction.mapping.slice(index + 1);
+function dirtyRanges(index: TextIndex, previous: BridgeState, projection: TextProjection, transaction: Transaction): DirtyRange[] {
+    const ranges = previous.dirty.map(range => ({ from: transaction.mapping.map(range.from, -1), to: transaction.mapping.map(range.to, 1) }));
+    transaction.mapping.maps.forEach((map, step) => {
+        const after = transaction.mapping.slice(step + 1);
         map.forEach((_from, _to, from, to) => ranges.push({ from: after.map(from, -1), to: after.map(to, 1) }));
     });
+    // Normalization can change the provenance of untouched neighbors, e.g. D18 restoring earlier typed text.
+    const change = projection === previous.projection ? null : provenanceChange(index, previous.projection, projection);
+    if (change) ranges.push({ from: projectionOffset(projection, change.from, true) + 1, to: projectionOffset(projection, change.to, true) + 1 });
     const merged: DirtyRange[] = [];
     const end = transaction.doc.content.size - 1;
     for (const range of ranges.sort((left, right) => left.from - right.from)) {
@@ -230,7 +234,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 return {
                     projection,
                     saved: snapshot ? projection : previous.saved,
-                    dirty: transaction.getMeta(bridgeKey) === true ? [] : dirtyRanges(previous.dirty, transaction)
+                    dirty: transaction.getMeta(bridgeKey) === true ? [] : dirtyRanges(index, previous, projection, transaction)
                 };
             }
         },
@@ -250,35 +254,6 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             return transaction.steps.length || dirty.length ? transaction : null;
         },
         props: {
-            handleKeyDown(view, event) {
-                if (event.defaultPrevented || event.isComposing || view.composing || event.altKey || event.metaKey) return false;
-                const { selection, doc } = view.state;
-                const end = doc.content.size - 1;
-                if (event.key === "Home") {
-                    if (!event.ctrlKey && selection.head !== 1) {
-                        const start = view.coordsAtPos(1);
-                        const head = view.coordsAtPos(selection.head);
-                        // Use the active end of a selection when checking its visual line.
-                        if (head.top >= start.bottom || head.bottom <= start.top) return false;
-                    }
-                    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, event.shiftKey ? selection.anchor : 1, 1)).scrollIntoView());
-                    return true;
-                }
-                if (event.key === "ArrowLeft" && selection.empty && selection.head === 1) {
-                    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, 1)).scrollIntoView());
-                    return true;
-                }
-                // Navigate directly to the text endpoint, before the browser crosses trailing widgets.
-                if (event.key === "End" && event.ctrlKey && !event.shiftKey) {
-                    view.dispatch(view.state.tr.setSelection(TextSelection.create(doc, end)).scrollIntoView());
-                    return true;
-                }
-                if (!selection.empty || selection.head !== end) return false;
-                if (event.key !== "End" && (event.key !== "ArrowRight" || !view.endOfTextblock("right"))) return false;
-                // Do not let a no-op navigation move the DOM caret across trailing widgets.
-                view.dispatch(view.state.tr.scrollIntoView());
-                return true;
-            },
             clipboardTextParser(text, $context) {
                 return plainSlice($context.doc.type.schema, text);
             },
@@ -350,7 +325,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             }
         }
     });
-    return [compositionPlugin(), bridge, playback, history()];
+    return [compositionPlugin(), bridge, caretPlugin(), playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {
@@ -395,7 +370,7 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
             onChange(next);
         }
     });
-    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, inspection));
+    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state) ?? -1, inspection));
     editors.set(editor.view.dom, editor);
     return editor;
 }

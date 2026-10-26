@@ -24,7 +24,7 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
 } | {
     kind: "media-not-file" | "media-size-changed" | "media-hash-changed" | "media-changed-during-read"
         | "media-missing" | "media-cancelled" | "media-source-invalidated" | "media-invalid-info"
-        | "media-no-streams" | "media-no-duration" | "media-timeout" | "media-format"
+        | "media-no-audio" | "media-no-duration" | "media-timeout" | "media-format"
         | "media-invalid-reference" | "media-invalid-check-id" | "media-invalid-concurrency" | "media-invalid-import"
         | "transcription-media-unavailable" | "transcription-cancelled" | "transcription-invalid-request"
         | "transcription-invalid-id" | "transcription-params-object"

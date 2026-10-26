@@ -244,8 +244,8 @@ function sameModification(left: Modification, right: Modification): boolean {
             && left.range.start.offset === right.range.start.offset && left.range.end.segmentIdx === right.range.end.segmentIdx && left.range.end.offset === right.range.end.offset;
 }
 
-function updateTree(index: TextIndex, projection: TextProjection, modifications: Modification[]): PieceTree | null {
-    const previous = projection.modifications;
+// Source window whose pieces may differ between two normalized modification lists; pieces outside it are shared.
+function changedWindow(index: TextIndex, previous: readonly Modification[], modifications: readonly Modification[]): [number, number] | null {
     let first = 0;
     while (first < previous.length && first < modifications.length && sameModification(previous[first], modifications[first])) first++;
     let oldEnd = previous.length;
@@ -254,7 +254,7 @@ function updateTree(index: TextIndex, projection: TextProjection, modifications:
         oldEnd--; newEnd--;
     }
     const changed = [...previous.slice(first, oldEnd), ...modifications.slice(first, newEnd)];
-    if (!changed.length) return projection.tree;
+    if (!changed.length) return null;
     let from = Math.min(...changed.map(modification => modificationStart(index, modification)));
     let to = Math.max(...changed.map(modification => modificationEnd(index, modification)));
     // Boundary insertions belong to their deletion anchor, including its end. Keep that unit whole.
@@ -272,9 +272,25 @@ function updateTree(index: TextIndex, projection: TextProjection, modifications:
             }
         }
     }
-    const [left] = splitPieces(projection.tree, from, false);
-    const [, right] = splitPieces(projection.tree, to, true);
-    return concatPieces(concatPieces(left, sourceWindow(index, modifications, from, to)), right);
+    return [from, to];
+}
+
+function updateTree(index: TextIndex, projection: TextProjection, modifications: Modification[]): PieceTree | null {
+    const window = changedWindow(index, projection.modifications, modifications);
+    if (!window) return projection.tree;
+    const [left] = splitPieces(projection.tree, window[0], false);
+    const [, right] = splitPieces(projection.tree, window[1], true);
+    return concatPieces(concatPieces(left, sourceWindow(index, modifications, window[0], window[1])), right);
+}
+
+// Displayed codepoint range of `after` outside which both projections have identical text and provenance.
+// D18 can restore characters typed by earlier edits, so this may extend beyond the edited range.
+export function provenanceChange(index: TextIndex, before: TextProjection, after: TextProjection): { from: number; to: number } | null {
+    const window = changedWindow(index, before.modifications, after.modifications);
+    if (!window) return null;
+    const [left] = splitPieces(after.tree, window[0], false);
+    const [, right] = splitPieces(after.tree, window[1], true);
+    return { from: left?.length ?? 0, to: after.length - (right?.length ?? 0) };
 }
 
 // from/to address displayed codepoints. Only removed original characters create new source deletions.

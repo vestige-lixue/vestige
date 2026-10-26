@@ -4,10 +4,10 @@
         onClosed();
     }
 }}>
-    <Dialog.Title class="modal-title">{i18n.t(`settings.${purpose === "quit" ? "quitFailure" : "closeFailure"}.title`)}</Dialog.Title>
-    <Dialog.Description class="modal-description">{i18n.t(`settings.${purpose === "quit" ? "quitFailure" : "closeFailure"}.description`, { error: describeFailure(error) })}</Dialog.Description>
+    <Dialog.Title class="modal-title">{i18n.t(`${messages}.title`)}</Dialog.Title>
+    <Dialog.Description class="modal-description">{i18n.t(`${messages}.description`, { error: describeFailure(error) })}</Dialog.Description>
     {#snippet actions()}
-        <TextButton onclick={() => choose("discard")}>{i18n.t(purpose === "quit" ? "settings.quitFailure.discard" : "settings.closeFailure.close")}</TextButton>
+        <TextButton onclick={() => choose("continue")}>{i18n.t(`${messages}.continue`)}</TextButton>
         {#if purpose === "quit"}<TextButton onclick={() => choose("cancel")}>{i18n.t("settings.quitFailure.cancel")}</TextButton>{/if}
         <TextButton class="primary" onclick={() => choose("retry")}>{i18n.t("common.retry")}</TextButton>
     {/snippet}
@@ -29,6 +29,7 @@
         answer: (choice: dialogs.SettingsSaveChoice) => void;
         onClosed: () => void;
     } = $props();
+    const messages = $derived(purpose === "quit" ? "settings.quitFailure" : "settings.closeFailure");
     let choice: dialogs.SettingsSaveChoice = "cancel";
 
     function choose(value: dialogs.SettingsSaveChoice): void {

@@ -1,7 +1,7 @@
 <Tooltip.Root bind:open={() => open, value => {
     if (value && modal.isRestoringFocus(ref)) return;
     open = value;
-}} disableCloseOnTriggerClick>
+}} {disableCloseOnTriggerClick} {ignoreNonKeyboardFocus}>
     <Tooltip.Trigger {...triggerProps} onkeydown={event => {
         triggerProps.onkeydown?.(event);
         // Release the parent focus scope before Tab reaches the dialog.
@@ -82,6 +82,8 @@
         side?: Tooltip.ContentProps["side"];
         sideOffset?: Tooltip.ContentProps["sideOffset"];
         customAnchor?: Tooltip.ContentProps["customAnchor"];
+        disableCloseOnTriggerClick?: boolean;
+        ignoreNonKeyboardFocus?: boolean;
         open?: boolean;
     };
 
@@ -91,6 +93,8 @@
         side = "top",
         sideOffset = 6,
         customAnchor,
+        disableCloseOnTriggerClick = true,
+        ignoreNonKeyboardFocus,
         open = $bindable(false),
         ref = $bindable(null),
         ...triggerProps

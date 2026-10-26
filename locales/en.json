@@ -157,6 +157,11 @@
             "activeTranscriptions": "Transcription tasks are still running. Stop them or wait for them to finish before closing or switching projects.",
             "readFailed": "Could not read project “{{path}}”. Error:\n{{error}}"
         },
+        "quitWithImports": {
+            "title": "Cancel imports and quit?",
+            "description": "Some media are still being imported. Choosing “Quit anyway” continues to the project save step. Unfinished imports will be cancelled when quitting is confirmed; cancelling quitting resumes them.",
+            "quit": "Quit anyway"
+        },
         "saveFailure": {
             "title": "Save failed",
             "actions": {
@@ -291,12 +296,12 @@
         "closeFailure": {
             "title": "Settings could not be saved",
             "description": "Your changes are active, but could not be written to disk: {{error}}\nYou can retry or close Settings. Unsaved changes will be checked again when you quit.",
-            "close": "Close Settings"
+            "continue": "Close Settings"
         },
         "quitFailure": {
             "title": "Settings could not be saved",
             "description": "Your changes are active, but could not be written to disk: {{error}}",
-            "discard": "Discard unsaved settings and quit",
+            "continue": "Discard unsaved settings and quit",
             "cancel": "Cancel quitting"
         },
         "title": "Settings",
@@ -607,7 +612,7 @@
             "cancelled": "Media reading was cancelled.",
             "sourceInvalidated": "The media request was cancelled because the interface was reloaded or closed.",
             "invalidInfo": "ffprobe returned invalid media information.",
-            "noStreams": "The file contains no usable audio or video streams.",
+            "noAudio": "The file contains no audio track.",
             "noDuration": "The media duration could not be determined.",
             "timeout": "Reading media information timed out. Please retry.",
             "format": "Unsupported media format.",

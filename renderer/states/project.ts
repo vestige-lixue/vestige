@@ -105,8 +105,8 @@ function setOperation(operation: project.ProjectOperation | null): void {
     busy = current;
 }
 
-function invokeWithLock(action: () => Promise<boolean>): Promise<boolean> {
-    if (project.projectState.locked || rejectPendingImports()) return Promise.resolve(false);
+function invokeWithLock(action: () => Promise<boolean>, { allowPendingImports = false } = {}): Promise<boolean> {
+    if (project.projectState.locked || (!allowPendingImports && rejectPendingImports())) return Promise.resolve(false);
     // Confirmation holds the lock, but progress starts only when work begins.
     project.projectState.locked = true;
     let completed = false;
@@ -159,12 +159,12 @@ function createProject(): Project {
     return { version: projectVersion, lastOpened: Date.now(), vestiges: [] };
 }
 
-function hasChanges(): boolean {
-    return mediaImport.hasPendingImports() || (project.projectState.project !== null && (project.projectState.path === null || projectRevision !== savedRevision));
+function hasChanges(includePendingImports = true): boolean {
+    return (includePendingImports && mediaImport.hasPendingImports()) || (project.projectState.project !== null && (project.projectState.path === null || projectRevision !== savedRevision));
 }
 
-async function writeCurrent(saveAs: boolean, checkUnchanged: boolean): Promise<boolean> {
-    if (rejectPendingImports()) return false;
+async function writeCurrent(saveAs: boolean, checkUnchanged: boolean, allowPendingImports: boolean): Promise<boolean> {
+    if (!allowPendingImports && rejectPendingImports()) return false;
     const currentProject = project.projectState.project;
     if (!currentProject) return false;
     project.projectState.saving = true;
@@ -173,7 +173,7 @@ async function writeCurrent(saveAs: boolean, checkUnchanged: boolean): Promise<b
     let lastError: FailureInfo | null = null;
     try {
         for (; ;) {
-            if (rejectPendingImports()) return false;
+            if (!allowPendingImports && rejectPendingImports()) return false;
             let failure = lastError;
             try {
                 if (project.projectState.locked) setOperation({ kind: "save", path, saveAs });
@@ -243,19 +243,19 @@ async function writeCurrent(saveAs: boolean, checkUnchanged: boolean): Promise<b
     }
 }
 
-async function saveCurrent(saveAs = false, checkUnchanged = false): Promise<boolean> {
+async function saveCurrent(saveAs = false, checkUnchanged = false, allowPendingImports = false): Promise<boolean> {
     while (saveTask) {
         if (project.projectState.locked) setOperation({ kind: "wait-save", fileName: project.getFileName() });
         if (!await saveTask) return false;
     }
-    saveTask = writeCurrent(saveAs, checkUnchanged).finally(() => {
+    saveTask = writeCurrent(saveAs, checkUnchanged, allowPendingImports).finally(() => {
         saveTask = null;
     });
     return saveTask;
 }
 
-async function prepareToLeave(): Promise<boolean> {
-    if (rejectPendingImports() || rejectActiveTranscriptions()) return false;
+async function prepareToLeave(allowPendingImports = false): Promise<boolean> {
+    if ((!allowPendingImports && rejectPendingImports()) || rejectActiveTranscriptions()) return false;
     while (saveTask) {
         if (project.projectState.locked) setOperation({ kind: "wait-save", fileName: project.getFileName() });
         if (!await saveTask) return false;
@@ -267,9 +267,9 @@ async function prepareToLeave(): Promise<boolean> {
         if (choice === "cancel") return false;
         if (choice === "discard") return true;
     }
-    if (!await saveCurrent(false, true)) return false;
+    if (!await saveCurrent(false, true, allowPendingImports)) return false;
     // Flush edits or completed Runs that arrived during the preceding write.
-    while (hasChanges()) if (!await saveCurrent()) return false;
+    while (hasChanges(!allowPendingImports)) if (!await saveCurrent(false, false, allowPendingImports)) return false;
     return true;
 }
 
@@ -284,7 +284,7 @@ async function replaceProject(nextProject: Project | null, path: AbsolutePath | 
     mediaImportAPI.reset([]);
     const released = playerAPI.reset();
     project.projectState.path = path;
-    project.projectState.project = nextProject;
+    project.setProject(nextProject);
     await released;
     mediaImportAPI.reset(nextProject?.vestiges.map(vestige => vestige.media.id) ?? []);
 }
@@ -341,8 +341,8 @@ export function save(saveAs = false): Promise<boolean> {
 
 export function appendMedia(mediaFile: Media, index: number): void {
     if (!mediaImport.get(mediaFile.id) || project.getMedia(mediaFile.id)) throw new VestigeErrors({ kind: "media-invalid-import" });
-    project.projectState.project ??= createProject();
-    project.projectState.project.vestiges.splice(index, 0, { media: mediaFile, playbackPosition: 0, runs: [], displayedRunIdx: 0, modifications: [] });
+    if (!project.projectState.project) project.setProject(createProject());
+    project.insertVestige(index, { media: mediaFile, playbackPosition: 0, runs: [], displayedRunIdx: 0, modifications: [] });
     projectRevision++;
 }
 
@@ -490,13 +490,7 @@ export function removeMedia(id: string): void {
     transcriptionAPI.stop(id);
     for (const dialog of dialogs.state.dialogs) if ("mediaId" in dialog && dialog.mediaId === id) dialogsAPI.close(dialog.id);
     const next = mediaSelection.get() === id ? mediaSelection.adjacent(1) ?? mediaSelection.adjacent(-1) : mediaSelection.get();
-    if (project.projectState.project) {
-        const index = project.projectState.project.vestiges.findIndex(vestige => vestige.media.id === id);
-        if (index >= 0) {
-            project.projectState.project.vestiges.splice(index, 1);
-            projectRevision++;
-        }
-    }
+    if (project.removeVestige(id)) projectRevision++;
     mediaImportAPI.remove(id);
     selectMedia(next);
 }
@@ -558,17 +552,37 @@ export function startLifecycle(prepareSettingsBeforeQuit: () => Promise<boolean>
     });
     let checking: Promise<boolean> | null = null;
     const unsubscribe = window.api.beforeQuit(() => {
-        if (rejectPendingImports() || rejectActiveTranscriptions()) return Promise.resolve(true);
         checking ??= (async () => {
             while (activeTransition) if (!await activeTransition) return true;
             while (saveTask) if (!await saveTask) return true;
-            return !await invokeWithLock(async () => {
-                // Validate settings before progress dialogs can capture or restore focus.
-                if (!await prepareSettingsBeforeQuit()) return false;
-                if (!await prepareToLeave()) return false;
-                setOperation({ kind: "quit" });
-                return true;
-            });
+            if (rejectActiveTranscriptions()) return true;
+            let cancelImports = false;
+            if (mediaImport.hasPendingImports()) {
+                // Keep imports and directory collection running until cancellation is accepted.
+                cancelImports = await new Promise<boolean>(resolve => {
+                    dialogsAPI.show({
+                        kind: "project-error", error: { kind: "pending-imports" },
+                        onQuit: () => resolve(true), onClosed: () => resolve(false)
+                    });
+                });
+                if (!cancelImports) return true;
+            }
+            // Keep the pending work intact and the save snapshot stable until quitting is final.
+            const resumeImports = cancelImports ? mediaImportAPI.pauseForQuit() : null;
+            try {
+                return !await invokeWithLock(async () => {
+                    // Validate settings before progress dialogs can capture or restore focus.
+                    if (!await prepareSettingsBeforeQuit()) return false;
+                    if (!await prepareToLeave(cancelImports)) return false;
+                    setOperation({ kind: "quit" });
+                    if (cancelImports) await mediaImportAPI.cancelPending();
+                    return true;
+                }, { allowPendingImports: cancelImports });
+            }
+            finally {
+                // Directory collection must resume only after the project lock is released.
+                resumeImports?.();
+            }
         })().finally(() => {
             checking = null;
         });

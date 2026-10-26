@@ -42,10 +42,10 @@ export async function probeMedia(path: AbsolutePath, runtimeDirectory: AbsoluteP
         }
         const info = object(value);
         const streams = Array.isArray(info?.streams) ? info.streams.map(object).filter(stream => stream !== null) : [];
-        const video = streams.some(stream => stream.codec_type === "video" && object(stream.disposition)?.attached_pic !== 1);
-        if (!video && !streams.some(stream => stream.codec_type === "audio")) {
-            return { status: "unreadable", error: { kind: "media-no-streams" } };
+        if (!streams.some(stream => stream.codec_type === "audio")) {
+            return { status: "unreadable", error: { kind: "media-no-audio" } };
         }
+        const video = streams.some(stream => stream.codec_type === "video" && object(stream.disposition)?.attached_pic !== 1);
         const streamDurations = streams.map(stream => duration(stream.duration)).filter(value => value !== null);
         const seconds = duration(object(info?.format)?.duration) ?? (streamDurations.length ? Math.max(...streamDurations) : null);
         if (seconds === null) return { status: "unreadable", error: { kind: "media-no-duration" } };

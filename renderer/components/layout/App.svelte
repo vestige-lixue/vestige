@@ -48,7 +48,7 @@
     import * as settingsAPI from "../../states/settings";
     import * as transcriptionAPI from "../../states/transcription";
     import * as projectAPI from "../../states/project";
-    import { prepareSettingsForQuit } from "../../states/settingsQuit";
+    import { prepareSettingsForQuit } from "../../states/settingsPersistence";
 
     let availableHeight = $state(0);
 

@@ -7,7 +7,8 @@ import { type Config } from "../../shared/transcription/Config";
 import * as project from "./project.svelte";
 
 export type SaveChoice = "save" | "discard" | "cancel" | "memory" | "retry";
-export type SettingsSaveChoice = "retry" | "cancel" | "discard";
+// "continue" closes or quits with the accepted settings still active but unsaved.
+export type SettingsSaveChoice = "retry" | "cancel" | "continue";
 
 export type MediaRefImportIssue = {
     status: MediaIssueStatus;
@@ -74,6 +75,7 @@ type ProjectBusyDialog = {
 type ProjectErrorDialog = {
     kind: "project-error";
     error: project.ProjectError;
+    onQuit?: () => void;
 };
 
 type MediaImportErrorDialog = {

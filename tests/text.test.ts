@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
-    createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications
+    createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications,
+    provenanceChange
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary } from "./support/generators";
@@ -39,6 +40,7 @@ describe("text projection and editing", () => {
             for (const edit of edits) {
                 const range = editRange(index, projection, edit);
                 const before = structuredClone(projection);
+                const previous = [...provenance];
                 const next = editText(index, projection, range.from, range.to, edit.text);
                 if (expected.slice(range.from, range.to).join("") !== edit.text) {
                     provenance.splice(range.from, range.to - range.from, ...[...edit.text].map(text => ({ text, source: null })));
@@ -62,6 +64,10 @@ describe("text projection and editing", () => {
                 }
                 // D18 may restore newly inserted characters; surviving original characters keep their identity.
                 provenance.splice(0, provenance.length, ...actualSources);
+                // Editors resynchronize provenance only inside the reported range, so everything outside it must match.
+                const change = provenanceChange(index, projection, next) ?? { from: actualSources.length, to: actualSources.length };
+                expect(actualSources.slice(0, change.from)).toEqual(previous.slice(0, change.from));
+                expect(actualSources.slice(change.to)).toEqual(previous.slice(previous.length - (actualSources.length - change.to)));
                 expect(textPieces(index, projectText(index, next.modifications))).toEqual(pieces);
                 for (let offset = 0, utf16 = 0; offset <= expected.length; offset++) {
                     expect(projectionOffset(next, offset, true)).toBe(utf16);
@@ -216,6 +222,16 @@ describe("text projection and editing", () => {
         expect(value.modifications).toEqual(expected);
         expect(normalizeModifications(index, value.modifications)).toEqual(expected);
         expect(textPieces(index, value)).toEqual(textPieces(index, projectText(index, expected)));
+    });
+
+    it("reports source restored outside the edited range", () => {
+        const index = createTextIndex(transcript(["ab"]));
+        let value = editText(index, projectText(index, []), 0, 2, "");
+        value = editText(index, value, 0, 0, "x");
+        value = editText(index, value, 0, 0, "b");
+        const next = editText(index, value, 1, 2, "");
+        expect(textPieces(index, next).filter(piece => piece.text).map(piece => piece.source.kind)).toEqual(["segment"]);
+        expect(provenanceChange(index, value, next)).toEqual({ from: 0, to: 1 });
     });
 
     it("preserves the original deletion when editing an adjacent insertion", () => {

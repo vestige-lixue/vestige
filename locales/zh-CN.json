@@ -157,6 +157,11 @@
             "activeTranscriptions": "仍有正在运行的转写任务。请停止任务或等待完成后，再关闭或切换项目。",
             "readFailed": "无法读取项目“{{path}}”。错误信息：\n{{error}}"
         },
+        "quitWithImports": {
+            "title": "取消导入并退出？",
+            "description": "仍有未完成导入的媒体。选择“仍要退出”将继续处理项目保存，确认退出后才会取消所有未完成的导入；取消退出则继续导入。",
+            "quit": "仍要退出"
+        },
         "saveFailure": {
             "title": "保存失败",
             "actions": {
@@ -291,12 +296,12 @@
         "closeFailure": {
             "title": "设置保存失败",
             "description": "设置已生效，但未能写入磁盘：{{error}}\n你可以重试或关闭设置窗口。退出应用时会再次检查未保存的设置。",
-            "close": "关闭设置窗口"
+            "continue": "关闭设置窗口"
         },
         "quitFailure": {
             "title": "设置保存失败",
             "description": "设置已生效，但未能写入磁盘：{{error}}",
-            "discard": "放弃未保存的设置并退出",
+            "continue": "放弃未保存的设置并退出",
             "cancel": "取消退出"
         },
         "title": "设置",
@@ -607,7 +612,7 @@
             "cancelled": "媒体读取已取消。",
             "sourceInvalidated": "前端已重新加载或退出，媒体源请求已取消。",
             "invalidInfo": "ffprobe 返回了无效的媒体信息。",
-            "noStreams": "文件中没有可用的音频或视频流。",
+            "noAudio": "文件中没有音轨。",
             "noDuration": "无法确定媒体时长。",
             "timeout": "读取媒体信息超时，请重试。",
             "format": "媒体格式不符合。",

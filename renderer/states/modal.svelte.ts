@@ -6,12 +6,12 @@ const layerStep = 2;
 const layers = new SvelteSet<symbol>();
 let restoringFocus: HTMLElement | null = null;
 
-export function restoreFocus(target: Element | null): void {
+export function restoreFocus(target: Element | null, options?: FocusOptions): void {
     if (!(target instanceof HTMLElement) || !target.isConnected || target === target.ownerDocument.body) return;
     const previous = restoringFocus;
     restoringFocus = target;
     try {
-        target.focus();
+        target.focus(options);
     }
     catch {
         target.ownerDocument.body.focus();

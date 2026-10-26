@@ -21,10 +21,10 @@
         tabindex={tabIndex}
         style:--scroll-distance={`${scrollDistance}px`}
         style:--scroll-duration={`${scrollAnimationDuration}s`}
-        style:--scroll-stop={`${scrollStop}s`}
+        style:--scroll-delay={`${scrollPauseAtStart ? scrollStop / 2 : -scrollStop / 2}s`}
         style:--scroll-stop-progress={`${scrollStopProgress}%`}
     >
-        <span bind:this={text}>{value}</span>
+        <span bind:this={text}>{#if children}{@render children()}{:else}{value}{/if}</span>
     </div>
 {/if}
 
@@ -47,15 +47,15 @@
     .label:focus-visible {
         border-radius: 4px;
     }
-    .label span {
+    .label > span {
         display: block;
         line-height: inherit;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .scrolling span {
+    .scrolling > span {
         width: max-content;
-        animation: scroll-label var(--scroll-duration) calc(var(--scroll-stop) / 2)
+        animation: scroll-label var(--scroll-duration) var(--scroll-delay)
             linear(0 0% var(--scroll-stop-progress), 1 calc(100% - var(--scroll-stop-progress)) 100%)
             infinite alternate;
     }
@@ -75,7 +75,7 @@
         }
     }
     @media (prefers-reduced-motion: reduce) {
-        .scrolling span {
+        .scrolling > span {
             width: auto;
             animation: none;
         }
@@ -85,27 +85,33 @@
 
 <script lang="ts">
     import { mergeProps } from "bits-ui";
-    import { tick } from "svelte";
+    import { tick, type Snippet } from "svelte";
     import { type HTMLAttributes } from "svelte/elements";
 
     type Props = Omit<HTMLAttributes<HTMLDivElement>, "onchange"> & {
         value: string;
         editable: boolean;
         onchange: (value: string) => void;
+        children?: Snippet;
+        autoScroll?: boolean;
         scrollMode?: "none" | "ontime" | "onspeed";
         // Seconds for ontime, pixels per second for onspeed.
         scrollParam?: number;
         // Seconds to pause at either endpoint.
         scrollPause?: number;
+        // Apply scrollPause before the first movement too.
+        scrollPauseAtStart?: boolean;
     };
 
-    let { class: className = "", value, onchange, editable, scrollMode = "none", scrollParam = 1, scrollPause = 1, ...labelProps }: Props = $props();
+    let { class: className = "", value, onchange, editable, children, autoScroll = false, scrollMode = "none", scrollParam = 1, scrollPause = 1, scrollPauseAtStart = true, ...labelProps }: Props = $props();
 
     let element = $state<HTMLDivElement>();
     let text = $state<HTMLSpanElement>();
     let draft = $state("");
     let editing = $state(false);
     let scrollDistance = $state(0);
+    // Parent geometry updates must not restart unchanged text.
+    const labelValue = $derived(value);
     const tabIndex = $derived(labelProps.tabindex ?? (editable ? 0 : undefined));
     const labelAttributes = $derived(mergeProps(labelProps, {
         ondblclick: editable ? startEditing : undefined,
@@ -128,9 +134,26 @@
         if (editing && !editable) editing = false;
         // External updates must not replace an active draft or move the caret.
         if (!editing) {
-            draft = value;
+            draft = labelValue;
             scrollDistance = 0;
         }
+    });
+
+    $effect(() => {
+        if (!autoScroll || editing || !element || !text) return;
+        const currentValue = labelValue;
+        let active = true;
+        const observer = new ResizeObserver(startScrolling);
+        observer.observe(element);
+        observer.observe(text);
+        // Measure after new content and its parent layout have both updated.
+        void tick().then(() => {
+            if (active && labelValue === currentValue) startScrolling();
+        });
+        return () => {
+            active = false;
+            observer.disconnect();
+        };
     });
 
     $effect(() => {
@@ -216,12 +239,12 @@
     }
 
     function startScrolling(): void {
-        if (!element || !text) return;
+        if (editing || !element || !text) return;
         scrollDistance = Math.max(0, text.scrollWidth - element.clientWidth);
     }
 
     function stopScrolling(): void {
-        if (!element?.matches(":hover, :focus")) scrollDistance = 0;
+        if (!autoScroll && !element?.matches(":hover, :focus")) scrollDistance = 0;
     }
 
     function scrollSelectionFocusIntoView(): void {

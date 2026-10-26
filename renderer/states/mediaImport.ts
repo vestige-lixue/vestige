@@ -33,6 +33,7 @@ let validationEpoch = 0;
 let samplingEpoch: number | null = null;
 let validationTimer: ReturnType<typeof setInterval> | null = null;
 let prioritized: string | null = null;
+let suspension: AbortController | null = null;
 
 const tasks = new TaskQueue<TaskSource>({
     concurrency: 0,
@@ -44,6 +45,29 @@ const tasks = new TaskQueue<TaskSource>({
 const issueDialogs = new Map<string, string>();
 const failureDialogs = new Map<mediaImport.MediaImportFailure, string>();
 let collection: AbortController | null = null;
+
+function updateConcurrency(): void {
+    tasks.setConcurrency(!suspension && validationReady ? validation.getConcurrency() : 0);
+}
+
+export function pauseForQuit(): () => void {
+    const current = new AbortController();
+    suspension = current;
+    updateConcurrency();
+    return () => {
+        if (suspension !== current) return;
+        suspension = null;
+        current.abort();
+        updateConcurrency();
+    };
+}
+
+export async function waitForResume(signal: AbortSignal): Promise<void> {
+    while (suspension && !signal.aborted) {
+        const resumed = AbortSignal.any([suspension.signal, signal]);
+        if (!resumed.aborted) await new Promise<void>(resolve => resumed.addEventListener("abort", () => resolve(), { once: true }));
+    }
+}
 
 function resetValidation(): void {
     validationEpoch++;
@@ -75,7 +99,7 @@ function monitorValidation(): void {
             const previous = validation.getConcurrency();
             validation.observe(load, roundTripMs);
             validationReady = true;
-            tasks.setConcurrency(validation.getConcurrency());
+            updateConcurrency();
             if (previous !== validation.getConcurrency()) console.debug("Media validation concurrency", {
                 concurrency: validation.getConcurrency(), bytesPerSecond: validation.getBytesPerSecond(),
                 eventLoopDelayMs: load.eventLoopDelayMs, roundTripMs
@@ -96,7 +120,7 @@ export function updateValidationPlayback(value: boolean): void {
     if (playing === value) return;
     playing = value;
     validation.setPlaying(value);
-    tasks.setConcurrency(validationReady ? validation.getConcurrency() : 0);
+    updateConcurrency();
     window.api.file.validationPlayback(value);
 }
 
@@ -129,12 +153,7 @@ export function endCollection(controller: AbortController): void {
 }
 
 function update(item: mediaImport.ImportState): void {
-    const current = mediaImport.get(item.id);
-    if (!current) return;
-    for (const key of ["error", "path", "ignored"] as const) {
-        if (!(key in item)) Reflect.deleteProperty(current, key);
-    }
-    Object.assign(current, item);
+    if (mediaImport.items.has(item.id)) mediaImport.items.set(item.id, mediaImport.createItem(item));
 }
 
 function closeIssue(id: string): void {
@@ -162,6 +181,8 @@ export function reset(ids: string[]): void {
     collection = null;
     mediaImport.state.collecting = false;
     tasks.clear();
+    suspension?.abort();
+    suspension = null;
     resetValidation();
     mediaImport.names.clear();
     for (const dialog of [...issueDialogs.values(), ...failureDialogs.values()]) dialogsAPI.close(dialog);
@@ -169,7 +190,7 @@ export function reset(ids: string[]): void {
     failureDialogs.clear();
     mediaImport.state.importFailures = [];
     mediaImport.items.clear();
-    for (const id of ids) mediaImport.items.set(id, mediaImport.createItem(id));
+    for (const id of ids) mediaImport.items.set(id, mediaImport.createItem({ id, stage: "queued" }));
     mediaImport.state.ids = [...ids];
     for (const id of ids) enqueue(id, { kind: "check", path: project.getMedia(id)!.path }, "");
 }
@@ -177,7 +198,8 @@ export function reset(ids: string[]): void {
 export function add(sources: InputSource[]): void {
     for (const source of sources) {
         const id = crypto.randomUUID();
-        mediaImport.items.set(id, mediaImport.createItem(id));
+        project.prepareVestige(id);
+        mediaImport.items.set(id, mediaImport.createItem({ id, stage: "queued" }));
         mediaImport.state.ids.push(id);
         enqueue(id, { kind: "import", source }, typeof source === "string" ? getFileName(source) : source.name);
     }
@@ -192,7 +214,7 @@ export function retry(id: string): void {
 export function relink(id: string): void {
     const item = mediaImport.get(id);
     if (!item || !mediaImport.isIssue(item)) return;
-    enqueue(id, { kind: "relink", previous: { ...item } }, "");
+    enqueue(id, { kind: "relink", previous: item }, "");
 }
 
 export function ignore(id: string): void {
@@ -220,6 +242,33 @@ export function remove(id: string): void {
     closeIssue(id);
     mediaImport.items.delete(id);
     mediaImport.state.ids = mediaImport.state.ids.filter(current => current !== id);
+}
+
+export async function cancelPending(): Promise<void> {
+    collection?.abort();
+    collection = null;
+    mediaImport.state.collecting = false;
+    const remaining: string[] = [];
+    const completions: Promise<void>[] = [];
+    // Suspend dispatch and replace the order once, rather than rescan it for every removal.
+    tasks.setConcurrency(0);
+    for (const id of mediaImport.getIds()) {
+        if (project.getMedia(id)) {
+            remaining.push(id);
+            continue;
+        }
+        const task = tasks.get(id);
+        if (task) completions.push(task.completed);
+        tasks.cancel(id);
+        mediaImport.names.delete(id);
+        closeIssue(id);
+        mediaImport.items.delete(id);
+    }
+    mediaImport.state.ids = remaining;
+    if (prioritized !== null && !mediaImport.items.has(prioritized)) prioritized = null;
+    updateConcurrency();
+    // A cancelled read resolves only after main has closed its file and native process.
+    await Promise.all(completions);
 }
 
 export function move(id: string, beforeId: string | null): boolean {
@@ -270,10 +319,13 @@ function enqueue(id: string, source: TaskSource, name: string): void {
 async function run(id: string, task: ImportTask): Promise<void> {
     let path: AbsolutePath | null = null;
     try {
+        await waitForResume(task.signal);
+        if (!tasks.isCurrent(task)) return;
         let source: InputSource;
         if (task.value.kind === "relink") {
             update({ id, stage: "relocating" });
             const selected = await window.api.file.selectMediaPath(task.value.previous.path);
+            await waitForResume(task.signal);
             if (!tasks.isCurrent(task)) return;
             if (selected === null) {
                 update(task.value.previous);
@@ -290,6 +342,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
             if (!result.success) throw new VestigeErrors(result.error);
             path = result.path;
         }
+        await waitForResume(task.signal);
         if (!tasks.isCurrent(task)) return;
         if (task.value.kind === "import" && isProjectFile(path)) {
             reportFailure(id, "unreadable", { kind: "media-format" }, path);
@@ -303,6 +356,8 @@ async function run(id: string, task: ImportTask): Promise<void> {
         const reference = expected ? { path: expected.path, size: expected.size, hash: expected.hash } : null;
         const result = await window.api.file.readMedia(requestId, path, expected ? { size: expected.size, hash: expected.hash } : null)
             .finally(() => task.signal.removeEventListener("abort", cancel));
+        // Hold results while saving for quit; a cancelled quit can apply them normally.
+        await waitForResume(task.signal);
         if (!tasks.isCurrent(task)) return;
         if (expected && (project.getMedia(id) !== expected || expected.path !== reference!.path || expected.size !== reference!.size || expected.hash !== reference!.hash)) {
             const current = project.getMedia(id);
@@ -324,6 +379,7 @@ async function run(id: string, task: ImportTask): Promise<void> {
         else if (mediaSelection.get() === null) projectAPI.selectMedia(id);
     }
     catch (error) {
+        await waitForResume(task.signal);
         if (!tasks.isCurrent(task) || task.signal.aborted) return;
         reportFailure(id, "unreadable", toFailureInfo(error), path);
         console.error(error);

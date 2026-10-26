@@ -11,7 +11,7 @@ const failureKeys = {
     "media-cancelled": "errors.media.cancelled",
     "media-source-invalidated": "errors.media.sourceInvalidated",
     "media-invalid-info": "errors.media.invalidInfo",
-    "media-no-streams": "errors.media.noStreams",
+    "media-no-audio": "errors.media.noAudio",
     "media-no-duration": "errors.media.noDuration",
     "media-timeout": "errors.media.timeout",
     "media-format": "errors.media.format",

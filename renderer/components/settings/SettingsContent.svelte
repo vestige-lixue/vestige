@@ -100,7 +100,8 @@
                         pickerColor = hexToHsla(color)!;
                     }
                 }}>
-                    <Tooltip id={`theme-${scheme}-${key}`} text={i18n.t("colorPicker.pick")} disabled={pending}>
+                    <Tooltip id={`theme-${scheme}-${key}`} text={i18n.t("colorPicker.pick")} disabled={pending}
+                        ignoreNonKeyboardFocus disableCloseOnTriggerClick={false}>
                         {#snippet child({ props })}
                             <Popover.Trigger {...props} bind:ref={picker.anchor} class="themeSwatch focusable"
                                 style={`background-color: ${color};`} disabled={pending} />
@@ -109,10 +110,8 @@
                     <Popover.Portal>
                         <PopoverContent class="themeColorPicker" style={`z-index: ${modal.getTopLayer()};`} align="end" sideOffset={8}
                             onCloseAutoFocus={event => {
-                                if (picker.detached) {
-                                    event.preventDefault();
-                                    picker.anchor?.focus({ preventScroll: true });
-                                }
+                                event.preventDefault();
+                                modal.restoreFocus(picker.anchor, { preventScroll: picker.detached });
                             }}
                             collisionPadding={{ top: titlebarHeight + 12, right: 12, bottom: 12, left: 12 }}>
                             <ColorPicker bind:value={pickerColor} alpha={false} disabled={pending} hexLabel={i18n.t("colorPicker.hex")}
@@ -395,8 +394,8 @@
         type ThemeColorKey, type ThemeScheme, type ThemeSettings
     } from "../../../shared/theme";
     import * as dialogsAPI from "../../states/dialogs";
-    import * as dialogs from "../../states/dialogs.svelte";
     import * as settingsAPI from "../../states/settings";
+    import { persistSettings } from "../../states/settingsPersistence";
 
     let { dialogId, beforeClose = $bindable() }: { dialogId: string; beforeClose?: () => Promise<boolean> } = $props();
     const [current, micaSupported] = await Promise.all([load(), window.api.supportsMica()]);
@@ -710,20 +709,7 @@
         pending = true;
         try {
             // Quit commits drafts directly and owns its separate D2 confirmation.
-            while (await commit()) {
-                if (await settingsAPI.flushAccepted()) return true;
-                const error = settings.getError();
-                if (!error) return false;
-                const choice = await new Promise<dialogs.SettingsSaveChoice>(resolve => {
-                    dialogsAPI.show({
-                        kind: "settings-save-failure", purpose: "close", parentId: dialogId, error,
-                        answer: resolve, onClosed: () => resolve("cancel")
-                    });
-                });
-                if (choice === "discard") return true;
-                if (choice === "cancel") return false;
-            }
-            return false;
+            return await persistSettings("close", commit, dialogId);
         }
         finally {
             pending = false;

@@ -2,7 +2,11 @@
     {#if informationDisplay === "bar"}
         <div class="information-bar">
             <div class="information-placeholder"><TranscriptInformation information={null} compact /></div>
-            <div class="information-content"><TranscriptInformation information={inspection?.information ?? null} compact /></div>
+            <div class="information-content">
+                {#key inspection?.information.key}
+                    <TranscriptInformation information={inspection?.information ?? null} compact />
+                {/key}
+            </div>
         </div>
     {/if}
     <div class="editor-surface">
@@ -27,9 +31,11 @@
     if (!value) closeTooltip();
 }} disableHoverableContent disableCloseOnTriggerClick>
     <Tooltip.Portal>
-        {#if inspection && informationDisplay === "tooltip"}
+        {#if tooltipOpen && inspection && informationDisplay === "tooltip"}
             <Tooltip.Content class="tooltip-content transcript-tooltip" customAnchor={anchor} side="top" sideOffset={7} collisionPadding={8}>
-                <TranscriptInformation information={inspection.information} />
+                {#key inspection.information.key}
+                    <TranscriptInformation information={inspection.information} />
+                {/key}
             </Tooltip.Content>
         {/if}
     </Tooltip.Portal>
@@ -127,6 +133,10 @@
         width: 0;
         height: 0;
     }
+    /* Chromium draws an oversized caret beside separators before hard breaks. */
+    .editor :global(img.ProseMirror-separator:has(+ br:not(.ProseMirror-trailingBreak))) {
+        display: none;
+    }
     .editor :global(.ProseMirror-hideselection) {
         caret-color: transparent;
     }
@@ -204,6 +214,9 @@
     }
     .editor :global(.transcript-event.deletion) {
         color: var(--c-danger);
+    }
+    .editor :global(.transcript-event:focus-visible) {
+        outline-offset: max(3px, .2em);
     }
     .editor :global(.transcript-event-shape) {
         width: .55em;

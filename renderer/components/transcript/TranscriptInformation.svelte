@@ -2,8 +2,8 @@
     <div class="events" class:compact>
         {#each information.items as item (item.key)}
             <div class="event" class:deletion={item.kind === "deletion"}>
-                <span class="kind">{i18n.t(item.kind === "deletion" ? "transcript.information.deletion" : "transcript.information.gap")}</span>
-                {@render details(item)}
+                {#if !compact}{@render kind(item)}{/if}
+                {@render details(item, compact)}
             </div>
         {/each}
     </div>
@@ -11,10 +11,28 @@
     {@render details(information)}
 {/if}
 
-{#snippet details(information: TranscriptInformation | null)}
+{#snippet kind(information: TranscriptInformation)}
+    <span class="kind">{i18n.t(information.kind === "deletion" ? "transcript.information.deletion" : "transcript.information.gap")}</span>
+{/snippet}
+
+{#snippet details(information: TranscriptInformation | null, showKind = false)}
     <div class="information" class:compact>
+        {#if showKind && information}{@render kind(information)}{/if}
         {#if information?.original !== null && information?.original !== undefined}
-            <div class="original">{information.original || "—"}</div>
+            <div class="original" class:deleted={information.kind === "deletion"}>
+                {#if information.kind === "deletion"}
+                    <NiceLabel value={information.original} editable={false} onchange={() => {}}
+                        scrollMode="ontime" scrollParam={2} scrollPause={1} autoScroll scrollPauseAtStart
+                    >
+                        <span class="deleted-text">{#each information.original.split(/(\r\n|[\r\n\t]|[^\S\r\n\t]+)/u) as part, index (index)}{#if part && /^\s+$/u.test(part)}<span
+                            class="whitespace" class:line-break={/[\r\n]/u.test(part)}
+                            data-symbol={part === "\t" ? "→\u00a0" : /[\r\n]/u.test(part) ? "↵" : "·".repeat(part.length)}
+                        >{part}</span>{:else}{part}{/if}{/each}</span>
+                    </NiceLabel>
+                {:else}
+                    {information.original || "—"}
+                {/if}
+            </div>
         {/if}
         {#if !information || information.kind === "token"}
             <div class="probabilities">
@@ -47,6 +65,15 @@
     }
     .events.compact {
         gap: 6px;
+    }
+    .events:not(.compact) {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr);
+        align-items: center;
+        column-gap: 8px;
+    }
+    .events:not(.compact) .event {
+        display: contents;
     }
     .event {
         display: flex;
@@ -90,6 +117,30 @@
         overflow: hidden;
         text-align: center;
     }
+    .original.deleted {
+        display: block;
+        padding: 0 4px;
+        white-space: pre;
+    }
+    .deleted-text {
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: color-mix(in srgb, var(--c-danger) 10%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-danger) 20%, transparent);
+        box-decoration-break: clone;
+    }
+    .whitespace {
+        font-size: 0;
+    }
+    .whitespace::before {
+        content: attr(data-symbol);
+        color: color-mix(in srgb, var(--c-danger) 65%, var(--c-text));
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+    }
+    .line-break {
+        white-space: nowrap;
+    }
     .compact .original {
         display: block;
         flex: 1;
@@ -97,21 +148,25 @@
         white-space: pre;
         text-overflow: ellipsis;
     }
+    .compact .original.deleted {
+        flex: 0 1 auto;
+        text-align: left;
+    }
     .events.compact .information {
         flex: 1;
-    }
-    .events.compact .range {
-        margin-left: auto;
     }
     .range {
         white-space: nowrap;
         text-align: center;
     }
     .compact .range {
-        order: 1;
+        order: -1;
+        flex-shrink: 0;
         min-width: 0;
+        max-width: 50%;
         overflow: hidden;
         text-overflow: ellipsis;
+        text-align: left;
     }
     .probabilities {
         display: flex;
@@ -122,8 +177,11 @@
     }
     .compact .probabilities {
         order: 2;
+        flex-shrink: 1;
         flex-wrap: nowrap;
+        min-width: 0;
         margin-left: auto;
+        overflow: hidden;
     }
     .probabilities > span {
         display: flex;
@@ -147,6 +205,7 @@
     import { formatDuration } from "../../format";
     import { type TranscriptInformation } from "../../editor/informationModel";
     import { type InspectionInformation } from "../../editor/information";
+    import NiceLabel from "../util/NiceLabel.svelte";
 
     let { information, compact = false }: { information: InspectionInformation | null; compact?: boolean } = $props();
 
