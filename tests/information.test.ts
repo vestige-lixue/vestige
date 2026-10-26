@@ -5,7 +5,7 @@ import { createTextIndex, projectText, editText } from "../shared/transcript/tex
 import { modification, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange } from "./support/generators";
 import { checkProperty } from "./support/properties";
-import { middlePreview, previewUnits } from "../renderer/editor/preview";
+import { middlePreview, previewUnits, comparisonPreview } from "../renderer/editor/preview";
 
 describe("transcriptInformation", () => {
     it("finds the complement of unsorted, overlapping speech intervals clipped to duration", () => {
@@ -221,5 +221,76 @@ describe("selection information", () => {
         expect(transcriptSelection(index, projection, 10, 1, 3)?.range).toEqual({ start: 0, end: 9 });
         expect(transcriptSelection(index, projection, 6, 0, 1)).toBeNull();
         expect(transcriptSelection(index, projection, 10, 0, 1)?.key).not.toBe(transcriptSelection(index, projection, 10, 0, 2)?.key);
+    });
+});
+
+describe("selection comparison", () => {
+    it("preserves ordinary spaces in unchanged context across token boundaries", () => {
+        expect(comparisonPreview([
+            { kind: "original", text: "to " }, { kind: "original", text: "the " },
+            { kind: "deleted", text: "store" }, { kind: "inserted", text: "shop" }, { kind: "original", text: " now" }
+        ]).flat().map(part => part.text).join("")).toBe("to the storeshop now");
+    });
+    it("compares a whole modified token using projection provenance", () => {
+        const spans = transcript(["store"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 0, 5, "shop"));
+        expect(transcriptSelection(index, projection, 1, 0, 4)?.comparison).toEqual([
+            { kind: "deleted", text: "store" }, { kind: "inserted", text: "shop" }
+        ]);
+        expect(transcriptSelection(index, projectText(index, []), 1, 0, 5)?.comparison).toEqual([]);
+    });
+
+    it("merges consecutive touched tokens including multiple independent modifications", () => {
+        const spans = transcript(["one", "two", "three"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, [...modification(spans, 1, 2, "X"), ...modification(spans, 4, 5, "Y")]);
+        expect(transcriptSelection(index, projection, 5, 0, projection.text.length)?.comparison).toEqual([
+            { kind: "deleted", text: "onetwo" }, { kind: "inserted", text: "oXetYo" }, { kind: "original", text: "three" }
+        ]);
+    });
+
+    it("groups a deletion across tokens and attaches boundary replacement text", () => {
+        const spans = transcript(["one", "two", "three"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 1, 5, "X"));
+        expect(transcriptSelection(index, projection, 5, 0, projection.text.length)?.comparison).toEqual([
+            { kind: "deleted", text: "onetwo" }, { kind: "inserted", text: "oXo" }, { kind: "original", text: "three" }
+        ]);
+    });
+
+    it("shows a boundary-only insertion without replacing its neighboring tokens", () => {
+        const spans = transcript(["a", "b"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 1, 1, "X"));
+        expect(transcriptSelection(index, projection, 3, 0, 3)?.comparison).toEqual([
+            { kind: "original", text: "a" }, { kind: "inserted", text: "X" }, { kind: "original", text: "b" }
+        ]);
+    });
+
+    it("limits comparison to the expanded selection, including a replacement-only selection", () => {
+        const spans = transcript(["a😀b", "other"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 1, 2, "X"));
+        expect(transcriptSelection(index, projection, 3, 1, 2)?.comparison).toEqual([
+            { kind: "deleted", text: "😀" }, { kind: "inserted", text: "X" }
+        ]);
+        expect(transcriptSelection(index, projection, 3, 4, 6)?.comparison).toEqual([]);
+        const removed = projectText(index, modification(spans, 0, 3, ""));
+        expect(transcriptSelection(index, removed, 3, 0, 2)?.comparison).toEqual([]);
+    });
+
+    it("keeps two context tokens on each side of changes and folds longer unchanged runs", () => {
+        const spans = transcript(Array.from({ length: 15 }, (_, i) => String.fromCharCode(65 + i)));
+        const index = createTextIndex(spans);
+        const projection = projectText(index, [...modification(spans, 3, 4, "x"), ...modification(spans, 10, 11, "y")]);
+        expect(transcriptSelection(index, projection, 30, 0, 15)?.comparison).toEqual([
+            { kind: "ellipsis", text: "…" }, { kind: "original", text: "B" }, { kind: "original", text: "C" },
+            { kind: "deleted", text: "D" }, { kind: "inserted", text: "x" },
+            { kind: "original", text: "E" }, { kind: "original", text: "F" }, { kind: "ellipsis", text: "…" },
+            { kind: "original", text: "I" }, { kind: "original", text: "J" },
+            { kind: "deleted", text: "K" }, { kind: "inserted", text: "y" },
+            { kind: "original", text: "L" }, { kind: "original", text: "M" }, { kind: "ellipsis", text: "…" }
+        ]);
     });
 });

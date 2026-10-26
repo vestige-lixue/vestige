@@ -1,5 +1,6 @@
 import { type Range } from "../../shared/util/range";
 import { textPosition, textPieces, sourceTextPieces, projectedOffset, type TextPiece, type TextIndex, type TextProjection } from "../../shared/transcript/text";
+import { selectionComparison, type ComparisonPart } from "./comparison";
 
 export type TranscriptInformation = {
     key: string;
@@ -146,6 +147,7 @@ export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
     selectionTo: number;
     tokens: number[];
     deletions: TranscriptInformation[];
+    comparison: ComparisonPart[];
 };
 
 // Selection and geometry use displayed UTF-16 offsets; source identities remain codepoint offsets.
@@ -191,10 +193,11 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
             last = Math.max(last, piece.utf16To);
         }
     }
+    const comparison = selectionComparison(index, projection, { from: first, to: last, sourceFrom, sourceTo });
     return {
-        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${start}-${end}`,
+        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${start}-${end}/${JSON.stringify(comparison)}`,
         kind: "selection", from: first, to: last, selectionFrom: from, selectionTo: to, sourceFrom, sourceTo,
-        tokens, deletions, range: { start, end }, original: null, probability: null, blankProbability: null
+        tokens, deletions, comparison, range: { start, end }, original: null, probability: null, blankProbability: null
     };
 }
 

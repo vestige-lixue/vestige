@@ -2,8 +2,8 @@
 
 {#snippet details(information: InspectionInformation | null)}
     <div class="information" class:compact>
-        {#if information?.original !== null && information?.original !== undefined}
-            <div class="original" use:fitPreview={{ units: preview, compact }}></div>
+        {#if preview.length}
+            <div class="original" class:comparison={information?.kind === "selection"} use:fitPreview={{ units: preview, compact }}></div>
         {/if}
         {#if !information || information.kind === "token"}
             <div class="probabilities">
@@ -72,6 +72,14 @@
         color: color-mix(in srgb, var(--c-danger) 65%, var(--c-text));
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
+    .comparison :global(.preview-deleted) {
+        text-decoration-line: line-through;
+    }
+    .comparison :global(.preview-inserted) {
+        text-decoration-line: underline;
+        text-decoration-style: dashed;
+        text-underline-offset: .15em;
+    }
     .original :global(.preview-gap), .gaps {
         color: var(--c-accent);
     }
@@ -138,10 +146,11 @@
     import * as i18n from "../../i18n.svelte";
     import { formatDuration } from "../../format";
     import { type InspectionInformation } from "../../editor/information";
-    import { fitPreview, previewUnits } from "../../editor/preview";
+    import { fitPreview, previewUnits, comparisonPreview } from "../../editor/preview";
 
     let { information, compact = false }: { information: InspectionInformation | null; compact?: boolean } = $props();
-    const preview = $derived(information?.original ? previewUnits(information.original, "deleted", information.gaps, information.sourceFrom) : []);
+    const preview = $derived(information?.kind === "selection" ? comparisonPreview(information.comparison)
+        : information?.original ? previewUnits(information.original, "deleted", information.gaps, information.sourceFrom) : []);
 
     function formatProbability(value: number | null | undefined): string {
         return value == null ? "—" : `${(value * 100).toFixed(1).replace(/\.0$/, "")}%`;

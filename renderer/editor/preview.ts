@@ -13,7 +13,7 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function previewUnits(text: string, kind: PreviewPart["kind"], gaps: readonly TranscriptInformation[] = [], sourceFrom = 0): PreviewUnit[] {
     const characters = Array.from(text);
-    const onlyWhitespace = /^\s*$/u.test(text);
+    const onlyWhitespace = kind !== "original" && /^\s*$/u.test(text);
     const markers = new Map<number, TranscriptInformation[]>();
     for (const gap of gaps) {
         const offset = gap.sourceFrom - sourceFrom;
@@ -31,7 +31,7 @@ export function previewUnits(text: string, kind: PreviewPart["kind"], gaps: read
         for (const character of grapheme.segment) {
             parts.push(...gapParts(offset));
             const lineBreak = character === "\n" || character === "\r";
-            const space = character === " " && (onlyWhitespace || offset === 0 || offset === characters.length - 1
+            const space = character === " " && (onlyWhitespace || kind !== "original" && (offset === 0 || offset === characters.length - 1)
                 || characters[offset - 1] === " " || characters[offset + 1] === " ");
             const whitespace = lineBreak || character === "\t" || space || onlyWhitespace && /\s/u.test(character);
             const value = lineBreak ? character === "\n" && characters[offset - 1] === "\r" ? "" : "↵"
@@ -54,6 +54,16 @@ export function middlePreview(units: readonly PreviewUnit[], count: number): rea
     const start = Math.ceil(count / 2);
     const end = Math.floor(count / 2);
     return [...units.slice(0, start), [{ kind: "ellipsis", text: "…" }], ...end ? units.slice(-end) : []];
+}
+
+export function comparisonPreview(parts: readonly { kind: PreviewPart["kind"]; text: string }[]): PreviewUnit[] {
+    const groups: { kind: PreviewPart["kind"]; text: string }[] = [];
+    for (const part of parts) {
+        const previous = groups.at(-1);
+        if (previous?.kind === part.kind) previous.text += part.text;
+        else groups.push({ ...part });
+    }
+    return groups.flatMap(part => previewUnits(part.text, part.kind));
 }
 
 export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[]): void {
