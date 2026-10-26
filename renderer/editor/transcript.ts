@@ -10,7 +10,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
-import { informationPlugin, type InspectionOptions } from "./information";
+import { informationPlugin, toggleSelectionDeletions, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
     type TextIndex, type TextProjection
@@ -370,7 +370,7 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
             onChange(next);
         }
     });
-    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state) ?? -1, inspection));
+    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state) ?? -1, inspection, canEdit));
     editors.set(editor.view.dom, editor);
     return editor;
 }
@@ -385,6 +385,11 @@ function transcriptEditorAt(element: HTMLElement | null): Editor | null {
 
 export function isTranscriptEditorTarget(element: HTMLElement | null): boolean {
     return transcriptEditorAt(element) !== null;
+}
+
+export function toggleTranscriptDeletions(element: HTMLElement | null): boolean {
+    const editor = transcriptEditorAt(element);
+    return editor ? toggleSelectionDeletions(editor.view) : false;
 }
 
 export function transcriptHistoryAvailable(element: HTMLElement | null, action: "undo" | "redo"): boolean | null {

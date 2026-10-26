@@ -150,9 +150,9 @@ export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
     comparison: ComparisonPart[];
 };
 
-// Selection and geometry use displayed UTF-16 offsets; source identities remain codepoint offsets.
-export function transcriptSelection(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): SelectionInformation | null {
-    if (from >= to || !Number.isFinite(duration) || duration <= 0) return null;
+// View commands share inclusion rules even when the selected units have no playable audio.
+export function transcriptSelectionUnits(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): { tokens: Set<number>; deletions: TranscriptInformation[] } {
+    if (from >= to) return { tokens: new Set(), deletions: [] };
     const whitespace = /^\s+$/u.test(projection.text.slice(from, to));
     const tokenIndices = new Set<number>();
     const replacements = new Set<number>();
@@ -167,6 +167,13 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
     }
     const deletions = transcriptEvents(index, projection, duration).filter(item => item.kind === "deletion"
         && (from < item.from && item.from < to || replacements.has(item.sourceTo)));
+    return { tokens: tokenIndices, deletions };
+}
+
+// Selection and geometry use displayed UTF-16 offsets; source identities remain codepoint offsets.
+export function transcriptSelection(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): SelectionInformation | null {
+    if (from >= to || !Number.isFinite(duration) || duration <= 0) return null;
+    const { tokens: tokenIndices, deletions } = transcriptSelectionUnits(index, projection, duration, from, to);
     const tokens = [...tokenIndices];
     let start = Infinity;
     let end = -Infinity;

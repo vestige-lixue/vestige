@@ -78,6 +78,7 @@ Mod means Ctrl on Windows and Linux, and Command on macOS. Text fields and the t
 | Previous word / Next word | Mod + Left / Mod + Right |
 | Previous media / Next media | Mod + Shift + Left / Mod + Shift + Right |
 | Undo / Redo | Mod + Z / Mod + Y |
+| Expand/collapse deletions in the transcript selection | Mod + Shift + D |
 
 ## Settings and documentation
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
-import { transcriptEvents, transcriptInformation, transcriptSelection } from "../renderer/editor/informationModel";
+import { transcriptEvents, transcriptInformation, transcriptSelection, transcriptSelectionUnits } from "../renderer/editor/informationModel";
 import { createTextIndex, projectText, editText } from "../shared/transcript/text";
 import { modification, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange } from "./support/generators";
@@ -166,6 +166,17 @@ describe("information previews", () => {
 });
 
 describe("selection information", () => {
+    it("keeps zero-duration deletions available to selection view commands", () => {
+        const spans = transcript(["a", "b", "c"]);
+        spans.forEach(span => span.range = { start: 0, end: 0 });
+        const index = createTextIndex(spans);
+        const projection = editText(index, projectText(index, []), 1, 2, "X");
+        expect(transcriptSelection(index, projection, 1, 1, 2)).toBeNull();
+        expect(transcriptSelectionUnits(index, projection, 1, 1, 2).deletions.map(item => item.original)).toEqual(["b"]);
+        expect(transcriptSelectionUnits(index, projection, 1, 0, 1).deletions).toEqual([]);
+        expect(transcriptSelectionUnits(index, projection, 1, 0, 2).deletions.map(item => item.original)).toEqual(["b"]);
+    });
+
     it("expands partial tokens and all surviving fragments into one continuous outline", () => {
         const spans = transcript(["hello", " world"]);
         const index = createTextIndex(spans);

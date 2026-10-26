@@ -35,6 +35,7 @@ const bindings: readonly Binding[] = [
     { key: "r", mod: true, shift: true, command: { kind: "focus", target: "playback-speed" } },
     { key: "e", mod: true, shift: true, command: { kind: "focus", target: "playback-volume" } },
     { key: "m", mod: true, shift: true, command: { kind: "cyclePlaybackMode" } },
+    { key: "d", mod: true, shift: true, command: { kind: "toggleSelectionDeletions" } },
     { key: "arrowleft", mod: true, command: { kind: "seekAdjacentWord", direction: -1 } },
     { key: "arrowright", mod: true, command: { kind: "seekAdjacentWord", direction: 1 } },
     { key: "arrowleft", mod: true, shift: true, command: { kind: "selectAdjacentMedia", direction: -1 } },
@@ -105,6 +106,10 @@ function editingTarget(target: EventTarget | null): target is HTMLElement {
     return target instanceof HTMLElement && (target.closest("input, textarea") !== null || target.isContentEditable);
 }
 
+function deletionControl(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement && isTranscriptEditorTarget(target) && !!target.closest(".transcript-event.deletion, .transcript-restore");
+}
+
 function run(command: Command): void {
     if (menuBindings) menuBindings.run(command);
     else runCommand(command);
@@ -151,7 +156,7 @@ export function seekProgress(event: KeyboardEvent): void {
 }
 
 function preventSpaceActivation(event: KeyboardEvent): void {
-    if (interfaceBlocked() || event.key !== " " || event.isComposing || editingTarget(event.target)) return;
+    if (interfaceBlocked() || event.key !== " " || event.isComposing || editingTarget(event.target) || deletionControl(event.target)) return;
     event.preventDefault();
     event.stopPropagation();
 }
@@ -173,6 +178,7 @@ function keydown(event: KeyboardEvent): void {
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.key.toLowerCase();
+    if (!event.ctrlKey && !event.metaKey && !event.shiftKey && (key === " " || key === "enter") && deletionControl(event.target)) return;
     const editing = editingTarget(event.target);
     const editTarget = event.target instanceof HTMLElement && (editing || isTranscriptEditorTarget(event.target)) ? event.target : null;
     const edit = mod ? event.shiftKey ? key === "z" ? "redo" : undefined : editKeys[key] : undefined;

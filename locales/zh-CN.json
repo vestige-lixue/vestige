@@ -276,6 +276,11 @@
             "gap": "无语音",
             "characters": "共 {{count}} 个字符",
             "gaps": "含 {{count}} 段无语音，共 {{duration}}s",
+            "restore": "放回",
+            "expand": "展开删除",
+            "collapse": "收起删除",
+            "expandHint": "单击 ▼ 展开",
+            "toggleSelectionDeletions": "展开/收起选区内的删除",
             "estimated": "预计的："
         },
         "runs": {

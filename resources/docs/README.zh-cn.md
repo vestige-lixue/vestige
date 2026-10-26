@@ -78,6 +78,7 @@ Vestige 将音视频播放、转写与文本校对放在同一个工作空间中
 | 上一词 / 下一词 | Mod + Left / Mod + Right |
 | 上一媒体 / 下一媒体 | Mod + Shift + Left / Mod + Shift + Right |
 | 撤销 / 重做 | Mod + Z / Mod + Y |
+| 展开/收起正文选区内的删除 | Mod + Shift + D |
 
 ## 设置与阅读文档
 

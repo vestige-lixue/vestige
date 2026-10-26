@@ -14,9 +14,10 @@ import * as transcriptionAPI from "./transcription";
 import * as transcriptAPI from "./transcript";
 import * as projectAPI from "./project";
 import * as playerAPI from "./player";
+import { isTranscriptEditorTarget, toggleTranscriptDeletions } from "../editor/transcript";
 
 type ParameterlessCommand = {
-    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode";
+    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode" | "toggleSelectionDeletions";
 };
 
 // Select a project file, read it, and handle saving the current project before switching.
@@ -253,6 +254,13 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         label: () => i18n.t(player.isPlaying() ? "player.actions.pause" : "player.actions.play")
     },
     cyclePlaybackMode: { run: () => playerAPI.cycleMode(), enabled: always, label: () => i18n.t(`player.modes.${player.getMode()}`) },
+    toggleSelectionDeletions: {
+        run: () => {
+            toggleTranscriptDeletions(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+        },
+        enabled: () => isTranscriptEditorTarget(document.activeElement instanceof HTMLElement ? document.activeElement : null),
+        label: label("transcript.information.toggleSelectionDeletions")
+    },
     focus: {
         // Closing menus must release focus before the target receives it.
         run: command => void tick().then(() => focus(command.target)), enabled: always, label: label("player.actions.focusSlider")

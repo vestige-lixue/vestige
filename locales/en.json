@@ -276,6 +276,11 @@
             "gap": "No speech",
             "characters": "{{count}} characters total",
             "gaps": "Includes {{count}} no-speech intervals, {{duration}}s total",
+            "restore": "Restore",
+            "expand": "Expand deletion",
+            "collapse": "Collapse deletion",
+            "expandHint": "Click ▼ to expand",
+            "toggleSelectionDeletions": "Expand/collapse deletions in selection",
             "estimated": "Estimated: "
         },
         "runs": {

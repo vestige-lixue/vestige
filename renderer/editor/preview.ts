@@ -66,12 +66,18 @@ export function comparisonPreview(parts: readonly { kind: PreviewPart["kind"]; t
     return groups.flatMap(part => previewUnits(part.text, part.kind));
 }
 
-export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[]): void {
+export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[], options: { lineBreaks?: boolean; gap?: (gap: TranscriptInformation) => HTMLElement } = {}): void {
     const fragment = document.createDocumentFragment();
     let span: HTMLSpanElement | null = null;
     let previous = "";
     for (const unit of units) {
         for (const part of unit) {
+            if (part.gap && options.gap) {
+                fragment.append(options.gap(part.gap));
+                span = null;
+                previous = "";
+                continue;
+            }
             const className = `preview-${part.kind}`;
             if (!span || previous !== className || part.kind === "gap") {
                 span = document.createElement("span");
@@ -86,6 +92,7 @@ export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[
             }
             else span.append(document.createTextNode(part.text));
             if (part.gap) span.dataset.previewGap = part.gap.key;
+            if (part.lineBreak && options.lineBreaks) span.append(document.createElement("br"));
             previous = part.kind === "gap" ? "" : className;
         }
     }

@@ -323,4 +323,31 @@ describe("text projection and editing", () => {
         expect(textPieces(index, first).find(piece => piece.text === "a")?.sourceFrom).toBe(1);
         expect(textPieces(index, last).find(piece => piece.text === "a")?.sourceFrom).toBe(0);
     });
+
+    it("restores each random deletion through ordinary typing while preserving replacement text", () => {
+        checkProperty("deletion-restoration", fc.property(editingArbitrary, ({ spans, edits }) => {
+            const index = createTextIndex(spans);
+            let projection = projectText(index, []);
+            for (const edit of edits) {
+                const range = editRange(index, projection, edit);
+                projection = editText(index, projection, range.from, range.to, edit.text);
+            }
+            for (const deletion of projection.modifications) {
+                if (deletion.type !== "delete") continue;
+                const from = textOffset(index, deletion.range.start);
+                const to = textOffset(index, deletion.range.end);
+                const offset = projectedOffset(projection, from);
+                const position = projectionOffset(projection, offset, false);
+                const original = index.characters.slice(from, to).join("");
+                const restored = editText(index, projection, position, position, original);
+                expect(restored.text).toBe(projection.text.slice(0, offset) + original + projection.text.slice(offset));
+                for (const modification of restored.modifications) {
+                    if (modification.type === "delete") {
+                        expect(textOffset(index, modification.range.end) <= from || textOffset(index, modification.range.start) >= to).toBe(true);
+                    }
+                }
+                expect(textPieces(index, restored)).toEqual(textPieces(index, projectText(index, restored.modifications)));
+            }
+        }));
+    });
 });

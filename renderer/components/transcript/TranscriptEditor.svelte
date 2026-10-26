@@ -215,6 +215,46 @@
     .editor :global(.transcript-event.deletion) {
         color: var(--c-danger);
     }
+    .editor :global(.transcript-deletion-expanded), .editor :global(.transcript-deletion-expanded *) {
+        user-select: none;
+    }
+    .editor :global(.transcript-deletion-original) {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .editor :global(.transcript-deletion-original .preview-deleted) {
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: color-mix(in srgb, var(--c-danger) 10%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-danger) 20%, transparent);
+        box-decoration-break: clone;
+        text-decoration-line: line-through;
+    }
+    .editor :global(.transcript-deletion-original .preview-whitespace) {
+        color: color-mix(in srgb, var(--c-danger) 65%, var(--c-text));
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .editor :global(.transcript-deletion-original .transcript-event) {
+        display: inline-grid;
+        vertical-align: middle;
+    }
+    .editor :global(.transcript-event.expanded .transcript-event-shape > path:not(.transcript-event-stroke)) {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5px;
+        vector-effect: non-scaling-stroke;
+    }
+    .editor :global(.transcript-restore) {
+        display: inline-block;
+        margin-inline: .3em;
+        padding: 0 .35em;
+        border: 1px solid var(--c-border);
+        border-radius: 4px;
+        background: var(--c-surface);
+        color: var(--c-text);
+        font-size: .8em;
+        cursor: pointer;
+    }
     .editor :global(.transcript-event:focus-visible) {
         outline-offset: max(3px, .2em);
     }
@@ -252,7 +292,7 @@
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
-    import { type TranscriptInspection } from "../../editor/information";
+    import { refreshTranscriptInformation, type TranscriptInspection } from "../../editor/information";
     import { textRectangles } from "../../editor/geometry";
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
@@ -260,6 +300,7 @@
     import * as transcript from "../../states/transcript.svelte";
     import * as projectAPI from "../../states/project";
     import { runCommand } from "../../states/commands";
+    import * as i18n from "../../i18n.svelte";
 
     let { vestige, run }: { vestige: Vestige; run: Run } = $props();
     let element: HTMLDivElement;
@@ -341,6 +382,10 @@
 
     $effect(() => {
         editor?.setEditable(!project.projectState.locked, false);
+        const labels = {
+            restore: i18n.t("transcript.information.restore"), expand: i18n.t("transcript.information.expand"), collapse: i18n.t("transcript.information.collapse")
+        };
+        if (editor) untrack(() => refreshTranscriptInformation(editor!.view, labels));
     });
 
     $effect(() => {

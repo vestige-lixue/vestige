@@ -8,8 +8,12 @@ import { compositionPending } from "./composition";
 export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false): DOMRect[] {
     const result: DOMRect[] = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-        acceptNode: node => node.nodeType === Node.TEXT_NODE || includeBreaks && node instanceof HTMLBRElement
-            && !node.classList.contains("ProseMirror-trailingBreak") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+        acceptNode: node => {
+            const readonly = (node instanceof Element ? node : node.parentElement)?.closest("[contenteditable=\"false\"]");
+            if (readonly && readonly !== root && root.contains(readonly)) return NodeFilter.FILTER_REJECT;
+            return node.nodeType === Node.TEXT_NODE || includeBreaks && node instanceof HTMLBRElement
+                && !node.classList.contains("ProseMirror-trailingBreak") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
     });
     walker.currentNode = range.startContainer.childNodes[range.startOffset] ?? range.startContainer;
     const textRange = document.createRange();

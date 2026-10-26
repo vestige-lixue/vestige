@@ -31,6 +31,9 @@
                 duration: information.gaps.reduce((sum, gap) => sum + (gap.range ? gap.range.end - gap.range.start : 0), 0).toFixed(2)
             })}</div>
         {/if}
+        {#if information?.kind === "deletion"}
+            <div class="hint">{i18n.t("transcript.information.expandHint")}</div>
+        {/if}
     </div>
 {/snippet}
 
@@ -106,8 +109,16 @@
     .gaps {
         text-align: center;
     }
+    .hint {
+        color: var(--c-text-80p);
+        text-align: center;
+        white-space: nowrap;
+    }
     .compact .gaps {
-        flex-shrink: 0;
+        flex-shrink: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
     }
     .probabilities {
