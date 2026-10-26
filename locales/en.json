@@ -274,6 +274,8 @@
             "blankProbability": "No-speech:",
             "deletion": "Deleted",
             "gap": "No speech",
+            "characters": "{{count}} characters total",
+            "gaps": "Includes {{count}} no-speech intervals, {{duration}}s total",
             "estimated": "Estimated: "
         },
         "runs": {

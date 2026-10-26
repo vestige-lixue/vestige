@@ -5,6 +5,7 @@ import { createTextIndex, projectText, editText } from "../shared/transcript/tex
 import { modification, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange } from "./support/generators";
 import { checkProperty } from "./support/properties";
+import { middlePreview, previewUnits } from "../renderer/editor/preview";
 
 describe("transcriptInformation", () => {
     it("finds the complement of unsorted, overlapping speech intervals clipped to duration", () => {
@@ -137,5 +138,29 @@ describe("transcriptInformation", () => {
                 }
             }
         }));
+    });
+});
+
+describe("information previews", () => {
+    it("marks edge and repeated spaces, tabs and line breaks without changing ordinary internal spaces", () => {
+        const display = (text: string): string => previewUnits(text, "deleted").flat().map(part => part.text).join("");
+        expect(display(" a b  c\t\r\n ")).toBe("·a b··c→↵·");
+        expect(display(" \t\n\u00a0")).toBe("·→↵·");
+        expect(display("a b")).toBe("a b");
+    });
+
+    it("keeps complete combining and emoji graphemes on both sides of a middle omission", () => {
+        const units = previewUnits("e\u0301👩‍🔬abcdef🇨🇳", "deleted");
+        expect(middlePreview(units, 3).flat().map(part => part.text).join("")).toBe("e\u0301👩‍🔬…🇨🇳");
+        expect(middlePreview(units, units.length)).toBe(units);
+    });
+
+    it("places absorbed gaps at source positions and drops markers in omitted text", () => {
+        const spans = transcript(["a", "b", "c", "d"]);
+        const index = createTextIndex(spans);
+        const deletion = transcriptEvents(index, projectText(index, modification(spans, 0, 4, "")), 8)[0];
+        const units = previewUnits(deletion.original!, "deleted", deletion.gaps, deletion.sourceFrom);
+        expect(units.flat().map(part => part.text).join("")).toBe("a▼b▼c▼d▼");
+        expect(middlePreview(units, 2).flat().map(part => part.text).join("")).toBe("a…▼d▼");
     });
 });

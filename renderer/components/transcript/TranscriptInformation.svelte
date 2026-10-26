@@ -3,20 +3,7 @@
 {#snippet details(information: TranscriptInformation | null)}
     <div class="information" class:compact>
         {#if information?.original !== null && information?.original !== undefined}
-            <div class="original" class:deleted={information.kind === "deletion"}>
-                {#if information.kind === "deletion"}
-                    <NiceLabel value={information.original} editable={false} onchange={() => {}}
-                        scrollMode="ontime" scrollParam={2} scrollPause={1} autoScroll scrollPauseAtStart
-                    >
-                        <span class="deleted-text">{#each information.original.split(/(\r\n|[\r\n\t]|[^\S\r\n\t]+)/u) as part, index (index)}{#if part && /^\s+$/u.test(part)}<span
-                            class="whitespace" class:line-break={/[\r\n]/u.test(part)}
-                            data-symbol={part === "\t" ? "→\u00a0" : /[\r\n]/u.test(part) ? "↵" : "·".repeat(part.length)}
-                        >{part}</span>{:else}{part}{/if}{/each}</span>
-                    </NiceLabel>
-                {:else}
-                    {information.original || "—"}
-                {/if}
-            </div>
+            <div class="original" use:fitPreview={{ units: preview, compact }}></div>
         {/if}
         {#if !information || information.kind === "token"}
             <div class="probabilities">
@@ -34,7 +21,16 @@
             {#if information?.range}
                 {formatDuration(information.range.start, { precision: 2 })}–{formatDuration(information.range.end, { precision: 2 })} ({(information.range.end - information.range.start).toFixed(2)}s)
             {:else}—{/if}
+            {#if information?.kind === "deletion"}
+                <span class="length">{i18n.t("transcript.information.characters", { count: Array.from(information.original ?? "").length })}</span>
+            {/if}
         </div>
+        {#if information?.gaps?.length}
+            <div class="gaps">{i18n.t("transcript.information.gaps", {
+                count: information.gaps.length,
+                duration: information.gaps.reduce((sum, gap) => sum + (gap.range ? gap.range.end - gap.range.start : 0), 0).toFixed(2)
+            })}</div>
+        {/if}
     </div>
 {/snippet}
 
@@ -56,49 +52,32 @@
         align-items: center;
     }
     .original {
-        display: -webkit-box;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 4;
-        line-clamp: 4;
+        width: 360px;
+        max-width: 100%;
+        min-width: 0;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         overflow: hidden;
-        text-align: center;
-    }
-    .original.deleted {
-        display: block;
         padding: 0 4px;
-        white-space: pre;
+        text-align: left;
     }
-    .deleted-text {
+    .original :global(.preview-deleted) {
         padding: 1px 4px;
         border-radius: 4px;
         background: color-mix(in srgb, var(--c-danger) 10%, transparent);
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-danger) 20%, transparent);
         box-decoration-break: clone;
     }
-    .whitespace {
-        font-size: 0;
-    }
-    .whitespace::before {
-        content: attr(data-symbol);
+    .original :global(.preview-whitespace) {
         color: color-mix(in srgb, var(--c-danger) 65%, var(--c-text));
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 13px;
     }
-    .line-break {
-        white-space: nowrap;
+    .original :global(.preview-gap), .gaps {
+        color: var(--c-accent);
     }
     .compact .original {
-        display: block;
         flex: 1;
-        min-width: 0;
         white-space: pre;
-        text-overflow: ellipsis;
-    }
-    .compact .original.deleted {
-        flex: 0 1 auto;
-        text-align: left;
     }
     .range {
         white-space: nowrap;
@@ -112,6 +91,16 @@
         overflow: hidden;
         text-overflow: ellipsis;
         text-align: left;
+    }
+    .length {
+        margin-left: 8px;
+    }
+    .gaps {
+        text-align: center;
+    }
+    .compact .gaps {
+        flex-shrink: 0;
+        white-space: nowrap;
     }
     .probabilities {
         display: flex;
@@ -150,9 +139,10 @@
     import { formatDuration } from "../../format";
     import { type TranscriptInformation } from "../../editor/informationModel";
     import { type InspectionInformation } from "../../editor/information";
-    import NiceLabel from "../util/NiceLabel.svelte";
+    import { fitPreview, previewUnits } from "../../editor/preview";
 
     let { information, compact = false }: { information: InspectionInformation | null; compact?: boolean } = $props();
+    const preview = $derived(information?.original ? previewUnits(information.original, "deleted", information.gaps, information.sourceFrom) : []);
 
     function formatProbability(value: number | null | undefined): string {
         return value == null ? "—" : `${(value * 100).toFixed(1).replace(/\.0$/, "")}%`;

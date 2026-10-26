@@ -274,6 +274,8 @@
             "blankProbability": "无语音",
             "deletion": "删除",
             "gap": "无语音",
+            "characters": "共 {{count}} 个字符",
+            "gaps": "含 {{count}} 段无语音，共 {{duration}}s",
             "estimated": "预计的："
         },
         "runs": {
