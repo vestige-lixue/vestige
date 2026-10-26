@@ -1,23 +1,7 @@
-{#if information?.kind === "events"}
-    <div class="events" class:compact>
-        {#each information.items as item (item.key)}
-            <div class="event" class:deletion={item.kind === "deletion"}>
-                {#if !compact}{@render kind(item)}{/if}
-                {@render details(item, compact)}
-            </div>
-        {/each}
-    </div>
-{:else}
-    {@render details(information)}
-{/if}
+{@render details(information)}
 
-{#snippet kind(information: TranscriptInformation)}
-    <span class="kind">{i18n.t(information.kind === "deletion" ? "transcript.information.deletion" : "transcript.information.gap")}</span>
-{/snippet}
-
-{#snippet details(information: TranscriptInformation | null, showKind = false)}
+{#snippet details(information: TranscriptInformation | null)}
     <div class="information" class:compact>
-        {#if showKind && information}{@render kind(information)}{/if}
         {#if information?.original !== null && information?.original !== undefined}
             <div class="original" class:deleted={information.kind === "deletion"}>
                 {#if information.kind === "deletion"}
@@ -56,42 +40,6 @@
 
 
 <style>
-    .events {
-        display: flex;
-        flex-direction: column;
-        gap: 12px 20px;
-        min-width: 0;
-        font-size: 13px;
-    }
-    .events.compact {
-        gap: 6px;
-    }
-    .events:not(.compact) {
-        display: grid;
-        grid-template-columns: max-content minmax(0, 1fr);
-        align-items: center;
-        column-gap: 8px;
-    }
-    .events:not(.compact) .event {
-        display: contents;
-    }
-    .event {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .compact .event {
-        flex-shrink: 0;
-        max-width: 100%;
-    }
-    .kind {
-        flex-shrink: 0;
-        color: var(--c-accent);
-        white-space: nowrap;
-    }
-    .deletion .kind {
-        color: var(--c-danger);
-    }
     .information {
         display: flex;
         flex-direction: column;
@@ -151,9 +99,6 @@
     .compact .original.deleted {
         flex: 0 1 auto;
         text-align: left;
-    }
-    .events.compact .information {
-        flex: 1;
     }
     .range {
         white-space: nowrap;

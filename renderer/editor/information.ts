@@ -1,7 +1,7 @@
 import { type Node as PMNode } from "@tiptap/pm/model";
 import { Plugin, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { transcriptEvents, groupTranscriptEvents, type InspectionInformation } from "./informationModel";
+import { transcriptEvents, type InspectionInformation } from "./informationModel";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { inspectionGeometry } from "./geometry";
 import { inspectionController, type InspectionCallbacks } from "./interaction";
@@ -20,13 +20,15 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
         events: PlaybackEvent[];
         latestEnd: number[];
     } {
-        const groups = groupTranscriptEvents(transcriptEvents(index, projection, options.duration));
+        const information = transcriptEvents(index, projection, options.duration);
         const byKey = new Map<string, InspectionInformation>();
         const events: PlaybackEvent[] = [];
-        const decorations = [...groups].map(([position, information]) => {
+        const decorations = information.map(information => {
+            const position = information.from;
             byKey.set(information.key, information);
-            const items = information.kind === "events" ? information.items : [information];
+            const items = [information, ...information.gaps ?? []];
             for (const item of items) {
+                byKey.set(item.key, item);
                 if (item.range) events.push({ ...item.range, key: information.key });
             }
             // Keep the default end-of-document caret inside the last text node.
@@ -41,9 +43,8 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 // Native buttons inside contenteditable distort Chromium's IME text offsets.
                 const marker = document.createElement("span");
                 marker.tabIndex = 0;
-                marker.className = `transcript-event ${[...new Set(items.map(item => item.kind))].join(" ")} focusable`;
+                marker.className = `transcript-event ${information.kind} focusable`;
                 marker.dataset.inspection = information.key;
-                if (items.length > 1) marker.dataset.count = String(items.length);
                 const shape = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                 shape.classList.add("transcript-event-shape");
                 shape.setAttribute("viewBox", "0 0 10 10");
@@ -51,8 +52,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 // Cover the inner half of the stroke to preserve the triangle's filled size.
                 for (const [className, path] of [
                     ["transcript-event-stroke", "M0 0H10L5 10Z"],
-                    ["", "M0 0H10L5 10Z"],
-                    ["transcript-event-split", "M5 0H10L5 10Z"]
+                    ["", "M0 0H10L5 10Z"]
                 ]) {
                     const part = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     if (className) part.classList.add(className);
@@ -95,7 +95,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 const { events, latestEnd } = informationOf(view.state);
                 const keys = new Set<string>();
                 const first = firstTrue(events.length, index => events[index].start > time);
-                // Separate deletions can share token times; grouped events can share one marker.
+                // Separate deletions can share token times; absorbed gaps highlight their deletion marker.
                 for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
                     if (time < events[i].end) keys.add(events[i].key);
                 }

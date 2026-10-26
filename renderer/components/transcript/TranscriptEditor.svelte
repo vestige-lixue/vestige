@@ -225,32 +225,12 @@
         fill: currentColor;
         transition: transform .12s ease;
     }
-    .editor :global(.transcript-event-split) {
-        display: none;
-        fill: var(--c-accent);
-    }
-    .editor :global(.transcript-event.deletion.gap .transcript-event-split) {
-        display: initial;
-    }
     .editor :global(.transcript-event-stroke) {
         fill: none;
         stroke: var(--c-background);
         stroke-width: 2px;
         stroke-linejoin: round;
         vector-effect: non-scaling-stroke;
-    }
-    .editor :global(.transcript-event[data-count]::after) {
-        content: attr(data-count);
-        position: absolute;
-        bottom: calc(100% - .25em);
-        left: 50%;
-        transform: translateX(-50%);
-        width: max-content;
-        white-space: nowrap;
-        color: var(--c-text-80p);
-        font-size: .7em;
-        font-variant-numeric: tabular-nums;
-        line-height: 1;
     }
     .editor :global(.transcript-event:hover .transcript-event-shape), .editor :global(.transcript-event:focus-visible .transcript-event-shape) {
         transform: scale(1.25);

@@ -7,10 +7,13 @@ export type TranscriptInformation = {
     // UTF-16 offsets in the current displayed text, excluding editor node boundaries.
     from: number;
     to: number;
+    sourceFrom: number;
+    sourceTo: number;
     range: Range | null;
     original: string | null;
     probability: number | null;
     blankProbability: number | null;
+    gaps?: TranscriptInformation[];
 };
 
 type SpeechInterval = { start: number; end: number; offset: number };
@@ -46,6 +49,7 @@ function pieceInformation(index: TextIndex, piece: TextPiece): TranscriptInforma
         key: `${piece.source.kind}-${piece.source.index}`,
         kind: segment ? "token" : "deletion",
         from: piece.utf16From, to: piece.utf16To, range,
+        sourceFrom: piece.sourceFrom, sourceTo: piece.sourceTo,
         original: segment ? null : index.characters.slice(piece.sourceFrom, piece.sourceTo).join(""),
         probability: segment?.token.prob ?? null,
         blankProbability: segment?.blankProb ?? null
@@ -99,6 +103,7 @@ function gapInformation(index: TextIndex, projection: TextProjection, duration: 
         const from = projectedOffset(projection, gap.offset);
         return {
             key: `gap-${gap.start}-${gap.end}`, kind: "gap", from, to: from,
+            sourceFrom: gap.offset, sourceTo: gap.offset,
             range: { start: gap.start, end: gap.end }, original: null, probability: null, blankProbability: null
         };
     });
@@ -106,51 +111,33 @@ function gapInformation(index: TextIndex, projection: TextProjection, duration: 
 
 export function transcriptEvents(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
     const result: TranscriptInformation[] = [];
+    const deletions = new Map<number, TranscriptInformation>();
     projection.modifications.forEach((modification, modificationIdx) => {
         if (modification.type !== "delete") return;
         const sourceFrom = index.starts[modification.range.start.segmentIdx] + modification.range.start.offset;
         const sourceTo = index.starts[modification.range.end.segmentIdx] + modification.range.end.offset;
         const position = projectedOffset(projection, sourceFrom);
-        result.push(pieceInformation(index, {
+        const information = pieceInformation(index, {
             source: { kind: "modification", index: modificationIdx }, sourceFrom, sourceTo,
             from: 0, to: 0, utf16From: position, utf16To: position, text: ""
-        }));
+        });
+        information.gaps = [];
+        result.push(information);
+        deletions.set(position, information);
     });
-    return [...result, ...gapInformation(index, projection, duration)];
+    for (const gap of gapInformation(index, projection, duration)) {
+        const deletion = deletions.get(gap.from);
+        if (deletion) deletion.gaps!.push(gap);
+        else result.push(gap);
+    }
+    return result;
 }
 
 export function transcriptInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
     return [
-        ...textPieces(index, projection)
-            .filter(piece => piece.source.kind === "segment" || projection.modifications[piece.source.index].type === "delete")
-            .map(piece => pieceInformation(index, piece)),
-        ...gapInformation(index, projection, duration)
+        ...tokens(index, projection, textPieces(index, projection)),
+        ...transcriptEvents(index, projection, duration)
     ];
 }
 
-export type InspectionInformation = TranscriptInformation | {
-    key: string;
-    kind: "events";
-    items: TranscriptInformation[];
-    range: TranscriptInformation["range"];
-};
-
-export function groupTranscriptEvents(items: TranscriptInformation[]): Map<number, InspectionInformation> {
-    const groups = new Map<number, TranscriptInformation[]>();
-    for (const item of items) {
-        if (item.kind !== "deletion" && item.kind !== "gap") continue;
-        const group = groups.get(item.from) ?? [];
-        group.push(item);
-        groups.set(item.from, group);
-    }
-    return new Map([...groups].map(([position, group]) => {
-        group.sort((left, right) => (left.range?.start ?? Infinity) - (right.range?.start ?? Infinity));
-        const information: InspectionInformation = group.length === 1 ? group[0] : {
-            key: `events/${group.map(item => item.key).join("/")}`, kind: "events", items: group,
-            range: group.reduce<TranscriptInformation["range"]>((range, item) => !item.range ? range : !range ? item.range : {
-                start: Math.min(range.start, item.range.start), end: Math.max(range.end, item.range.end)
-            }, null)
-        };
-        return [position, information];
-    }));
-}
+export type InspectionInformation = TranscriptInformation;
