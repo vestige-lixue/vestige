@@ -1,6 +1,6 @@
 {@render details(information)}
 
-{#snippet details(information: TranscriptInformation | null)}
+{#snippet details(information: InspectionInformation | null)}
     <div class="information" class:compact>
         {#if information?.original !== null && information?.original !== undefined}
             <div class="original" use:fitPreview={{ units: preview, compact }}></div>
@@ -137,7 +137,6 @@
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
     import { formatDuration } from "../../format";
-    import { type TranscriptInformation } from "../../editor/informationModel";
     import { type InspectionInformation } from "../../editor/information";
     import { fitPreview, previewUnits } from "../../editor/preview";
 

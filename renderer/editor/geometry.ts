@@ -1,7 +1,7 @@
 import { type EditorState } from "@tiptap/pm/state";
 import { type EditorView } from "@tiptap/pm/view";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
-import { transcriptTokens, transcriptTokenGroup, type InspectionInformation, type TranscriptInformation } from "./informationModel";
+import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type TranscriptInformation } from "./informationModel";
 import { compositionPending } from "./composition";
 
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
@@ -84,12 +84,12 @@ export type InspectionGeometry = {
 
 export function inspectionGeometry(
     view: EditorView, index: TextIndex, projectionOf: (state: EditorState) => TextProjection,
-    events: () => Map<string, InspectionInformation>
+    events: () => Map<string, InspectionInformation>, duration: number
 ): InspectionGeometry {
     function eventMarker(target: EventTarget | null): HTMLElement | null {
         return target instanceof Element ? target.closest<HTMLElement>(".transcript-event") : null;
     }
-    function rectangles(item: TranscriptInformation): DOMRect[] {
+    function rectangles(item: { from: number; to: number }): DOMRect[] {
         const start = view.domAtPos(item.from + 1, 1);
         const end = view.domAtPos(item.to + 1, -1);
         const range = document.createRange();
@@ -150,7 +150,16 @@ export function inspectionGeometry(
                 const item = events().get(button.dataset.inspection!);
                 if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: true, pressed: false };
             }
-            if (!control || element !== view.dom || !view.state.selection.empty) return null;
+            if (!control || element !== view.dom) return null;
+            if (!view.state.selection.empty) {
+                const selection = view.state.selection;
+                const item = transcriptSelection(index, projectionOf(view.state), duration, selection.from - 1, selection.to - 1);
+                if (!item) return null;
+                const boxes = rectangles(item);
+                const caret = view.coordsAtPos(selection.head);
+                const anchor = keyboardRectangle(boxes, caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+                return { information: item, rectangles: [boxes], anchor, keyboard: true, pressed: false };
+            }
             const offset = view.state.selection.head - 1;
             // A caret at a boundary belongs to the following character; the document end has none.
             const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);

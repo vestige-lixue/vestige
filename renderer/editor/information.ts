@@ -115,7 +115,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 }
             }
             updatePlayback();
-            const geometry = inspectionGeometry(view, index, projectionOf, () => informationOf(view.state).byKey);
+            const geometry = inspectionGeometry(view, index, projectionOf, () => informationOf(view.state).byKey, options.duration);
             const interaction = inspectionController(view, geometry, options);
             const observer = new ResizeObserver(interaction.refresh);
             observer.observe(view.dom);

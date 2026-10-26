@@ -140,4 +140,62 @@ export function transcriptInformation(index: TextIndex, projection: TextProjecti
     ];
 }
 
-export type InspectionInformation = TranscriptInformation;
+export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
+    kind: "selection";
+    selectionFrom: number;
+    selectionTo: number;
+    tokens: number[];
+    deletions: TranscriptInformation[];
+};
+
+// Selection and geometry use displayed UTF-16 offsets; source identities remain codepoint offsets.
+export function transcriptSelection(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): SelectionInformation | null {
+    if (from >= to || !Number.isFinite(duration) || duration <= 0) return null;
+    const whitespace = /^\s+$/u.test(projection.text.slice(from, to));
+    const tokenIndices = new Set<number>();
+    const replacements = new Set<number>();
+    for (const piece of textPieces(index, projection, from, to, true)) {
+        const first = Math.max(from, piece.utf16From);
+        const end = Math.min(to, piece.utf16To);
+        if (first >= end) continue;
+        if (piece.source.kind === "segment") {
+            if (whitespace || /\S/u.test(piece.text.slice(first - piece.utf16From, end - piece.utf16From))) tokenIndices.add(piece.source.index);
+        }
+        else replacements.add(piece.sourceFrom);
+    }
+    const deletions = transcriptEvents(index, projection, duration).filter(item => item.kind === "deletion"
+        && (from < item.from && item.from < to || replacements.has(item.sourceTo)));
+    const tokens = [...tokenIndices];
+    let start = Infinity;
+    let end = -Infinity;
+    let sourceFrom = Infinity;
+    let sourceTo = -Infinity;
+    function include(range: Range | null, first: number, last: number): void {
+        if (!range) return;
+        start = Math.min(start, range.start);
+        end = Math.max(end, range.end);
+        sourceFrom = Math.min(sourceFrom, first);
+        sourceTo = Math.max(sourceTo, last);
+    }
+    for (const segmentIdx of tokens) include(index.transcript[segmentIdx].range, index.starts[segmentIdx], index.starts[segmentIdx + 1]);
+    for (const deletion of deletions) include(deletion.range, deletion.sourceFrom, deletion.sourceTo);
+    start = Math.max(0, Math.min(duration, start));
+    end = Math.max(0, Math.min(duration, end));
+    if (start >= end) return null;
+    let first = from;
+    let last = to;
+    if (tokens.length) {
+        for (const piece of sourceTextPieces(index, projection, index.starts[tokens[0]], index.starts[tokens[tokens.length - 1] + 1])) {
+            if (piece.source.kind !== "segment" || !tokenIndices.has(piece.source.index)) continue;
+            first = Math.min(first, piece.utf16From);
+            last = Math.max(last, piece.utf16To);
+        }
+    }
+    return {
+        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${start}-${end}`,
+        kind: "selection", from: first, to: last, selectionFrom: from, selectionTo: to, sourceFrom, sourceTo,
+        tokens, deletions, range: { start, end }, original: null, probability: null, blankProbability: null
+    };
+}
+
+export type InspectionInformation = TranscriptInformation | SelectionInformation;

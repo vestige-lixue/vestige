@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
-import { transcriptEvents, transcriptInformation } from "../renderer/editor/informationModel";
+import { transcriptEvents, transcriptInformation, transcriptSelection } from "../renderer/editor/informationModel";
 import { createTextIndex, projectText, editText } from "../shared/transcript/text";
 import { modification, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange } from "./support/generators";
@@ -162,5 +162,64 @@ describe("information previews", () => {
         const units = previewUnits(deletion.original!, "deleted", deletion.gaps, deletion.sourceFrom);
         expect(units.flat().map(part => part.text).join("")).toBe("a▼b▼c▼d▼");
         expect(middlePreview(units, 2).flat().map(part => part.text).join("")).toBe("a…▼d▼");
+    });
+});
+
+describe("selection information", () => {
+    it("expands partial tokens and all surviving fragments into one continuous outline", () => {
+        const spans = transcript(["hello", " world"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 2, 2, "X"));
+        expect(transcriptSelection(index, projection, 3, 3, 4)).toMatchObject({
+            kind: "selection", from: 0, to: 6, tokens: [0], range: { start: 0, end: 1 }, probability: null, blankProbability: null
+        });
+        expect(transcriptSelection(index, projection, 3, 4, 9)).toMatchObject({ from: 0, to: 12, tokens: [0, 1], range: { start: 0, end: 3 } });
+    });
+
+    it("ignores a next token selected only by its leading space after a Windows double-click", () => {
+        const index = createTextIndex(transcript(["hello", " world"]));
+        expect(transcriptSelection(index, projectText(index, []), 3, 0, 6)).toMatchObject({ from: 0, to: 6, tokens: [0], range: { start: 0, end: 1 } });
+    });
+
+    it("includes whitespace owners only when the complete selection is whitespace", () => {
+        const index = createTextIndex(transcript(["a ", "\t", " b"]));
+        const projection = projectText(index, []);
+        expect(transcriptSelection(index, projection, 5, 1, 4)).toMatchObject({ from: 0, to: 5, tokens: [0, 1, 2], range: { start: 0, end: 5 } });
+        expect(transcriptSelection(index, projection, 5, 0, 3)).toMatchObject({ tokens: [0], range: { start: 0, end: 1 } });
+    });
+
+    it("includes boundary deletions only when their replacement text is selected", () => {
+        const spans = transcript(["O", "u", "tro"]);
+        const index = createTextIndex(spans);
+        const replacement = projectText(index, modification(spans, 1, 2, "h"));
+        expect(transcriptSelection(index, replacement, 5, 1, 2)).toMatchObject({
+            tokens: [], deletions: [{ original: "u" }], range: { start: 2, end: 3 }
+        });
+        expect(transcriptSelection(index, replacement, 5, 0, 1)).toMatchObject({ deletions: [], range: { start: 0, end: 1 } });
+        expect(transcriptSelection(index, replacement, 5, 2, 3)).toMatchObject({ deletions: [], range: { start: 4, end: 5 } });
+        const removed = projectText(index, modification(spans, 1, 2, ""));
+        expect(transcriptSelection(index, removed, 5, 0, 2)).toMatchObject({ deletions: [{ original: "u" }] });
+        expect(transcriptSelection(index, removed, 5, 1, 2)).toMatchObject({ deletions: [] });
+    });
+
+    it("assigns no audio to ordinary insertion-only selections and excludes gaps", () => {
+        const spans = transcript(["a", "b"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 1, 1, "X"));
+        expect(transcriptSelection(index, projection, 10, 1, 2)).toBeNull();
+        expect(transcriptSelection(index, projection, 10, 1, 3)).toMatchObject({ from: 1, to: 3, range: { start: 2, end: 3 } });
+    });
+
+    it("takes the envelope of unsorted overlapping times and clips it to duration", () => {
+        const spans = transcript(["a", "b", "c"]);
+        spans[0].range = { start: 7, end: 14 };
+        spans[1].range = { start: -2, end: 3 };
+        spans[2].range = { start: 2, end: 9 };
+        const index = createTextIndex(spans);
+        const projection = projectText(index, []);
+        expect(transcriptSelection(index, projection, 10, 0, 2)?.range).toEqual({ start: 0, end: 10 });
+        expect(transcriptSelection(index, projection, 10, 1, 3)?.range).toEqual({ start: 0, end: 9 });
+        expect(transcriptSelection(index, projection, 6, 0, 1)).toBeNull();
+        expect(transcriptSelection(index, projection, 10, 0, 1)?.key).not.toBe(transcriptSelection(index, projection, 10, 0, 2)?.key);
     });
 });
