@@ -185,15 +185,15 @@ describe("text projection and editing", () => {
                     expect(item.text).not.toBe("");
                     expect(anchors.has(position)).toBe(false);
                     anchors.add(position);
-                    expect(deletions.some(range => range.from < position && position <= range.to)).toBe(false);
-                    const deletion = deletions.find(range => range.from === position);
+                    expect(deletions.some(range => range.from <= position && position < range.to)).toBe(false);
+                    const deletion = deletions.find(range => range.to === position);
                     if (deletion) {
                         const inserted = [...item.text];
                         const deleted = index.characters.slice(deletion.from, deletion.to);
                         expect(inserted[0]).not.toBe(deleted[0]);
                         expect(inserted.at(-1)).not.toBe(deleted.at(-1));
                         for (let length = 1; length <= Math.min(inserted.length, deleted.length); length++) {
-                            expect(inserted.slice(-length).join("")).not.toBe(deleted.slice(0, length).join(""));
+                            expect(inserted.slice(0, length).join("")).not.toBe(deleted.slice(-length).join(""));
                         }
                     }
                 }
@@ -206,17 +206,19 @@ describe("text projection and editing", () => {
         { original: "Outro", from: 3, to: 4, inserted: "ar", insertion: [3, "a"] as const, deletion: null, text: "Outaro" },
         { original: "Outro", from: 2, to: 4, inserted: "t", insertion: null, deletion: [3, 4] as const, text: "Outo" },
         { original: "Outro", from: 2, to: 4, inserted: "r", insertion: null, deletion: [2, 3] as const, text: "Ouro" },
-        { original: "rx", from: 0, to: 2, inserted: "ar", insertion: [0, "a"] as const, deletion: [1, 2] as const, text: "ar" },
+        { original: "rx", from: 0, to: 2, inserted: "ar", insertion: [2, "ar"] as const, deletion: [0, 2] as const, text: "ar" },
         { original: "Outro", from: 0, to: 5, inserted: "Outro", insertion: null, deletion: null, text: "Outro" },
-        { original: "𝄞中x", from: 0, to: 3, inserted: "a𝄞中", insertion: [0, "a"] as const, deletion: [2, 3] as const, text: "a𝄞中" }
+        { original: "𝄞中x", from: 0, to: 3, inserted: "a𝄞中", insertion: [3, "a𝄞中"] as const, deletion: [0, 3] as const, text: "a𝄞中" },
+        { original: "rx", from: 0, to: 2, inserted: "xa", insertion: [2, "a"] as const, deletion: [0, 1] as const, text: "xa" },
+        { original: "𝄞中x", from: 0, to: 3, inserted: "中xa", insertion: [3, "a"] as const, deletion: [0, 1] as const, text: "中xa" }
     ])("restores D18 source boundaries for $original / $inserted", ({ original, from, to, inserted, insertion, deletion, text }) => {
         const spans = transcript([...original]);
         const index = createTextIndex(spans);
         const removed = editText(index, projectText(index, []), from, to, "");
         const value = editText(index, removed, from, from, inserted);
         const expected = [
-            ...insertion ? modification(spans, insertion[0], insertion[0], insertion[1]) : [],
-            ...deletion ? modification(spans, deletion[0], deletion[1], "") : []
+            ...deletion ? modification(spans, deletion[0], deletion[1], "") : [],
+            ...insertion ? modification(spans, insertion[0], insertion[0], insertion[1]) : []
         ];
         expect(value.text).toBe(text);
         expect(value.modifications).toEqual(expected);
@@ -228,8 +230,8 @@ describe("text projection and editing", () => {
         const index = createTextIndex(transcript(["ab"]));
         let value = editText(index, projectText(index, []), 0, 2, "");
         value = editText(index, value, 0, 0, "x");
-        value = editText(index, value, 0, 0, "b");
-        const next = editText(index, value, 1, 2, "");
+        value = editText(index, value, 1, 1, "a");
+        const next = editText(index, value, 0, 1, "");
         expect(textPieces(index, next).filter(piece => piece.text).map(piece => piece.source.kind)).toEqual(["segment"]);
         expect(provenanceChange(index, value, next)).toEqual({ from: 0, to: 1 });
     });
@@ -243,8 +245,8 @@ describe("text projection and editing", () => {
         value = editText(index, value, 2, 2, "Y");
         expect(value.text).toBe("aXYX");
         expect(value.modifications).toEqual([
-            { type: "insert", pos: sourcePosition(spans, 1), text: "XYX" },
-            { type: "delete", range: { start: sourcePosition(spans, 1), end: sourcePosition(spans, 2) } }
+            { type: "delete", range: { start: sourcePosition(spans, 1), end: sourcePosition(spans, 2) } },
+            { type: "insert", pos: sourcePosition(spans, 2), text: "XYX" }
         ]);
     });
 
@@ -256,10 +258,10 @@ describe("text projection and editing", () => {
         value = editText(index, value, 2, 3, "");
         expect(value.text).toBe("Ouao");
         expect(value.modifications).toEqual([
-            { type: "insert", pos: sourcePosition(spans, 2), text: "a" },
-            { type: "delete", range: { start: sourcePosition(spans, 2), end: sourcePosition(spans, 4) } }
+            { type: "delete", range: { start: sourcePosition(spans, 2), end: sourcePosition(spans, 4) } },
+            { type: "insert", pos: sourcePosition(spans, 4), text: "a" }
         ]);
-        expect(textPieces(index, value).find(piece => piece.sourceFrom === 2 && piece.sourceTo === 4)).toMatchObject({ from: 3, to: 3, text: "" });
+        expect(textPieces(index, value).find(piece => piece.sourceFrom === 2 && piece.sourceTo === 4)).toMatchObject({ from: 2, to: 2, text: "" });
         expect(editText(index, value, 3, 3, "tr").text).toBe("Ouatro");
     });
 
@@ -276,11 +278,39 @@ describe("text projection and editing", () => {
         ];
         const value = projectText(index, changes);
         expect(value.text).toBe("aAB1B2Cd");
-        expect(value.modifications[0]).toEqual({ type: "insert", pos: sourcePosition(spans, 1), text: "AB1B2C" });
+        expect(value.modifications).toEqual([
+            { type: "delete", range: { start: sourcePosition(spans, 1), end: sourcePosition(spans, 3) } },
+            { type: "insert", pos: sourcePosition(spans, 3), text: "AB1B2C" }
+        ]);
         expect(normalizeModifications(index, [
             { type: "insert", pos: sourcePosition(spans, 0), text: "" },
             { type: "delete", range: { start: sourcePosition(spans, 0), end: sourcePosition(spans, 0) } }
         ])).toEqual([]);
+    });
+
+    it("anchors text typed at a deletion marker after the deletion", () => {
+        const spans = transcript(["Outro"]);
+        const index = createTextIndex(spans);
+        const removed = editText(index, projectText(index, []), 1, 2, "");
+        const value = editText(index, removed, 1, 1, "h");
+        expect(value.text).toBe("Ohtro");
+        expect(value.modifications).toEqual([
+            ...modification(spans, 1, 2, ""),
+            ...modification(spans, 2, 2, "h")
+        ]);
+        expect(textPieces(index, value).filter(piece => piece.source.kind === "modification").map(piece => ({
+            from: piece.from, to: piece.to, text: piece.text
+        }))).toEqual([{ from: 1, to: 1, text: "" }, { from: 1, to: 2, text: "h" }]);
+    });
+
+    it.each(["", "h"])("restores a deletion by typing its original before replacement %s", replacement => {
+        const spans = transcript(["Outro"]);
+        const index = createTextIndex(spans);
+        const removed = editText(index, projectText(index, []), 1, 2, replacement);
+        const restored = editText(index, removed, 1, 1, "u");
+        expect(restored.text).toBe("Ou" + replacement + "tro");
+        expect(restored.modifications).toEqual(modification(spans, 2, 2, replacement));
+        expect(textPieces(index, restored)).toEqual(textPieces(index, projectText(index, restored.modifications)));
     });
 
     it("preserves different surviving source characters even when displayed strings match", () => {

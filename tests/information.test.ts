@@ -54,7 +54,7 @@ describe("transcriptInformation", () => {
         ]);
     });
 
-    it("keeps the deleted u marker after inserting h in Outro (R5)", () => {
+    it("keeps the deleted u marker before inserted h in Outro (D20)", () => {
         const spans = transcript(["O", "u", "t", "r", "o"]);
         const index = createTextIndex(spans);
         const deleted = editText(index, projectText(index, []), 1, 2, "");
@@ -62,18 +62,18 @@ describe("transcriptInformation", () => {
         const items = transcriptInformation(index, inserted, 9);
         expect(inserted.text).toBe("Ohtro");
         expect(items.filter(item => item.kind === "deletion")).toMatchObject([
-            { original: "u", from: 2, to: 2, range: { start: 2, end: 3 }, probability: null, blankProbability: null }
+            { original: "u", from: 1, to: 1, range: { start: 2, end: 3 }, probability: null, blankProbability: null }
         ]);
         expect(items.some(item => item.kind === "token" && item.from < 2 && item.to > 1)).toBe(false);
     });
 
-    it("maps a source gap inside a deletion to its marker after inserted text", () => {
+    it("maps a source gap inside a deletion to its marker before inserted text", () => {
         const spans = transcript(["ab", "cd"]);
         const index = createTextIndex(spans);
         const value = projectText(index, modification(spans, 1, 3, "😀"));
         const items = transcriptInformation(index, value, 3);
         expect(value.text).toBe("a😀d");
-        expect(items.find(item => item.kind === "gap")).toMatchObject({ from: 3, to: 3, range: { start: 1, end: 2 } });
-        expect(items.find(item => item.kind === "deletion")).toMatchObject({ from: 3, to: 3, original: "bc" });
+        expect(items.find(item => item.kind === "gap")).toMatchObject({ from: 1, to: 1, range: { start: 1, end: 2 } });
+        expect(items.find(item => item.kind === "deletion")).toMatchObject({ from: 1, to: 1, original: "bc" });
     });
 });
