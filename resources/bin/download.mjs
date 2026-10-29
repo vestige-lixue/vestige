@@ -143,7 +143,8 @@ function inside(parent, path) {
 
 async function extract(archive, directory) {
     const zip = archive.endsWith(".zip") && process.platform !== "win32";
-    const executable = zip ? "unzip" : "tar";
+    // Git Bash puts GNU tar first in PATH, which reads "D:\..." as a remote host; Windows ships bsdtar.
+    const executable = zip ? "unzip" : process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
     const { stdout } = await run(executable, zip ? ["-Z1", archive] : ["-tf", archive], { windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
     for (const entry of stdout.split(/\r?\n/).filter(Boolean)) {
         const path = entry.replaceAll("\\", "/");
