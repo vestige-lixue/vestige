@@ -44,8 +44,7 @@ jobs:
       - name: Validate the version and select build targets
         id: prepare
         env:
-          # Tags release Windows x64 only until the other targets have a verified aria2 package.
-          TARGET: ${{ inputs.target || 'windows-x64' }}
+          TARGET: ${{ inputs.target || 'all' }}
         shell: bash
         run: |
           node --input-type=module <<'NODE'

@@ -78,18 +78,24 @@ async function resolveDownloads(platform, arch, selected) {
             };
         }
         if (name === "aria2") {
-            if (platform !== "win32" || arch !== "x64") {
-                throw new Error(`No verified aria2 archive is configured for ${platform}/${arch}. `
-                    + "Supply aria2c and its distribution notices in resources/bin/aria2, then prepare the other packages with --only.");
-            }
-            // This official release predates GitHub asset digests. Pin its SHA-256 from the winget manifest.
-            const repo = "aria2/aria2", tag = "release-1.37.0", assetName = "aria2-1.37.0-win-64bit-build1.zip";
+            // Native builds of the official source. Pin the release and its archives together;
+            // a newer build recipe publishes a new release instead of replacing these assets.
+            const repo = "vestige-lixue/aria2", tag = "native-aria2-1.37.0-02f2d0d8472b-8f2e27f10306";
+            const archives = {
+                "win32-x64": [2371429, "d6c1a7206c3b85979787811ddd6c17d1dec9462aa55eb7f14440e8eaa391ec50"],
+                "win32-arm64": [2210004, "b02c32d72b8960162d6a7afceed160c59f5257edbef316fc71b4e199e9fff6fc"],
+                "darwin-x64": [3792340, "b58d773e25970223d97f77f3fb2ff532b1439ce41d5f5c970bed6bac975e4916"],
+                "darwin-arm64": [3844574, "e3f8127364aaf79e41f2e245cad29bab3c1b88a563837e7336423366a657c8e6"],
+                "linux-x64": [5026032, "d65f26664d45cfa33d1219ddb327d970373a2d2bcd1a73a9fbad9b23a706d2be"],
+                "linux-arm64": [5161474, "44e5503175cddf54b08901d35dcb170566a0caffe18e39bcb9e0715a20d0c352"]
+            };
+            const [size, sha256] = archives[`${platform}-${arch}`];
+            const assetName = `aria2-bin-${platform}-${arch}.${platform === "win32" ? "zip" : "tar.gz"}`;
             return {
                 name, repo, tag, page: `https://github.com/${repo}/releases/tag/${tag}`,
-                programs: ["aria2c.exe"], licenseURL: null,
+                programs: ["aria2c" + suffix], licenseURL: null,
                 downloads: [{ asset: {
-                    name: assetName, size: 2475379,
-                    digest: "sha256:67d015301eef0b612191212d564c5bb0a14b5b9c4796b76454276a4d28d9b288",
+                    name: assetName, size, digest: `sha256:${sha256}`,
                     browser_download_url: `https://github.com/${repo}/releases/download/${tag}/${assetName}`
                 } }]
             };
@@ -273,7 +279,7 @@ async function main() {
     if (settings.help) {
         console.log("Usage: node resources/bin/download.mjs [--dry-run] [--only ffmpeg|aria2|vad] [--platform win32|linux|darwin] [--arch x64|arm64]\n"
             + "Downloads media and download tools, the VAD model, shared libraries and licenses. Transcription backends are downloaded in the app.\n"
-            + "Replaces the selected package directories only after all selected packages are ready; defaults to all three. aria2's verified archive is Windows x64 only.");
+            + "Replaces the selected package directories only after all selected packages are ready; defaults to all three.");
         return;
     }
     const selected = settings.only === null ? names : [settings.only];
