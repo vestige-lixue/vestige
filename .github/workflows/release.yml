@@ -194,7 +194,8 @@ jobs:
               --repo "$GITHUB_REPOSITORY" --clobber
           else
             args=(--draft --verify-tag --generate-notes --title "Vestige $VERSION")
-            if [[ "${VERSION%%+*}" == *-* ]]; then
+            # Every 0.x release is a pre-release.
+            if [[ "$VERSION" == 0.* ]]; then
               args+=(--prerelease)
             fi
             gh release create "$RELEASE_TAG" "${files[@]}" SHA256SUMS \
