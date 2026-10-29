@@ -34,6 +34,7 @@ jobs:
     outputs:
       version: ${{ steps.prepare.outputs.version }}
       matrix: ${{ steps.prepare.outputs.matrix }}
+      files: ${{ steps.prepare.outputs.files }}
     steps:
       - name: Check out the application
         uses: actions/checkout@v7.0.1
@@ -43,7 +44,8 @@ jobs:
       - name: Validate the version and select build targets
         id: prepare
         env:
-          TARGET: ${{ inputs.target || 'all' }}
+          # Tags release Windows x64 only until the other targets have a verified aria2 package.
+          TARGET: ${{ inputs.target || 'windows-x64' }}
         shell: bash
         run: |
           node --input-type=module <<'NODE'
@@ -58,16 +60,17 @@ jobs:
           }
 
           const targets = [
-              { target: "windows-x64", os: "windows-2025", platform: "win32", builder: "win", arch: "x64" },
-              { target: "windows-arm64", os: "windows-11-arm", platform: "win32", builder: "win", arch: "arm64" },
-              { target: "macos-x64", os: "macos-15-intel", platform: "darwin", builder: "mac", arch: "x64" },
-              { target: "macos-arm64", os: "macos-26", platform: "darwin", builder: "mac", arch: "arm64" },
-              { target: "linux-x64", os: "ubuntu-24.04", platform: "linux", builder: "linux", arch: "x64" },
-              { target: "linux-arm64", os: "ubuntu-24.04-arm", platform: "linux", builder: "linux", arch: "arm64" }
+              { target: "windows-x64", os: "windows-2025", platform: "win32", builder: "win", arch: "x64", asset: "x64-setup.exe" },
+              { target: "windows-arm64", os: "windows-11-arm", platform: "win32", builder: "win", arch: "arm64", asset: "arm64-setup.exe" },
+              { target: "macos-x64", os: "macos-15-intel", platform: "darwin", builder: "mac", arch: "x64", asset: "x64.dmg" },
+              { target: "macos-arm64", os: "macos-26", platform: "darwin", builder: "mac", arch: "arm64", asset: "arm64.dmg" },
+              { target: "linux-x64", os: "ubuntu-24.04", platform: "linux", builder: "linux", arch: "x64", asset: "x64.AppImage" },
+              { target: "linux-arm64", os: "ubuntu-24.04-arm", platform: "linux", builder: "linux", arch: "arm64", asset: "arm64.AppImage" }
           ];
           const include = targets.filter(({ target }) => process.env.TARGET === "all" || process.env.TARGET === target);
           if (include.length === 0) throw new Error(`Unknown build target: ${process.env.TARGET}`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nmatrix=${JSON.stringify({ include })}\n`);
+          const files = include.map(({ asset }) => `vestige-${version}-${asset}`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nmatrix=${JSON.stringify({ include })}\nfiles=${JSON.stringify(files)}\n`);
           NODE
 
   build:
@@ -165,18 +168,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.prepare.outputs.version }}
+          FILES: ${{ needs.prepare.outputs.files }}
           RELEASE_TAG: ${{ github.ref_name }}
         shell: bash
         working-directory: release
         run: |
-          files=(
-            "vestige-$VERSION-x64-setup.exe"
-            "vestige-$VERSION-arm64-setup.exe"
-            "vestige-$VERSION-x64.dmg"
-            "vestige-$VERSION-arm64.dmg"
-            "vestige-$VERSION-x64.AppImage"
-            "vestige-$VERSION-arm64.AppImage"
-          )
+          mapfile -t files < <(jq -r '.[]' <<< "$FILES")
           for file in "${files[@]}"; do
             if [[ ! -s "$file" ]]; then
               echo "::error::Missing or empty release package: $file"
