@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { chmod, copyFile, lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
@@ -218,8 +218,12 @@ async function prepare(item, work, platform, arch) {
     }
     for (const name of [...item.programs, ...(item.resources ?? [])]) if (!copied.has(name)) throw new Error(`${item.name} does not contain ${name}.`);
     if (["ffmpeg", "aria2"].includes(item.name) && platform === process.platform && arch === process.arch) {
+        // Shared libraries sit beside the programs, while upstream RPATHs may expect ../lib.
+        // Search them like runProcess in main/util/process.ts does at run time.
+        const env = { ...process.env };
+        for (const key of ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]) env[key] = [target, env[key] ?? ""].join(delimiter);
         for (const name of item.programs) {
-            await run(join(target, name), [item.name === "aria2" ? "--version" : "-version"], { windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 });
+            await run(join(target, name), [item.name === "aria2" ? "--version" : "-version"], { env, windowsHide: true, timeout: 15_000, maxBuffer: 1024 * 1024 });
         }
     }
     if (item.licenseURL) {
