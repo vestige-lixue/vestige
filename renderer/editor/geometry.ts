@@ -1,24 +1,27 @@
 import { type EditorState } from "@tiptap/pm/state";
 import { type EditorView } from "@tiptap/pm/view";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
-import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type TranscriptInformation } from "./informationModel";
+import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type TranscriptInformation, type SelectionInformation } from "./informationModel";
 import { compositionPending } from "./composition";
 
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
-export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false): DOMRect[] {
+export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false, includeDeleted = false): DOMRect[] {
     const result: DOMRect[] = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    const filter = {
         acceptNode: node => {
-            const readonly = (node instanceof Element ? node : node.parentElement)?.closest("[contenteditable=\"false\"]");
-            if (readonly && readonly !== root && root.contains(readonly)) return NodeFilter.FILTER_REJECT;
+            const element = node instanceof Element ? node : node.parentElement;
+            if (includeDeleted && element?.matches(".transcript-deletion-expanded")) return NodeFilter.FILTER_SKIP;
+            const readonly = element?.closest("[contenteditable=\"false\"]");
+            if (readonly && readonly !== root && root.contains(readonly)
+                && !(includeDeleted && readonly.classList.contains("transcript-deletion-expanded"))) return NodeFilter.FILTER_REJECT;
             return node.nodeType === Node.TEXT_NODE || includeBreaks && node instanceof HTMLBRElement
                 && !node.classList.contains("ProseMirror-trailingBreak") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         }
-    });
+    } satisfies NodeFilter;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, filter);
     walker.currentNode = range.startContainer.childNodes[range.startOffset] ?? range.startContainer;
     const textRange = document.createRange();
-    let node = walker.currentNode.nodeType === Node.TEXT_NODE || includeBreaks && walker.currentNode instanceof HTMLBRElement
-        ? walker.currentNode : walker.nextNode();
+    let node = filter.acceptNode(walker.currentNode) === NodeFilter.FILTER_ACCEPT ? walker.currentNode : walker.nextNode();
     while (node && range.comparePoint(node, 0) <= 0) {
         if (range.intersectsNode(node)) {
             if (node.nodeType === Node.TEXT_NODE) {
@@ -82,7 +85,7 @@ export function keyboardRectangle<T extends Rectangle>(rectangles: readonly T[],
 }
 
 export type InspectionGeometry = {
-    hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, measure?: boolean) => InspectionTarget | null;
+    hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, options?: { measure?: boolean; selection?: boolean }) => InspectionTarget | null;
     keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
 };
 
@@ -90,6 +93,15 @@ export function inspectionGeometry(
     view: EditorView, index: TextIndex, projectionOf: (state: EditorState) => TextProjection,
     events: () => Map<string, InspectionInformation>, duration: number
 ): InspectionGeometry {
+    let selected: {
+        projection: TextProjection;
+        from: number;
+        to: number;
+        information: SelectionInformation | null;
+        rectangles: DOMRect[][];
+        hit: DOMRect[];
+    } | undefined;
+    let measureSelection = false;
     function eventMarker(target: EventTarget | null): HTMLElement | null {
         return target instanceof Element ? target.closest<HTMLElement>(".transcript-event") : null;
     }
@@ -104,7 +116,7 @@ export function inspectionGeometry(
     function tokenRectangles(item: TranscriptInformation): DOMRect[][] {
         return transcriptTokenGroup(index, projectionOf(view.state), item).map(rectangles);
     }
-    function spacingOf(item: TranscriptInformation): Spacing | null {
+    function spacingOf(item: { from: number }): Spacing | null {
         const start = view.domAtPos(item.from + 1, 1).node;
         const span = (start instanceof Element ? start : start.parentElement)?.closest(".transcript-text");
         if (!span) return null;
@@ -117,18 +129,55 @@ export function inspectionGeometry(
         };
     }
     function blocked(): boolean {
-        return compositionPending(view.state) || view.composing || !document.hasFocus();
+        return compositionPending(view.state) || view.composing;
+    }
+    function selectionGeometry(measure = false): typeof selected {
+        const { from, to, empty } = view.state.selection;
+        if (empty) return selected = undefined;
+        const projection = projectionOf(view.state);
+        if (!selected || selected.projection !== projection || selected.from !== from - 1 || selected.to !== to - 1) {
+            selected = {
+                projection, from: from - 1, to: to - 1,
+                information: transcriptSelection(index, projection, duration, from - 1, to - 1), rectangles: [], hit: []
+            };
+            measure = true;
+        }
+        if (measure || measureSelection) {
+            selected.rectangles = selected.information?.fragments.map(rectangles) ?? [];
+            selected.hit = rectangles(selected);
+            measureSelection = false;
+        }
+        return selected;
     }
     return {
-        hover(pointer, previous, measure = false) {
+        hover(pointer, previous, { measure = false, selection = true } = {}) {
+            if (measure) measureSelection = true;
             if (!pointer || blocked()) return null;
             const { x, y, pressed } = pointer;
+            // Native drag selection can lag behind the pointer as it crosses a token boundary.
+            if (selection && pressed && !view.state.selection.empty) {
+                const target = selectionGeometry(measure)!;
+                if (!target.information) return null;
+                const caret = view.coordsAtPos(view.state.selection.head);
+                const anchor = keyboardRectangle(target.rectangles.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+                return { information: target.information, rectangles: target.rectangles, anchor, keyboard: false, pressed };
+            }
             const element = document.elementFromPoint(x, y);
             if (!element || !view.dom.contains(element)) return null;
             const button = eventMarker(element);
             if (button) {
                 const item = events().get(button.dataset.inspection!);
                 if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: false, pressed };
+            }
+            if (selection) {
+                const target = selectionGeometry(measure);
+                const spacing = target && spacingOf(target) || { top: 0, right: 0, bottom: 0, left: 0 };
+                const hit = target && pointerRectangle(target.hit, pointer, spacing);
+                if (target && hit) {
+                    if (!target.information) return null;
+                    const anchor = pointerRectangle(target.rectangles.flat(), pointer, spacing) ?? hit;
+                    return { information: target.information, rectangles: target.rectangles, anchor, keyboard: false, pressed };
+                }
             }
             const position = view.posAtCoords({ left: x, top: y });
             if (!position) return null;
@@ -148,7 +197,7 @@ export function inspectionGeometry(
             return null;
         },
         keyboard(control, element = document.activeElement) {
-            if (blocked()) return null;
+            if (blocked() || !document.hasFocus()) return null;
             const button = eventMarker(element);
             if (button && view.dom.contains(button) && button.matches(":focus-visible")) {
                 const item = events().get(button.dataset.inspection!);
@@ -156,13 +205,11 @@ export function inspectionGeometry(
             }
             if (!control || element !== view.dom) return null;
             if (!view.state.selection.empty) {
-                const selection = view.state.selection;
-                const item = transcriptSelection(index, projectionOf(view.state), duration, selection.from - 1, selection.to - 1);
-                if (!item) return null;
-                const boxes = rectangles(item);
-                const caret = view.coordsAtPos(selection.head);
-                const anchor = keyboardRectangle(boxes, caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
-                return { information: item, rectangles: [boxes], anchor, keyboard: true, pressed: false };
+                const target = selectionGeometry(true)!;
+                if (!target.information) return null;
+                const caret = view.coordsAtPos(view.state.selection.head);
+                const anchor = keyboardRectangle(target.rectangles.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+                return { information: target.information, rectangles: target.rectangles, anchor, keyboard: true, pressed: false };
             }
             const offset = view.state.selection.head - 1;
             // A caret at a boundary belongs to the following character; the document end has none.

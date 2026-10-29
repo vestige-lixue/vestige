@@ -146,6 +146,7 @@ export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
     selectionFrom: number;
     selectionTo: number;
     tokens: number[];
+    fragments: { from: number; to: number }[];
     deletions: TranscriptInformation[];
     comparison: ComparisonPart[];
 };
@@ -153,16 +154,13 @@ export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
 // View commands share inclusion rules even when the selected units have no playable audio.
 export function transcriptSelectionUnits(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): { tokens: Set<number>; deletions: TranscriptInformation[] } {
     if (from >= to) return { tokens: new Set(), deletions: [] };
-    const whitespace = /^\s+$/u.test(projection.text.slice(from, to));
     const tokenIndices = new Set<number>();
     const replacements = new Set<number>();
     for (const piece of textPieces(index, projection, from, to, true)) {
         const first = Math.max(from, piece.utf16From);
         const end = Math.min(to, piece.utf16To);
         if (first >= end) continue;
-        if (piece.source.kind === "segment") {
-            if (whitespace || /\S/u.test(piece.text.slice(first - piece.utf16From, end - piece.utf16From))) tokenIndices.add(piece.source.index);
-        }
+        if (piece.source.kind === "segment") tokenIndices.add(piece.source.index);
         else replacements.add(piece.sourceFrom);
     }
     const deletions = transcriptEvents(index, projection, duration).filter(item => item.kind === "deletion"
@@ -193,18 +191,22 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
     if (start >= end) return null;
     let first = from;
     let last = to;
+    const fragments: SelectionInformation["fragments"] = [];
     if (tokens.length) {
         for (const piece of sourceTextPieces(index, projection, index.starts[tokens[0]], index.starts[tokens[tokens.length - 1] + 1])) {
             if (piece.source.kind !== "segment" || !tokenIndices.has(piece.source.index)) continue;
             first = Math.min(first, piece.utf16From);
             last = Math.max(last, piece.utf16To);
+            const previous = fragments.at(-1);
+            if (previous?.to === piece.utf16From) previous.to = piece.utf16To;
+            else fragments.push({ from: piece.utf16From, to: piece.utf16To });
         }
     }
     const comparison = selectionComparison(index, projection, { from: first, to: last, sourceFrom, sourceTo });
     return {
         key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${start}-${end}/${JSON.stringify(comparison)}`,
         kind: "selection", from: first, to: last, selectionFrom: from, selectionTo: to, sourceFrom, sourceTo,
-        tokens, deletions, comparison, range: { start, end }, original: null, probability: null, blankProbability: null
+        tokens, fragments, deletions, comparison, range: { start, end }, original: null, probability: null, blankProbability: null
     };
 }
 

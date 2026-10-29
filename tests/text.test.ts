@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
     createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications,
-    provenanceChange
+    provenanceChange, commitText
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
-import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary } from "./support/generators";
+import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary, textArbitrary } from "./support/generators";
 import { checkProperty } from "./support/properties";
 
 describe("text projection and editing", () => {
@@ -191,10 +191,7 @@ describe("text projection and editing", () => {
                         const inserted = [...item.text];
                         const deleted = index.characters.slice(deletion.from, deletion.to);
                         expect(inserted[0]).not.toBe(deleted[0]);
-                        expect(inserted.at(-1)).not.toBe(deleted.at(-1));
-                        for (let length = 1; length <= Math.min(inserted.length, deleted.length); length++) {
-                            expect(inserted.slice(0, length).join("")).not.toBe(deleted.slice(-length).join(""));
-                        }
+                        // Local alignment deliberately does not search for distant suffixes or overlaps.
                     }
                 }
             }
@@ -206,12 +203,12 @@ describe("text projection and editing", () => {
         { original: "Outro", from: 3, to: 4, inserted: "ar", insertion: [3, "a"] as const, deletion: null, text: "Outaro" },
         { original: "Outro", from: 2, to: 4, inserted: "t", insertion: null, deletion: [3, 4] as const, text: "Outo" },
         { original: "Outro", from: 2, to: 4, inserted: "r", insertion: null, deletion: [2, 3] as const, text: "Ouro" },
-        { original: "rx", from: 0, to: 2, inserted: "ar", insertion: [2, "ar"] as const, deletion: [0, 2] as const, text: "ar" },
+        { original: "rx", from: 0, to: 2, inserted: "ar", insertion: [0, "a"] as const, deletion: [1, 2] as const, text: "ar" },
         { original: "Outro", from: 0, to: 5, inserted: "Outro", insertion: null, deletion: null, text: "Outro" },
-        { original: "𝄞中x", from: 0, to: 3, inserted: "a𝄞中", insertion: [3, "a𝄞中"] as const, deletion: [0, 3] as const, text: "a𝄞中" },
+        { original: "𝄞中x", from: 0, to: 3, inserted: "a𝄞中", insertion: [0, "a"] as const, deletion: [2, 3] as const, text: "a𝄞中" },
         { original: "rx", from: 0, to: 2, inserted: "xa", insertion: [2, "a"] as const, deletion: [0, 1] as const, text: "xa" },
         { original: "𝄞中x", from: 0, to: 3, inserted: "中xa", insertion: [3, "a"] as const, deletion: [0, 1] as const, text: "中xa" }
-    ])("restores D18 source boundaries for $original / $inserted", ({ original, from, to, inserted, insertion, deletion, text }) => {
+    ])("restores replacement boundaries for $original / $inserted", ({ original, from, to, inserted, insertion, deletion, text }) => {
         const spans = transcript([...original]);
         const index = createTextIndex(spans);
         const removed = editText(index, projectText(index, []), from, to, "");
@@ -219,7 +216,8 @@ describe("text projection and editing", () => {
         const expected = [
             ...deletion ? modification(spans, deletion[0], deletion[1], "") : [],
             ...insertion ? modification(spans, insertion[0], insertion[0], insertion[1]) : []
-        ];
+        ].sort((left, right) => sourceOffset(spans, left.type === "insert" ? left.pos : left.range.start)
+            - sourceOffset(spans, right.type === "insert" ? right.pos : right.range.start));
         expect(value.text).toBe(text);
         expect(value.modifications).toEqual(expected);
         expect(normalizeModifications(index, value.modifications)).toEqual(expected);
@@ -229,9 +227,9 @@ describe("text projection and editing", () => {
     it("reports source restored outside the edited range", () => {
         const index = createTextIndex(transcript(["ab"]));
         let value = editText(index, projectText(index, []), 0, 2, "");
-        value = editText(index, value, 0, 0, "x");
-        value = editText(index, value, 1, 1, "a");
-        const next = editText(index, value, 0, 1, "");
+        value = editText(index, value, 0, 0, "xx");
+        value = editText(index, value, 2, 2, "a");
+        const next = editText(index, value, 0, 2, "");
         expect(textPieces(index, next).filter(piece => piece.text).map(piece => piece.source.kind)).toEqual(["segment"]);
         expect(provenanceChange(index, value, next)).toEqual({ from: 0, to: 1 });
     });
@@ -322,6 +320,92 @@ describe("text projection and editing", () => {
         expect(first.modifications).not.toEqual(last.modifications);
         expect(textPieces(index, first).find(piece => piece.text === "a")?.sourceFrom).toBe(1);
         expect(textPieces(index, last).find(piece => piece.text === "a")?.sourceFrom).toBe(0);
+    });
+
+    it.each<{
+        original: string;
+        inserted: string;
+        changes: [number, number, string][];
+    }>([
+        { original: "醬油 -", inserted: "酱油\n", changes: [[0, 1, ""], [1, 1, "酱"], [2, 4, ""], [4, 4, "\n"]] },
+        { original: "醬油", inserted: "好醬油啊", changes: [[0, 0, "好"], [2, 2, "啊"]] },
+        { original: "a😀中z", inserted: "b😀文z", changes: [[0, 1, ""], [1, 1, "b"], [2, 3, ""], [3, 3, "文"]] },
+        { original: "aaa", inserted: "aba", changes: [[1, 2, ""], [2, 2, "b"]] },
+        { original: "ab", inserted: "ba", changes: [[0, 0, "b"], [1, 2, ""]] },
+        { original: "abc", inserted: "XYZabc", changes: [[0, 3, ""], [3, 3, "XYZabc"]] }
+    ])("uses local alignment for $original / $inserted", ({ original, inserted, changes }) => {
+        const spans = transcript([...original]);
+        const index = createTextIndex(spans);
+        const value = editText(index, projectText(index, []), 0, index.characters.length, inserted);
+        expect(value.text).toBe(inserted);
+        expect(value.modifications).toEqual(changes.flatMap(([from, to, text]) => modification(spans, from, to, text)));
+        expect(projectText(index, value.modifications)).toMatchObject({ text: inserted, modifications: value.modifications });
+    });
+
+    it("restores the recorded middle character before an existing line break", () => {
+        const spans = transcript(["醬", "油", " -"]);
+        const index = createTextIndex(spans);
+        const removed = editText(index, projectText(index, []), 0, 4, "\n");
+        const restored = editText(index, removed, 0, 0, "酱油");
+        expect(restored.text).toBe("酱油\n");
+        expect(restored.modifications).toEqual([
+            ...modification(spans, 0, 1, ""), ...modification(spans, 1, 1, "酱"),
+            ...modification(spans, 2, 4, ""), ...modification(spans, 4, 4, "\n")
+        ]);
+        expect(textPieces(index, restored).filter(piece => piece.source.kind === "segment").map(piece => piece.text)).toEqual(["油"]);
+    });
+
+    it("defers candidate restoration until the complete IME text is available", () => {
+        const spans = transcript(["abc"]);
+        const index = createTextIndex(spans);
+        const removed = editText(index, projectText(index, []), 0, 3, "");
+        let pending = editText(index, removed, 0, 0, "b", false);
+        expect(pending.modifications).toEqual([...removed.modifications, ...modification(spans, 3, 3, "b")]);
+        pending = editText(index, pending, 1, 1, "abc", false);
+        const committed = commitText(index, removed, pending);
+        expect(committed.text).toBe("babc");
+        expect(committed.modifications).toEqual(modification(spans, 0, 0, "b"));
+        expect(textPieces(index, committed)).toEqual(textPieces(index, projectText(index, committed.modifications)));
+        expect(commitText(index, committed, committed)).toBe(committed);
+    });
+
+    it("keeps final restoration independent of provisional IME candidates", () => {
+        checkProperty("composition-restoration", fc.property(transcriptArbitrary, fc.array(textArbitrary, { minLength: 1, maxLength: 8 }), (spans, candidates) => {
+            const index = createTextIndex(spans);
+            const removed = editText(index, projectText(index, []), 0, index.characters.length, "");
+            let pending = removed;
+            for (const text of candidates) pending = editText(index, pending, 0, pending.length, text, false);
+            const committed = commitText(index, removed, pending);
+            const direct = editText(index, removed, 0, 0, candidates.at(-1)!);
+            expect(committed.modifications).toEqual(direct.modifications);
+            expect(textPieces(index, committed)).toEqual(textPieces(index, direct));
+        }));
+    });
+
+    it("keeps a provisional replacement from choosing between repeated source characters", () => {
+        const spans = transcript(["a", "a", "a"]);
+        const index = createTextIndex(spans);
+        const saved = projectText(index, []);
+        let pending = editText(index, saved, 1, 2, "b", false);
+        pending = editText(index, pending, 0, 2, "ba", false);
+        const committed = commitText(index, saved, pending);
+        expect(committed.text).toBe("baa");
+        expect(committed.modifications).toEqual([...modification(spans, 0, 1, ""), ...modification(spans, 1, 1, "b")]);
+        expect(textPieces(index, committed).filter(piece => piece.source.kind === "segment").map(piece => piece.sourceFrom)).toEqual([1, 2]);
+        const cancelled = editText(index, pending, 0, 1, "a", false);
+        expect(commitText(index, saved, cancelled)).toBe(saved);
+    });
+
+    it("edits long replacements with many separately restored source characters", () => {
+        const original = "ab".repeat(75000);
+        const replacement = "ac".repeat(75000);
+        const index = createTextIndex(transcript([original]));
+        const value = editText(index, projectText(index, []), 0, original.length, replacement);
+        expect(value.modifications).toHaveLength(original.length);
+        expect(value.text).toBe(replacement);
+        const next = editText(index, value, value.length, value.length, "!");
+        expect(next.text).toBe(replacement + "!");
+        expect(textPieces(index, next).map(piece => piece.text).join("")).toBe(next.text);
     });
 
     it("restores each random deletion through ordinary typing while preserving replacement text", () => {

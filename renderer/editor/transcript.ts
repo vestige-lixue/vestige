@@ -12,7 +12,7 @@ import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
 import { informationPlugin, toggleSelectionDeletions, type InspectionOptions } from "./information";
 import {
-    createTextIndex, projectText, editText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
+    createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
     type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
@@ -23,6 +23,7 @@ const playbackKey = new PluginKey<number>("vestigePlayback");
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new WeakMap<HTMLElement, Editor>();
 const texts = new WeakMap<PMNode, string>();
+const sourceDOM = new WeakMap<HTMLElement, { kind: string; index: number }>();
 
 const Document = Node.create({ name: "doc", topNode: true, content: "paragraph" });
 
@@ -55,9 +56,10 @@ const Source = Mark.create({
     addAttributes() {
         return { kind: { default: "segment", rendered: false }, index: { default: 0, rendered: false } };
     },
-    // Source identities are generated locally, including when pasting our own HTML.
+    // Composition can detach ProseMirror's mark descriptions. Preserve locally rendered identities;
+    // pasted HTML has new DOM nodes and must never supply source identities.
     parseHTML() {
-        return [];
+        return [{ tag: "span", getAttrs: element => sourceDOM.get(element) ?? false }];
     },
     renderHTML() {
         return ["span", 0];
@@ -108,7 +110,7 @@ function splitsCodepoint(text: string, offset: number): boolean {
     return offset > 0 && offset < text.length && /[\uD800-\uDBFF]/.test(text[offset - 1]) && /[\uDC00-\uDFFF]/.test(text[offset]);
 }
 
-function applyTextSteps(index: TextIndex, projection: TextProjection, transaction: Transaction): TextProjection {
+function applyTextSteps(index: TextIndex, projection: TextProjection, transaction: Transaction, restore: boolean): TextProjection {
     for (let i = 0; i < transaction.steps.length; i++) {
         const before = projection.text;
         const after = documentText(transaction.docs[i + 1] ?? transaction.doc);
@@ -153,7 +155,7 @@ function applyTextSteps(index: TextIndex, projection: TextProjection, transactio
             else merged.push(change);
         }
         for (const change of merged.reverse()) {
-            projection = editText(index, projection, projectionOffset(projection, change.from, false), projectionOffset(projection, change.to, false), after.slice(change.start, change.end));
+            projection = editText(index, projection, projectionOffset(projection, change.from, false), projectionOffset(projection, change.to, false), after.slice(change.start, change.end), restore);
         }
         if (projection.text !== after) throw new Error("Transcript transaction did not preserve rendered text.");
     }
@@ -227,10 +229,11 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         key: bridgeKey,
         state: {
             init: () => ({ projection: initial, saved: initial, dirty: [] }),
-            apply(transaction, previous) {
+            apply(transaction, previous, _oldState, newState) {
                 const snapshot = transaction.steps.findLast(step => step instanceof ProjectionStep);
-                const projection = snapshot instanceof ProjectionStep ? snapshot.afterProjection ?? projectText(index, snapshot.after)
-                    : transaction.getMeta(bridgeKey) ? previous.projection : applyTextSteps(index, previous.projection, transaction);
+                let projection = snapshot instanceof ProjectionStep ? snapshot.afterProjection ?? projectText(index, snapshot.after)
+                    : transaction.getMeta(bridgeKey) ? previous.projection : applyTextSteps(index, previous.projection, transaction, !compositionActive(newState));
+                if (compositionCommit(transaction)) projection = commitText(index, previous.saved, projection);
                 return {
                     projection,
                     saved: snapshot ? projection : previous.saved,
@@ -331,10 +334,15 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {
     const source = Source.extend({
         renderHTML({ mark }) {
-            if (mark.attrs.kind !== "segment") return ["span", { class: "transcript-text transcript-added" }, 0];
-            const probability = index.transcript[mark.attrs.index].token.prob;
-            const level = probabilityThresholds.findIndex(threshold => probability < threshold);
-            return ["span", { class: `transcript-text token-prob-${level}` }, 0];
+            const dom = document.createElement("span");
+            sourceDOM.set(dom, { kind: mark.attrs.kind, index: mark.attrs.index });
+            if (mark.attrs.kind !== "segment") dom.className = "transcript-text transcript-added";
+            else {
+                const probability = index.transcript[mark.attrs.index].token.prob;
+                const level = probabilityThresholds.findIndex(threshold => probability < threshold);
+                dom.className = `transcript-text token-prob-${level}`;
+            }
+            return { dom, contentDOM: dom };
         }
     });
     const bridge = Extension.create({
@@ -370,7 +378,7 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
             onChange(next);
         }
     });
-    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state) ?? -1, inspection, canEdit));
+    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state) ?? -1, inspection));
     editors.set(editor.view.dom, editor);
     return editor;
 }

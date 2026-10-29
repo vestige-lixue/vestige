@@ -11,7 +11,7 @@
 />
 
 <Portal to="body">
-    <div class="file-drop-overlay" class:active={dragging && !disabled} style:z-index={modal.getTopLayer() + 1} bind:this={dropArea}>
+    <div class="file-drop-overlay" class:active={dragging && !disabled} style:z-index={modal.getTopLayer() + 1}>
         <div class="file-drop-message">
             <!-- eslint-disable-next-line svelte/no-at-html-tags -->
             {@html downloadIcon}
@@ -90,7 +90,6 @@
     import * as projectAPI from "../../states/project";
 
     const disabled = $derived(interfaceBlocked());
-    let dropArea: HTMLDivElement;
     let dragDepth = 0;
     let dragging = $state(false);
 
@@ -168,8 +167,7 @@
     }
 
     function isInDropArea(event: DragEvent): boolean {
-        const { left, top, right, bottom } = dropArea.getBoundingClientRect();
-        return event.clientX >= left && event.clientX < right && event.clientY >= top && event.clientY < bottom;
+        return event.clientX >= 0 && event.clientX < window.innerWidth && event.clientY >= 0 && event.clientY < window.innerHeight;
     }
 
     function resetDrag(): void {

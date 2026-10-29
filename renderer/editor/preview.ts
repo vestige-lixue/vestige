@@ -1,10 +1,9 @@
 import { type TranscriptInformation } from "./informationModel";
+import { transcriptMarker, transcriptMarkerAnchor } from "./markers";
 
 export type PreviewPart = {
     kind: "original" | "deleted" | "inserted" | "ellipsis" | "gap";
     text: string;
-    whitespace?: boolean;
-    lineBreak?: boolean;
     gap?: TranscriptInformation;
 };
 // Truncation only removes whole units, even when a gap falls inside a grapheme cluster.
@@ -12,8 +11,6 @@ export type PreviewUnit = PreviewPart[];
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function previewUnits(text: string, kind: PreviewPart["kind"], gaps: readonly TranscriptInformation[] = [], sourceFrom = 0): PreviewUnit[] {
-    const characters = Array.from(text);
-    const onlyWhitespace = kind !== "original" && /^\s*$/u.test(text);
     const markers = new Map<number, TranscriptInformation[]>();
     for (const gap of gaps) {
         const offset = gap.sourceFrom - sourceFrom;
@@ -30,13 +27,7 @@ export function previewUnits(text: string, kind: PreviewPart["kind"], gaps: read
         const parts: PreviewPart[] = [];
         for (const character of grapheme.segment) {
             parts.push(...gapParts(offset));
-            const lineBreak = character === "\n" || character === "\r";
-            const space = character === " " && (onlyWhitespace || kind !== "original" && (offset === 0 || offset === characters.length - 1)
-                || characters[offset - 1] === " " || characters[offset + 1] === " ");
-            const whitespace = lineBreak || character === "\t" || space || onlyWhitespace && /\s/u.test(character);
-            const value = lineBreak ? character === "\n" && characters[offset - 1] === "\r" ? "" : "↵"
-                : character === "\t" ? "→" : whitespace ? "·" : character;
-            if (value) parts.push({ kind, text: value, whitespace, lineBreak });
+            parts.push({ kind, text: character });
             offset++;
         }
         units.push(parts);
@@ -66,16 +57,27 @@ export function comparisonPreview(parts: readonly { kind: PreviewPart["kind"]; t
     return groups.flatMap(part => previewUnits(part.text, part.kind));
 }
 
-export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[], options: { lineBreaks?: boolean; gap?: (gap: TranscriptInformation) => HTMLElement } = {}): void {
+export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[], options: { gap?: (gap: TranscriptInformation) => HTMLElement; suffix?: string; deletion?: boolean } = {}): void {
     const fragment = document.createDocumentFragment();
+    const deletion = options.deletion ? document.createElement("span") : null;
+    if (deletion) {
+        deletion.className = "preview-deleted";
+        fragment.append(deletion);
+    }
     let span: HTMLSpanElement | null = null;
     let previous = "";
     for (const unit of units) {
         for (const part of unit) {
-            if (part.gap && options.gap) {
-                fragment.append(options.gap(part.gap));
+            if (part.gap) {
+                const anchor = options.gap?.(part.gap) ?? transcriptMarkerAnchor(transcriptMarker(part.gap, { interactive: false }));
+                anchor.dataset.previewGap = part.gap.key;
+                (deletion ?? fragment).append(anchor);
                 span = null;
                 previous = "";
+                continue;
+            }
+            if (deletion) {
+                deletion.append(document.createTextNode(part.text));
                 continue;
             }
             const className = `preview-${part.kind}`;
@@ -84,30 +86,29 @@ export function renderPreview(element: HTMLElement, units: readonly PreviewUnit[
                 span.className = className;
                 fragment.append(span);
             }
-            if (part.whitespace) {
-                const whitespace = document.createElement("span");
-                whitespace.className = "preview-whitespace";
-                whitespace.textContent = part.text;
-                span.append(whitespace);
-            }
-            else span.append(document.createTextNode(part.text));
-            if (part.gap) span.dataset.previewGap = part.gap.key;
-            if (part.lineBreak && options.lineBreaks) span.append(document.createElement("br"));
+            span.append(document.createTextNode(part.text));
             previous = part.kind === "gap" ? "" : className;
         }
+    }
+    if (options.suffix) {
+        const suffix = document.createElement("span");
+        suffix.className = "preview-suffix";
+        suffix.textContent = `\u00a0${options.suffix}`;
+        fragment.append(suffix);
     }
     element.replaceChildren(fragment);
 }
 
-export function fitPreview(element: HTMLElement, options: { units: readonly PreviewUnit[]; compact: boolean }): { update: (next: typeof options) => void; destroy: () => void } {
+export function fitPreview(element: HTMLElement, options: { units: readonly PreviewUnit[]; compact: boolean; suffix?: string; deletion?: boolean }): { update: (next: typeof options) => void; destroy: () => void } {
     let frame = 0;
     let destroyed = false;
     function measure(): void {
         frame = 0;
         if (destroyed || !element.clientWidth) return;
-        const height = parseFloat(getComputedStyle(element).lineHeight) * (options.compact ? 1 : 4);
+        const style = getComputedStyle(element);
+        const height = parseFloat(style.lineHeight) * (options.compact ? 1 : 4) + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
         function fits(count: number): boolean {
-            renderPreview(element, middlePreview(options.units, count));
+            renderPreview(element, middlePreview(options.units, count), options);
             // Inline box decoration can overhang the line box without creating an extra line.
             return element.getBoundingClientRect().height <= height + 1 && element.scrollWidth <= element.clientWidth + 1;
         }
@@ -129,7 +130,7 @@ export function fitPreview(element: HTMLElement, options: { units: readonly Prev
     const observer = new ResizeObserver(schedule);
     observer.observe(element);
     document.fonts.ready.then(schedule);
-    renderPreview(element, options.units);
+    renderPreview(element, options.units, options);
     schedule();
     return {
         update(next) {

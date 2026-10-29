@@ -1,7 +1,7 @@
 <nav>
     <Tooltip text={i18n.t("transcription.vocabulary.title")} shortcut={shortcut({ kind: "openPanel", panel: "vocabulary" })} onclick={() => runCommand({ kind: "openPanel", panel: "vocabulary" })}>
         {#snippet child({ props })}
-            <button {...props} class="icon-button hoverable activable focusable">
+            <button {...props} bind:this={firstButton} class="icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html bookIcon}
             </button>
@@ -78,6 +78,8 @@
     import bookIcon from "../../../resources/icons/carbon--book.svg?raw";
     import taskBlankIcon from "../../../resources/icons/carbon--task-blank.svg?raw";
     import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
+
+    let { firstButton = $bindable(null) }: { firstButton?: HTMLButtonElement | null } = $props();
 
     const taskCount = $derived(transcription.tasks.filter(transcription.isPending).length);
 </script>

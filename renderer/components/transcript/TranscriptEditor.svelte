@@ -1,14 +1,4 @@
 <div class="editor-shell">
-    {#if informationDisplay === "bar"}
-        <div class="information-bar">
-            <div class="information-placeholder"><TranscriptInformation information={null} compact /></div>
-            <div class="information-content">
-                {#key inspection?.information.key}
-                    <TranscriptInformation information={inspection?.information ?? null} compact />
-                {/key}
-            </div>
-        </div>
-    {/if}
     <div class="editor-surface">
         {#if selectionRectangles.length}
             <svg class="selection-highlight">
@@ -16,7 +6,7 @@
             </svg>
         {/if}
         <div
-            class="editor" spellcheck={settings.getEditing().spellcheck} style:font-size={`${settings.getEditing().fontSize}px`}
+            class="editor" spellcheck={settings.getEditing().spellcheck} style:--transcript-font-size={`${settings.getEditing().fontSize}px`}
             tabindex={-1} bind:this={element}
         ></div>
         {#if inspection?.rectangles.length}
@@ -33,9 +23,7 @@
     <Tooltip.Portal>
         {#if tooltipOpen && inspection && informationDisplay === "tooltip"}
             <Tooltip.Content class="tooltip-content transcript-tooltip" customAnchor={anchor} side="top" sideOffset={7} collisionPadding={8}>
-                {#key inspection.information.key}
-                    <TranscriptInformation information={inspection.information} />
-                {/key}
+                <TranscriptInformation information={inspection.information} />
             </Tooltip.Content>
         {/if}
     </Tooltip.Portal>
@@ -58,31 +46,12 @@
     .editor {
         --transcript-line-height: 1.2em;
         --transcript-line-gap: .6em;
+        font-size: var(--transcript-font-size);
         position: relative;
         z-index: 1;
         display: flex;
         flex-direction: column;
         flex: 1;
-    }
-    .information-bar {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        flex-shrink: 0;
-        pointer-events: none;
-    }
-    .information-placeholder, .information-content {
-        min-height: 16px;
-        padding: 10px 28px;
-        border-bottom: 1px solid var(--c-border);
-        background: color-mix(in srgb, var(--c-surface) 75%, transparent);
-    }
-    .information-placeholder {
-        visibility: hidden;
-    }
-    .information-content {
-        position: absolute;
-        inset: 0 0 auto;
     }
     .inspection-outline, .selection-highlight {
         position: absolute;
@@ -105,8 +74,9 @@
     }
     :global(.tooltip-content.transcript-tooltip) {
         display: block;
-        max-width: min(440px, calc(100vw - 16px));
+        max-width: min(400px, calc(100vw - 16px));
         pointer-events: none;
+        background: color-mix(in srgb, var(--c-surface) 75%, transparent);
         transition: none;
         transform: none;
     }
@@ -136,6 +106,12 @@
     /* Chromium draws an oversized caret beside separators before hard breaks. */
     .editor :global(img.ProseMirror-separator:has(+ br:not(.ProseMirror-trailingBreak))) {
         display: none;
+    }
+    /* Keep the trailing input anchor available without enlarging the native caret. */
+    .editor :global(.transcript-trailing-empty img.ProseMirror-separator:has(+ br.ProseMirror-trailingBreak)) {
+        position: absolute;
+        margin-top: calc((var(--transcript-line-height) + var(--transcript-line-gap) * 2 - 1lh) / 2);
+        line-height: normal;
     }
     .editor :global(.ProseMirror-hideselection) {
         caret-color: transparent;
@@ -176,25 +152,27 @@
         outline-offset: .0625em;
     }
     .editor :global(.transcript-event-anchor) {
-        position: relative;
-        display: inline-block;
-        width: 0;
-        height: 0;
+        /* Inline anchors with positioned children corrupt Chromium's IME text offsets. */
+        position: absolute;
+        display: inline;
+        font-size: 0;
         line-height: 0;
         user-select: none;
     }
     .editor :global(.transcript-events) {
-        position: absolute;
-        bottom: .85em;
+        position: relative;
+        bottom: .05em;
         left: 0;
-        display: flex;
+        display: block;
         transform: translateX(-50%);
+        font-size: var(--transcript-font-size);
         line-height: 0;
         user-select: none;
     }
     .editor :global(.transcript-event) {
         position: relative;
-        display: grid;
+        display: inline-grid;
+        vertical-align: top;
         place-items: center;
         flex-shrink: 0;
         width: .8em;
@@ -214,46 +192,28 @@
     }
     .editor :global(.transcript-event.deletion) {
         color: var(--c-danger);
-    }
-    .editor :global(.transcript-deletion-expanded), .editor :global(.transcript-deletion-expanded *) {
-        user-select: none;
+        cursor: pointer;
     }
     .editor :global(.transcript-deletion-original) {
         white-space: pre-wrap;
         overflow-wrap: anywhere;
-    }
-    .editor :global(.transcript-deletion-original .preview-deleted) {
         padding: 1px 4px;
         border-radius: 4px;
         background: color-mix(in srgb, var(--c-danger) 10%, transparent);
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-danger) 20%, transparent);
         box-decoration-break: clone;
-        text-decoration-line: line-through;
+        color: var(--c-danger);
+        outline: none;
     }
-    .editor :global(.transcript-deletion-original .preview-whitespace) {
-        color: color-mix(in srgb, var(--c-danger) 65%, var(--c-text));
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    }
-    .editor :global(.transcript-deletion-original .transcript-event) {
-        display: inline-grid;
-        vertical-align: middle;
+    .editor :global(.transcript-deletion-original > .transcript-event-anchor:first-child .transcript-events) {
+        transform: translateX(50%);
     }
     .editor :global(.transcript-event.expanded .transcript-event-shape > path:not(.transcript-event-stroke)) {
         fill: none;
         stroke: currentColor;
         stroke-width: 1.5px;
+        stroke-linejoin: round;
         vector-effect: non-scaling-stroke;
-    }
-    .editor :global(.transcript-restore) {
-        display: inline-block;
-        margin-inline: .3em;
-        padding: 0 .35em;
-        border: 1px solid var(--c-border);
-        border-radius: 4px;
-        background: var(--c-surface);
-        color: var(--c-text);
-        font-size: .8em;
-        cursor: pointer;
     }
     .editor :global(.transcript-event:focus-visible) {
         outline-offset: max(3px, .2em);
@@ -263,6 +223,7 @@
         height: .45em;
         overflow: visible;
         fill: currentColor;
+        transform: scale(1);
         transition: transform .12s ease;
     }
     .editor :global(.transcript-event-stroke) {
@@ -272,8 +233,11 @@
         stroke-linejoin: round;
         vector-effect: non-scaling-stroke;
     }
-    .editor :global(.transcript-event:hover .transcript-event-shape), .editor :global(.transcript-event:focus-visible .transcript-event-shape) {
+    .editor :global(.transcript-event:hover .transcript-event-shape) {
         transform: scale(1.25);
+    }
+    .editor :global(.transcript-event.deletion.pressed .transcript-event-shape) {
+        transform: scale(.95);
     }
     @media (prefers-reduced-motion: reduce) {
         .editor :global(.transcript-event-shape) {
@@ -292,7 +256,7 @@
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
-    import { refreshTranscriptInformation, type TranscriptInspection } from "../../editor/information";
+    import { refreshTranscriptInformation, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
     import { textRectangles } from "../../editor/geometry";
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
@@ -302,7 +266,7 @@
     import { runCommand } from "../../states/commands";
     import * as i18n from "../../i18n.svelte";
 
-    let { vestige, run }: { vestige: Vestige; run: Run } = $props();
+    let { vestige, run, onInspect }: { vestige: Vestige; run: Run; onInspect?: (information: InspectionInformation | null) => void } = $props();
     let element: HTMLDivElement;
     let editor = $state.raw<Editor>();
     let inspection = $state.raw<TranscriptInspection | null>(null);
@@ -339,12 +303,16 @@
 
     function inspect(value: TranscriptInspection | null, force = false): void {
         const released = inspection?.control && !value?.control;
-        const changed = force || inspection?.information !== value?.information || inspection?.pressed !== value?.pressed
+        const informationChanged = inspection?.information !== value?.information;
+        const changed = force || informationChanged || inspection?.pressed !== value?.pressed
             || inspection?.keyboard !== value?.keyboard || inspection?.control !== value?.control;
         if (changed || !value) closeTooltip();
         inspection = value;
-        const range = value?.information.range;
-        transcript.setInspection(range ? { mediaId: vestige.media.id, runId: run.id, range } : null);
+        if (informationChanged) {
+            onInspect?.(value?.information ?? null);
+            const range = value?.information.range;
+            transcript.setInspection(range ? { mediaId: vestige.media.id, runId: run.id, range } : null);
+        }
         if (!value || value.pressed || informationDisplay !== "tooltip" || !changed) return;
         if (value.control || value.keyboard || !released && Date.now() < skipDelayUntil) tooltipOpen = true;
         else openTimer = setTimeout(() => {
@@ -383,7 +351,7 @@
     $effect(() => {
         editor?.setEditable(!project.projectState.locked, false);
         const labels = {
-            restore: i18n.t("transcript.information.restore"), expand: i18n.t("transcript.information.expand"), collapse: i18n.t("transcript.information.collapse")
+            expand: i18n.t("transcript.information.expand"), collapse: i18n.t("transcript.information.collapse")
         };
         if (editor) untrack(() => refreshTranscriptInformation(editor!.view, labels));
     });
@@ -409,7 +377,7 @@
                 return;
             }
             const origin = element.getBoundingClientRect();
-            selectionRectangles = textRectangles(current!.view.dom, selection.getRangeAt(0), true)
+            selectionRectangles = textRectangles(current!.view.dom, selection.getRangeAt(0), true, true)
                 .map(rect => new DOMRect(rect.left - origin.left, rect.top - origin.top, rect.width, rect.height));
         }
         function schedule(): void {

@@ -99,6 +99,9 @@
     .media.selected :global(*)::selection {
         background-color: hsl(from var(--c-selection) h s calc(l * 0.85));
     }
+    :global(:root[data-theme="dark"]) .media.selected :global(*)::selection {
+        background-color: hsl(from var(--c-selection) h s calc(l * 1.5));
+    }
     :where(.media *) {
         cursor: default;
     }

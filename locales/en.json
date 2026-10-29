@@ -101,6 +101,7 @@
             "video": "Video"
         },
         "actions": {
+            "skip": "Skip media",
             "remove": "Remove from project",
             "moveEarlier": "Move earlier",
             "moveLater": "Move later"
@@ -274,12 +275,9 @@
             "blankProbability": "No-speech:",
             "deletion": "Deleted",
             "gap": "No speech",
-            "characters": "{{count}} characters total",
-            "gaps": "Includes {{count}} no-speech intervals, {{duration}}s total",
-            "restore": "Restore",
+            "gaps": "{{count}} ({{duration}}s)",
             "expand": "Expand deletion",
             "collapse": "Collapse deletion",
-            "expandHint": "Click ▼ to expand",
             "toggleSelectionDeletions": "Expand/collapse deletions in selection",
             "estimated": "Estimated: "
         },

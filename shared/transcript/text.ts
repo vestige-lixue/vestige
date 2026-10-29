@@ -76,26 +76,37 @@ function insertionOf(index: TextIndex, position: number, text: string): Modifica
     return { type: "insert", pos: textPosition(index, position), text };
 }
 
-// Longest suffix of deleted text matching the remaining inserted prefix, in linear time.
-function suffixPrefixLength(inserted: readonly string[], original: readonly string[], from: number, to: number): number {
-    const length = Math.min(inserted.length, to - from);
-    if (!length) return 0;
-    const borders = new Array<number>(length).fill(0);
-    for (let offset = 1, border = 0; offset < length; offset++) {
-        while (border && inserted[offset] !== inserted[border]) border = borders[border - 1];
-        if (inserted[offset] === inserted[border]) border++;
-        borders[offset] = border;
+// Greedy codepoint alignment with one-character lookahead; never search for distant matches.
+function restoreReplacement(index: TextIndex, from: number, to: number, text: string, modifications: Modification[]): void {
+    const characters = Array.from(text);
+    let source = from;
+    let inserted = 0;
+    let deletedFrom = from;
+    let insertedFrom = 0;
+    function append(end: number, insertedEnd: number): void {
+        if (deletedFrom < end) modifications.push(deletionOf(index, deletedFrom, end));
+        if (insertedFrom < insertedEnd) modifications.push(insertionOf(index, end, characters.slice(insertedFrom, insertedEnd).join("")));
     }
-    let matched = 0;
-    for (let offset = Math.max(from, to - length); offset < to; offset++) {
-        const character = original[offset];
-        while (matched && (matched === length || character !== inserted[matched])) matched = borders[matched - 1];
-        if (character === inserted[matched]) matched++;
+    while (source < to && inserted < characters.length) {
+        if (index.characters[source] === characters[inserted]) {
+            append(source, inserted);
+            deletedFrom = ++source;
+            insertedFrom = ++inserted;
+        }
+        else if (source + 1 < to && inserted + 1 < characters.length && index.characters[source + 1] === characters[inserted + 1]) {
+            // Prefer a substitution when the next pair already lines up.
+            source++; inserted++;
+        }
+        else if (inserted + 1 < characters.length && index.characters[source] === characters[inserted + 1]) inserted++;
+        else if (source + 1 < to && index.characters[source + 1] === characters[inserted]) source++;
+        else {
+            source++; inserted++;
+        }
     }
-    return matched;
+    append(to, characters.length);
 }
 
-export function normalizeModifications(index: TextIndex, modifications: readonly Modification[]): Modification[] {
+export function normalizeModifications(index: TextIndex, modifications: readonly Modification[], restore = true): Modification[] {
     const deletions: { from: number; to: number }[] = [];
     const insertions: { position: number; text: string }[] = [];
     for (const modification of modifications) {
@@ -137,27 +148,12 @@ export function normalizeModifications(index: TextIndex, modifications: readonly
             const insertion = anchored[insertionIndex++];
             normalized.push(insertionOf(index, insertion.position, insertion.text));
         }
-        let insertion: Modification | null = null;
-        if (anchored[insertionIndex]?.position === deletion.to) {
-            const characters = Array.from(anchored[insertionIndex++].text);
-            let first = 0;
-            let end = characters.length;
-            // D20 mirrors D18: common prefix, common suffix, then deleted-suffix/inserted-prefix overlap.
-            while (first < end && deletion.from < deletion.to && characters[first] === index.characters[deletion.from]) {
-                first++; deletion.from++;
-            }
-            while (first < end && deletion.from < deletion.to && characters[end - 1] === index.characters[deletion.to - 1]) {
-                end--; deletion.to--;
-            }
-            const position = deletion.to;
-            const remaining = characters.slice(first, end);
-            const overlap = suffixPrefixLength(remaining, index.characters, deletion.from, deletion.to);
-            deletion.to -= overlap;
-            // Keep this anchor after the restored suffix rather than moving it to the remaining deletion.
-            if (remaining.length > overlap) insertion = insertionOf(index, position, remaining.slice(overlap).join(""));
+        const insertion = anchored[insertionIndex]?.position === deletion.to ? anchored[insertionIndex++] : null;
+        if (insertion && restore) restoreReplacement(index, deletion.from, deletion.to, insertion.text, normalized);
+        else {
+            normalized.push(deletionOf(index, deletion.from, deletion.to));
+            if (insertion) normalized.push(insertionOf(index, insertion.position, insertion.text));
         }
-        if (deletion.from < deletion.to) normalized.push(deletionOf(index, deletion.from, deletion.to));
-        if (insertion) normalized.push(insertion);
     }
     for (; insertionIndex < anchored.length; insertionIndex++) {
         const insertion = anchored[insertionIndex];
@@ -257,8 +253,12 @@ function changedWindow(index: TextIndex, previous: readonly Modification[], modi
     }
     const changed = [...previous.slice(first, oldEnd), ...modifications.slice(first, newEnd)];
     if (!changed.length) return null;
-    let from = Math.min(...changed.map(modification => modificationStart(index, modification)));
-    let to = Math.max(...changed.map(modification => modificationEnd(index, modification)));
+    let from = Infinity;
+    let to = -Infinity;
+    for (const modification of changed) {
+        from = Math.min(from, modificationStart(index, modification));
+        to = Math.max(to, modificationEnd(index, modification));
+    }
     // Boundary insertions belong to their deletion anchor, including its end. Keep that unit whole.
     let expanded = true;
     while (expanded) {
@@ -295,8 +295,25 @@ export function provenanceChange(index: TextIndex, before: TextProjection, after
     return { from: left?.length ?? 0, to: after.length - (right?.length ?? 0) };
 }
 
-// from/to address displayed codepoints. Only removed original characters create new source deletions.
-export function editText(index: TextIndex, projection: TextProjection, from: number, to: number, text: string): TextProjection {
+// Reapply only the final IME replacement to its saved source identities, ignoring provisional candidates.
+export function commitText(index: TextIndex, saved: TextProjection, pending: TextProjection): TextProjection {
+    if (pending.text === saved.text) return saved;
+    const before = provenanceChange(index, pending, saved)!;
+    const after = provenanceChange(index, saved, pending)!;
+    const original = Array.from(saved.text.slice(projectionOffset(saved, before.from, true), projectionOffset(saved, before.to, true)));
+    const inserted = Array.from(pending.text.slice(projectionOffset(pending, after.from, true), projectionOffset(pending, after.to, true)));
+    let first = 0;
+    let oldEnd = original.length;
+    let newEnd = inserted.length;
+    while (first < oldEnd && first < newEnd && original[first] === inserted[first]) first++;
+    while (oldEnd > first && newEnd > first && original[oldEnd - 1] === inserted[newEnd - 1]) {
+        oldEnd--; newEnd--;
+    }
+    return editText(index, saved, before.from + first, before.from + oldEnd, inserted.slice(first, newEnd).join(""));
+}
+
+// from/to address displayed codepoints. IME updates defer restoration until their final commit.
+export function editText(index: TextIndex, projection: TextProjection, from: number, to: number, text: string, restore = true): TextProjection {
     if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < from || to > projection.length) {
         throw new RangeError("Invalid rendered text range.");
     }
@@ -341,8 +358,10 @@ export function editText(index: TextIndex, projection: TextProjection, from: num
         insert(piece.sourceFrom, characters.slice(end).join(""));
     }
     if (!inserted) insert(index.characters.length, text);
-    modifications.push(...remaining.filter(modification => modificationStart(index, modification) >= start));
-    const normalized = normalizeModifications(index, modifications);
+    for (const modification of remaining) {
+        if (modificationStart(index, modification) >= start) modifications.push(modification);
+    }
+    const normalized = normalizeModifications(index, modifications, restore);
     const tree = updateTree(index, projection, normalized);
     return { text: projection.text.slice(0, utf16From) + text + projection.text.slice(utf16To), length: tree?.length ?? 0, tree, modifications: normalized };
 }

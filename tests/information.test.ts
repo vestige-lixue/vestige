@@ -142,10 +142,10 @@ describe("transcriptInformation", () => {
 });
 
 describe("information previews", () => {
-    it("marks edge and repeated spaces, tabs and line breaks without changing ordinary internal spaces", () => {
+    it("preserves spaces, tabs and line breaks as original text", () => {
         const display = (text: string): string => previewUnits(text, "deleted").flat().map(part => part.text).join("");
-        expect(display(" a b  c\t\r\n ")).toBe("·a b··c→↵·");
-        expect(display(" \t\n\u00a0")).toBe("·→↵·");
+        expect(display(" a b  c\t\r\n ")).toBe(" a b  c\t\r\n ");
+        expect(display(" \t\n\u00a0")).toBe(" \t\n\u00a0");
         expect(display("a b")).toBe("a b");
     });
 
@@ -177,26 +177,31 @@ describe("selection information", () => {
         expect(transcriptSelectionUnits(index, projection, 1, 0, 2).deletions.map(item => item.original)).toEqual(["b"]);
     });
 
-    it("expands partial tokens and all surviving fragments into one continuous outline", () => {
+    it("outlines the union of touched tokens without covering inserted text", () => {
         const spans = transcript(["hello", " world"]);
         const index = createTextIndex(spans);
         const projection = projectText(index, modification(spans, 2, 2, "X"));
         expect(transcriptSelection(index, projection, 3, 3, 4)).toMatchObject({
-            kind: "selection", from: 0, to: 6, tokens: [0], range: { start: 0, end: 1 }, probability: null, blankProbability: null
+            kind: "selection", from: 0, to: 6, tokens: [0], fragments: [{ from: 0, to: 2 }, { from: 3, to: 6 }],
+            range: { start: 0, end: 1 }, probability: null, blankProbability: null
         });
-        expect(transcriptSelection(index, projection, 3, 4, 9)).toMatchObject({ from: 0, to: 12, tokens: [0, 1], range: { start: 0, end: 3 } });
+        expect(transcriptSelection(index, projection, 3, 4, 9)).toMatchObject({
+            from: 0, to: 12, tokens: [0, 1], fragments: [{ from: 0, to: 2 }, { from: 3, to: 12 }], range: { start: 0, end: 3 }
+        });
     });
 
-    it("ignores a next token selected only by its leading space after a Windows double-click", () => {
+    it("includes a token selected only by its leading space", () => {
         const index = createTextIndex(transcript(["hello", " world"]));
-        expect(transcriptSelection(index, projectText(index, []), 3, 0, 6)).toMatchObject({ from: 0, to: 6, tokens: [0], range: { start: 0, end: 1 } });
+        expect(transcriptSelection(index, projectText(index, []), 3, 0, 6)).toMatchObject({
+            from: 0, to: 11, tokens: [0, 1], fragments: [{ from: 0, to: 11 }], range: { start: 0, end: 3 }
+        });
     });
 
-    it("includes whitespace owners only when the complete selection is whitespace", () => {
+    it("includes whitespace tokens in both mixed and whitespace-only selections", () => {
         const index = createTextIndex(transcript(["a ", "\t", " b"]));
         const projection = projectText(index, []);
         expect(transcriptSelection(index, projection, 5, 1, 4)).toMatchObject({ from: 0, to: 5, tokens: [0, 1, 2], range: { start: 0, end: 5 } });
-        expect(transcriptSelection(index, projection, 5, 0, 3)).toMatchObject({ tokens: [0], range: { start: 0, end: 1 } });
+        expect(transcriptSelection(index, projection, 5, 0, 3)).toMatchObject({ tokens: [0, 1], range: { start: 0, end: 3 } });
     });
 
     it("includes boundary deletions only when their replacement text is selected", () => {
@@ -204,7 +209,7 @@ describe("selection information", () => {
         const index = createTextIndex(spans);
         const replacement = projectText(index, modification(spans, 1, 2, "h"));
         expect(transcriptSelection(index, replacement, 5, 1, 2)).toMatchObject({
-            tokens: [], deletions: [{ original: "u" }], range: { start: 2, end: 3 }
+            tokens: [], fragments: [], deletions: [{ original: "u" }], range: { start: 2, end: 3 }
         });
         expect(transcriptSelection(index, replacement, 5, 0, 1)).toMatchObject({ deletions: [], range: { start: 0, end: 1 } });
         expect(transcriptSelection(index, replacement, 5, 2, 3)).toMatchObject({ deletions: [], range: { start: 4, end: 5 } });
@@ -218,7 +223,9 @@ describe("selection information", () => {
         const index = createTextIndex(spans);
         const projection = projectText(index, modification(spans, 1, 1, "X"));
         expect(transcriptSelection(index, projection, 10, 1, 2)).toBeNull();
-        expect(transcriptSelection(index, projection, 10, 1, 3)).toMatchObject({ from: 1, to: 3, range: { start: 2, end: 3 } });
+        expect(transcriptSelection(index, projection, 10, 1, 3)).toMatchObject({
+            from: 1, to: 3, fragments: [{ from: 2, to: 3 }], range: { start: 2, end: 3 }
+        });
     });
 
     it("takes the envelope of unsorted overlapping times and clips it to duration", () => {
@@ -242,31 +249,66 @@ describe("selection comparison", () => {
             { kind: "deleted", text: "store" }, { kind: "inserted", text: "shop" }, { kind: "original", text: " now" }
         ]).flat().map(part => part.text).join("")).toBe("to the storeshop now");
     });
-    it("compares a whole modified token using projection provenance", () => {
+    it("preserves matching prefix and middle source in the comparison", () => {
         const spans = transcript(["store"]);
         const index = createTextIndex(spans);
         const projection = projectText(index, modification(spans, 0, 5, "shop"));
         expect(transcriptSelection(index, projection, 1, 0, 4)?.comparison).toEqual([
-            { kind: "deleted", text: "store" }, { kind: "inserted", text: "shop" }
+            { kind: "original", text: "s" }, { kind: "deleted", text: "t" }, { kind: "inserted", text: "h" },
+            { kind: "original", text: "o" }, { kind: "deleted", text: "re" }, { kind: "inserted", text: "p" }
         ]);
         expect(transcriptSelection(index, projectText(index, []), 1, 0, 5)?.comparison).toEqual([]);
     });
 
-    it("merges consecutive touched tokens including multiple independent modifications", () => {
+    it("keeps independent modifications at their actual character boundaries", () => {
         const spans = transcript(["one", "two", "three"]);
         const index = createTextIndex(spans);
         const projection = projectText(index, [...modification(spans, 1, 2, "X"), ...modification(spans, 4, 5, "Y")]);
         expect(transcriptSelection(index, projection, 5, 0, projection.text.length)?.comparison).toEqual([
-            { kind: "deleted", text: "onetwo" }, { kind: "inserted", text: "oXetYo" }, { kind: "original", text: "three" }
+            { kind: "original", text: "o" }, { kind: "deleted", text: "n" }, { kind: "inserted", text: "X" },
+            { kind: "original", text: "e" }, { kind: "original", text: "t" },
+            { kind: "deleted", text: "w" }, { kind: "inserted", text: "Y" },
+            { kind: "original", text: "o" }, { kind: "original", text: "three" }
         ]);
     });
 
-    it("groups a deletion across tokens and attaches boundary replacement text", () => {
+    it("preserves surviving characters around a deletion across tokens", () => {
         const spans = transcript(["one", "two", "three"]);
         const index = createTextIndex(spans);
         const projection = projectText(index, modification(spans, 1, 5, "X"));
         expect(transcriptSelection(index, projection, 5, 0, projection.text.length)?.comparison).toEqual([
-            { kind: "deleted", text: "onetwo" }, { kind: "inserted", text: "oXo" }, { kind: "original", text: "three" }
+            { kind: "original", text: "o" }, { kind: "deleted", text: "netw" }, { kind: "inserted", text: "X" },
+            { kind: "original", text: "o" }, { kind: "original", text: "three" }
+        ]);
+    });
+
+    it("renders only the deleted prefix of next without inventing an inserted t", () => {
+        const spans = transcript(["see", " you", " next", " time"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 7, 11, ""));
+        expect(projection.text).toBe("see yout time");
+        expect(transcriptEvents(index, projection, 7).find(item => item.kind === "deletion")?.original).toBe(" nex");
+        expect(transcriptSelection(index, projection, 7, 0, projection.text.length)?.comparison).toEqual([
+            { kind: "original", text: "see" }, { kind: "original", text: " you" },
+            { kind: "deleted", text: " nex" }, { kind: "original", text: "t" }, { kind: "original", text: " time" }
+        ]);
+    });
+
+    it("preserves deleted whitespace and supplementary characters verbatim", () => {
+        const spans = transcript(["a \t\n😀b"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 1, 5, ""));
+        expect(transcriptSelection(index, projection, 1, 0, 2)?.comparison).toEqual([
+            { kind: "original", text: "a" }, { kind: "deleted", text: " \t\n😀" }, { kind: "original", text: "b" }
+        ]);
+    });
+
+    it("shows an insertion inside a token without marking original characters as changed", () => {
+        const spans = transcript(["hello"]);
+        const index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 2, 2, "X"));
+        expect(transcriptSelection(index, projection, 1, 0, projection.text.length)?.comparison).toEqual([
+            { kind: "original", text: "he" }, { kind: "inserted", text: "X" }, { kind: "original", text: "llo" }
         ]);
     });
 

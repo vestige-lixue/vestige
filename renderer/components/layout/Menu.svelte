@@ -4,7 +4,7 @@
     bind:contentRect={menuBarBounds}
     style:--menu-item-padding={`${menuPadding}px`}
 >
-    <Menubar.Root class="menu" data-keyboard={keyboard.current} bind:value={menu.get, menu.set} onpointerdowncapture={rememberEditor}>
+    <Menubar.Root class="menu" data-keyboard={keyboard.current} bind:ref={menuRoot} bind:value={menu.get, menu.set} onpointerdowncapture={rememberEditor}>
         {#if compact}
             <Menubar.Menu value="all">
                 <Menubar.Trigger class="menu-trigger menu-toggle hoverable activable focusable">
@@ -12,7 +12,7 @@
                     {@html menuIcon}
                 </Menubar.Trigger>
                 <Menubar.Portal>
-                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents.all} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}
+                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents.all} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={event => handleCloseAutoFocus(event, "all")}
                         style={`z-index: ${layerIndex + 1};`} interactOutsideBehavior="ignore">
                         {@render menuGroups()}
                     </Menubar.Content>
@@ -51,7 +51,7 @@
             <Menubar.Menu value={menu.value}>
                 <Menubar.Trigger class="menu-trigger hoverable activable focusable">{i18n.t(menu.label)}</Menubar.Trigger>
                 <Menubar.Portal>
-                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents[menu.value]} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={handleCloseAutoFocus}
+                    <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents[menu.value]} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={event => handleCloseAutoFocus(event, menu.value)}
                         style={`z-index: ${layerIndex + 1};`} interactOutsideBehavior="ignore">
                         {@render menu.items()}
                     </Menubar.Content>
@@ -281,6 +281,7 @@
     ] as const;
 
     const keyboard = new IsUsingKeyboard();
+    let menuRoot = $state<HTMLDivElement | null>(null);
     let menuBarBounds = $state<DOMRectReadOnly>();
     let menuTextBounds = $state<DOMRectReadOnly>();
     let projectReservedWidth = $state(0);
@@ -419,7 +420,7 @@
         firstItem.focus({ preventScroll: true });
     }
 
-    function handleCloseAutoFocus(event: Event): void {
+    function handleCloseAutoFocus(event: Event, value: string): void {
         // Switching menus or opening a dialog must keep focus in the new content.
         if (menu.get() || interfaceBlocked() || restoringEditor || focusingControl || pointerDismissed) {
             event.preventDefault();
@@ -427,6 +428,22 @@
         else if (editor?.isConnected) {
             event.preventDefault();
             restoreEditor();
+        }
+        else {
+            // Pointer-opened triggers may have tabindex="-1", which the menu's default restoration skips.
+            const trigger = menuRoot?.querySelector<HTMLButtonElement>(`[data-menubar-trigger][data-menu-value="${value}"]`);
+            if (trigger) {
+                event.preventDefault();
+                // Let the closing content finish its pending autofocus before restoring the trigger.
+                void tick().then(() => {
+                    // Tab or another action may already have moved focus to its destination.
+                    const active = document.activeElement;
+                    if (!menu.get() && !interfaceBlocked() && trigger.isConnected
+                        && (active === document.body || active?.closest("[data-menubar-content], [data-menubar-sub-content]"))) {
+                        trigger.focus({ preventScroll: true });
+                    }
+                });
+            }
         }
         restoringEditor = false;
         focusingControl = false;

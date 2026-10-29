@@ -23,7 +23,7 @@ export function registerAppIPCs(contents: WebContents, logs: LogDirectory): void
         }
     });
     listen(contents, appChannels.openDevTools, () => {
-        contents.openDevTools({ mode: "detach" });
+        contents.openDevTools({ mode: "undocked" });
     });
     listen(contents, appChannels.quit, () => {
         app.quit();

@@ -107,7 +107,7 @@ function editingTarget(target: EventTarget | null): target is HTMLElement {
 }
 
 function deletionControl(target: EventTarget | null): boolean {
-    return target instanceof HTMLElement && isTranscriptEditorTarget(target) && !!target.closest(".transcript-event.deletion, .transcript-restore");
+    return target instanceof HTMLElement && isTranscriptEditorTarget(target) && !!target.closest(".transcript-event.deletion");
 }
 
 function run(command: Command): void {

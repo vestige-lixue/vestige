@@ -3,6 +3,12 @@ import { compositionPending } from "./composition";
 
 export function caretPlugin(): Plugin {
     return new Plugin({
+        props: {
+            attributes(state) {
+                const last = state.doc.firstChild?.lastChild;
+                return { class: !last || last.type.name === "hardBreak" ? "transcript-trailing-empty" : "" };
+            }
+        },
         view(view) {
             const document = view.dom.ownerDocument;
             const window = document.defaultView!;
@@ -39,9 +45,15 @@ export function caretPlugin(): Plugin {
                 const head = view.posAtDOM(dom.focusNode, dom.focusOffset);
                 const end = view.state.doc.content.size - 1;
                 if (head !== 1 && head !== end) return hideCaret(false);
-                const target = view.domAtPos(head, head === 1 ? 1 : -1);
-                // A blank line has no adjacent text; never move across a hard break to find some.
-                if (target.node.nodeType !== Node.TEXT_NODE) return hideCaret(false);
+                let target = view.domAtPos(head, head === 1 ? 1 : -1);
+                if (target.node.nodeType !== Node.TEXT_NODE) {
+                    // A trailing blank line uses the input anchor after its widgets, never text across a hard break.
+                    const paragraph = view.dom.firstElementChild;
+                    const separator = paragraph?.lastElementChild?.previousSibling;
+                    if (head !== end || !(separator instanceof HTMLImageElement) || !separator.classList.contains("ProseMirror-separator")) return hideCaret(false);
+                    target = { node: paragraph!, offset: paragraph!.childNodes.length - 2 };
+                }
+                if (dom.focusNode === target.node && dom.focusOffset === target.offset) return hideCaret(false);
                 // Changing the DOM selection while pressed resets Chromium's native drag anchor.
                 if (dragging) return hideCaret(true);
                 dom.collapse(target.node, target.offset);
