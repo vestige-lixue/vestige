@@ -19,7 +19,7 @@
         "dev": "electron-vite dev --config configs/electron.vite.config.ts",
         "build": "pnpm typecheck && electron-vite build --config configs/electron.vite.config.ts",
         "build:unpack": "pnpm build && electron-builder --dir",
-        "build:win": "pnpm build && electron-builder --win",
+        "build:win": "pnpm build && electron-builder --win --dir && node configs/package-windows.mjs",
         "build:mac": "pnpm build && electron-builder --mac",
         "build:linux": "pnpm build && electron-builder --linux",
         "test": "vitest run --config configs/vitest.config.ts"

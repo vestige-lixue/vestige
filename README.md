@@ -55,11 +55,11 @@ pnpm build:mac   # macOS
 pnpm build:linux # Linux
 ```
 
-Packages are written to `dist/release/`.
+Packages are written to `dist/release/`. Windows packaging requires Inno Setup 6.3 or newer, installed in its default location or with `ISCC.exe` on PATH.
 
 ### Building releases with GitHub Actions
 
-The [Build release workflow](.github/workflows/release.yml) builds Windows NSIS installers, macOS DMG files, and Linux AppImages for both x64 and arm64 on native runners. Each job installs the pnpm version from `package.json`, uses the frozen lockfile, downloads the target's native programs, and runs the existing typecheck and build commands before packaging.
+The [Build release workflow](.github/workflows/release.yml) builds Windows Inno Setup installers, macOS DMG files, and Linux AppImages for both x64 and arm64 on native runners. Each job installs the pnpm version from `package.json`, uses the frozen lockfile, downloads the target's native programs, and runs the existing typecheck and build commands before packaging.
 
 Transcription backends and speech recognition models are downloaded in the app. Packaging prepares FFmpeg / ffprobe, aria2 and the Silero VAD preprocessing model; see [bundled resource preparation](resources/bin/README.md) for supported targets. The [macos-whisper-cli repository](https://github.com/vestige-lixue/macos-whisper-cli) supplies downloadable macOS Whisper backends through the application catalog.
 

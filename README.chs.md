@@ -55,11 +55,11 @@ pnpm build:mac   # macOS
 pnpm build:linux # Linux
 ```
 
-生成的应用包位于 `dist/release/`。
+生成的应用包位于 `dist/release/`。Windows 打包需要 Inno Setup 6.3 或更新版本，安装在默认位置或将 `ISCC.exe` 加入 PATH 即可。
 
 ### 通过 GitHub Actions 构建发行版
 
-[Build release 工作流](.github/workflows/release.yml) 使用对应架构的原生运行器，为 x64 和 arm64 分别构建 Windows NSIS 安装程序、macOS DMG 和 Linux AppImage。每个任务都会按 `package.json` 安装 pnpm，使用冻结的锁文件安装依赖，下载目标平台的原生程序，再执行现有类型检查、构建和打包命令。
+[Build release 工作流](.github/workflows/release.yml) 使用对应架构的原生运行器，为 x64 和 arm64 分别构建 Windows Inno Setup 安装程序、macOS DMG 和 Linux AppImage。每个任务都会按 `package.json` 安装 pnpm，使用冻结的锁文件安装依赖，下载目标平台的原生程序，再执行现有类型检查、构建和打包命令。
 
 转写后端与语音识别模型均在应用内下载。打包时准备 FFmpeg / ffprobe、aria2 和用于音频预处理的 Silero VAD 模型，支持的平台见[内置资源准备说明](resources/bin/README.md)。独立仓库 [macos-whisper-cli](https://github.com/vestige-lixue/macos-whisper-cli) 提供的 macOS Whisper 后端通过应用内的预置后端列表下载。
 

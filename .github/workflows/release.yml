@@ -111,6 +111,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Windows packaging tools
+        if: runner.os == 'Windows'
+        run: choco install innosetup --yes --no-progress
+
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: |
@@ -129,12 +133,15 @@ jobs:
         run: |
           args=("--$BUILDER_PLATFORM" "--$TARGET_ARCH" --publish never)
           if [[ "$TARGET_PLATFORM" == win32 ]]; then
-            args+=('-c.nsis.artifactName=${name}-${version}-${arch}-setup.${ext}')
+            args+=(--dir)
           elif [[ "$TARGET_PLATFORM" == darwin ]]; then
             # Ad-hoc signing supports Apple Silicon without a Developer ID certificate.
             args+=(-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false)
           fi
           pnpm exec electron-builder "${args[@]}"
+          if [[ "$TARGET_PLATFORM" == win32 ]]; then
+            node configs/package-windows.mjs "$TARGET_ARCH"
+          fi
 
       - name: Upload application packages
         uses: actions/upload-artifact@v7.0.1

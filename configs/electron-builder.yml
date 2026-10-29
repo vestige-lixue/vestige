@@ -26,12 +26,7 @@ win:
   executableName: vestige
   icon: resources/logos/logo-square-black.ico
   target:
-    - nsis
-nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+    - dir
 mac:
   icon: resources/logos/logo-square.icns
   entitlements: resources/entitlements.mac.plist
