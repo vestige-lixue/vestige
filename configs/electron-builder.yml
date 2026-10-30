@@ -1,5 +1,8 @@
 appId: vestige.lixue
 productName: Vestige
+toolsets:
+  # Embed the static runtime so users do not need libfuse2.
+  appimage: '1.0.3'
 directories:
   buildResources: resources
   output: dist/release

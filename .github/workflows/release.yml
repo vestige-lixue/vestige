@@ -118,7 +118,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y libarchive-tools libfuse2t64
+          sudo apt-get install --no-install-recommends -y libarchive-tools
 
       - name: Download media and download tools for this target
         env:

@@ -135,13 +135,23 @@ function startApplication(): void {
             if (windowState.maximized) mainWindow.maximize();
             rememberWindow();
             mainWindow.show();
+            applicationLog?.record("Window shown");
         };
         listen(mainWindow.webContents, appChannels.ready, () => {
             if (mainWindow.isVisible()) return;
+            applicationLog?.record("Renderer ready");
             rendererReady = true;
             showWindow();
         });
         mainWindow.once("ready-to-show", () => {
+            applicationLog?.record("Window ready to show");
+            windowReady = true;
+            showWindow();
+        });
+        mainWindow.webContents.once("did-finish-load", () => {
+            applicationLog?.record("Window page loaded");
+            // Native Wayland can withhold ready-to-show until the window is shown.
+            if (process.platform !== "linux") return;
             windowReady = true;
             showWindow();
         });
