@@ -5,6 +5,8 @@ AppId=vestige.lixue
 AppName=Vestige
 AppVersion={#AppVersion}
 DefaultDirName={autopf}\Vestige
+DefaultGroupName=Vestige
+LicenseFile=..\LICENSE
 ArchitecturesAllowed={#InstallArch}
 ArchitecturesInstallIn64BitMode={#InstallArch}
 MinVersion=10.0
@@ -14,8 +16,18 @@ SetupIconFile=..\resources\logos\logo-square-black.ico
 UninstallDisplayName=Vestige
 UninstallDisplayIcon={app}\vestige.exe
 
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "inno-languages\ChineseSimplified.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
 [Files]
 Source: "{#AppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\Vestige"; Filename: "{app}\vestige.exe"
+Name: "{group}\Vestige"; Filename: "{app}\vestige.exe"
+Name: "{autodesktop}\Vestige"; Filename: "{app}\vestige.exe"; Tasks: desktopicon
+
+#include "inno-uninstall.iss"
