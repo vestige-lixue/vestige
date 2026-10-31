@@ -17,7 +17,7 @@
                 "configs/electron.vite.config.ts"
             ],
             "env": {
-                "REMOTE_DEBUGGING_PORT": "14201"
+                "REMOTE_DEBUGGING_PORT": "9222"
             },
             "outFiles": [
                 "${workspaceFolder}/dist/main/**/*.js",
@@ -27,7 +27,7 @@
         {
             "name": "Debug Renderer Process",
             "address": "127.0.0.1",
-            "port": 14201,
+            "port": 9222,
             "request": "attach",
             "type": "chrome",
             "webRoot": "${workspaceFolder}/renderer",
