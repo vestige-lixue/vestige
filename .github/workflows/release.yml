@@ -59,16 +59,16 @@ jobs:
           }
 
           const targets = [
-              { target: "windows-x64", os: "windows-2025", platform: "win32", builder: "win", arch: "x64", asset: "x64-setup.exe" },
-              { target: "windows-arm64", os: "windows-11-arm", platform: "win32", builder: "win", arch: "arm64", asset: "arm64-setup.exe" },
-              { target: "macos-x64", os: "macos-15-intel", platform: "darwin", builder: "mac", arch: "x64", asset: "x64.dmg" },
-              { target: "macos-arm64", os: "macos-26", platform: "darwin", builder: "mac", arch: "arm64", asset: "arm64.dmg" },
-              { target: "linux-x64", os: "ubuntu-24.04", platform: "linux", builder: "linux", arch: "x64", asset: "x64.AppImage" },
-              { target: "linux-arm64", os: "ubuntu-24.04-arm", platform: "linux", builder: "linux", arch: "arm64", asset: "arm64.AppImage" }
+              { target: "windows-x64", os: "windows-2025", platform: "win32", builder: "win", arch: "x64", assets: ["x64-setup.exe"] },
+              { target: "windows-arm64", os: "windows-11-arm", platform: "win32", builder: "win", arch: "arm64", assets: ["arm64-setup.exe"] },
+              { target: "macos-x64", os: "macos-15-intel", platform: "darwin", builder: "mac", arch: "x64", assets: ["x64.dmg"] },
+              { target: "macos-arm64", os: "macos-26", platform: "darwin", builder: "mac", arch: "arm64", assets: ["arm64.dmg"] },
+              { target: "linux-x64", os: "ubuntu-24.04", platform: "linux", builder: "linux", arch: "x64", assets: ["x86_64.AppImage", "amd64.deb"] },
+              { target: "linux-arm64", os: "ubuntu-24.04-arm", platform: "linux", builder: "linux", arch: "arm64", assets: ["arm64.AppImage", "arm64.deb"] }
           ];
           const include = targets.filter(({ target }) => process.env.TARGET === "all" || process.env.TARGET === target);
           if (include.length === 0) throw new Error(`Unknown build target: ${process.env.TARGET}`);
-          const files = include.map(({ asset }) => `vestige-${version}-${asset}`);
+          const files = include.flatMap(({ assets }) => assets.map(asset => `vestige-${version}-${asset}`));
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nmatrix=${JSON.stringify({ include })}\nfiles=${JSON.stringify(files)}\n`);
           NODE
 
@@ -150,6 +150,7 @@ jobs:
             dist/release/*.exe
             dist/release/*.dmg
             dist/release/*.AppImage
+            dist/release/*.deb
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

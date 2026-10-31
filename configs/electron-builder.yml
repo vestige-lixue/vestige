@@ -42,6 +42,11 @@ linux:
   icon: resources/logos/logo-square-black.png
   target:
     - AppImage
+    - deb
   category: Utility
+  syncDesktopName: true
 appImage:
   artifactName: ${name}-${version}-${arch}.${ext}
+deb:
+  artifactName: ${name}-${version}-${arch}.${ext}
+  maintainer: LJM12914 <LJM12914@outlook.com>
