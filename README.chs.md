@@ -57,17 +57,6 @@ pnpm build:linux # Linux
 
 生成的应用包位于 `dist/release/`。Windows 打包需要 Inno Setup 6.3 或更新版本，安装在默认位置或将 `ISCC.exe` 加入 PATH 即可。
 
-### 通过 GitHub Actions 构建发行版
-
-[Build release 工作流](.github/workflows/release.yml) 使用对应架构的原生运行器，为 x64 和 arm64 分别构建 Windows Inno Setup 安装程序、macOS DMG 和 Linux AppImage。每个任务都会按 `package.json` 安装 pnpm，使用冻结的锁文件安装依赖，下载目标平台的原生程序，再执行现有类型检查、构建和打包命令。
-
-转写后端与语音识别模型均在应用内下载。打包时准备 FFmpeg / ffprobe、aria2 和用于音频预处理的 Silero VAD 模型，支持的平台见[内置资源准备说明](resources/bin/README.md)。独立仓库 [macos-whisper-cli](https://github.com/vestige-lixue/macos-whisper-cli) 提供的 macOS Whisper 后端通过应用内的预置后端列表下载。
-
-- **手动构建**：将工作流提交到默认分支后，打开 **Actions → Build release → Run workflow**，选择分支以及 `all` 或单个平台与架构。构建产物可在该次运行的 **Artifacts** 中下载，保留 14 天。手动运行只上传构建产物。
-- **创建发行草稿**：将 `package.json` 设为目标版本并提交，然后推送对应标签，例如 `v0.1.0`。六个构建任务全部成功后，工作流会创建包含安装包和 `SHA256SUMS` 的 GitHub Release 草稿。标签必须严格等于 `v` 加包版本号；带预发布后缀的版本会创建预发布草稿。在 **Releases** 中检查文件和说明后即可发布。
-
-重新运行标签构建会更新已有草稿，不会覆盖已发布的发行版附件。仅创建发行草稿的任务通过 GitHub 内置令牌获得 `contents: write` 权限，无需额外配置 Secret。Windows 安装程序未签名；macOS 应用采用临时签名（ad-hoc），未进行 Developer ID 签名或公证，因此仍可能出现操作系统的信任提示。
-
 ## 作者
 
 [@ljm12914](https://github.com/ljm12914)
