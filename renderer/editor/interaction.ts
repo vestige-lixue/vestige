@@ -7,6 +7,7 @@ export type TranscriptInspection = InspectionTarget & { control: boolean };
 export type InspectionCallbacks = {
     onChange: (inspection: TranscriptInspection | null) => void;
     onSeek: (time: number) => void;
+    onHover?: (hovered: boolean) => void;
 };
 
 export function sameRect(left: DOMRect, right: DOMRect): boolean {
@@ -86,6 +87,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         return true;
     }
     function leave(event?: PointerEvent): void {
+        if (event?.type === "pointerleave") options.onHover?.(false);
         if (event?.type === "pointerleave" && state.pointer?.pressed) return move(event);
         state.pointer = null;
         state.hovered = null;
@@ -97,6 +99,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         const changed = setControl(event.ctrlKey && !event.altKey && !event.metaKey);
         state.pointer = { x: event.clientX, y: event.clientY, pressed: event.buttons !== 0 };
         state.hovered = geometry.hover(state.pointer, state.hovered);
+        options.onHover?.(event.type !== "pointerleave" && (!!state.hovered || geometry.containsAddedText(state.pointer)));
         inspect(state.hovered ? "pointer" : changed && state.control ? "keyboard" : state.priority);
     }
     function modifiers(event: KeyboardEvent): void {

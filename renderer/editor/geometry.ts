@@ -86,6 +86,7 @@ export function keyboardRectangle<T extends Rectangle>(rectangles: readonly T[],
 
 export type InspectionGeometry = {
     hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, options?: { measure?: boolean; selection?: boolean }) => InspectionTarget | null;
+    containsAddedText: (pointer: InspectionPointer | null) => boolean;
     keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
 };
 
@@ -195,6 +196,13 @@ export function inspectionGeometry(
                 if (anchor) return { information: item, rectangles: boxes, anchor, keyboard: false, pressed };
             }
             return null;
+        },
+        containsAddedText(pointer) {
+            if (!pointer || blocked()) return false;
+            const added = document.elementFromPoint(pointer.x, pointer.y)?.closest(".transcript-added");
+            if (!added || !view.dom.contains(added)) return false;
+            // Inline fragments include the text's padding without filling the whitespace between wrapped lines.
+            return !!pointerRectangle([...added.getClientRects()], pointer, { top: 0, right: 0, bottom: 0, left: 0 });
         },
         keyboard(control, element = document.activeElement) {
             if (blocked() || !document.hasFocus()) return null;

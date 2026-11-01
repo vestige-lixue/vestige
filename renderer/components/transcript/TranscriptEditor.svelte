@@ -274,6 +274,9 @@
     let tooltipOpen = $state(false);
     let openTimer: ReturnType<typeof setTimeout> | undefined;
     let skipDelayUntil = 0;
+    let hovering = false;
+    let controlDismissed = false;
+    let dismissedHover: "inside" | "outside" | null = null;
     let previousDisplay = "";
     const informationDisplay = $derived(settings.getEditing().informationDisplay);
     const anchor = $derived.by(() => {
@@ -297,8 +300,24 @@
     function closeTooltip(): void {
         clearTimeout(openTimer);
         openTimer = undefined;
-        if (tooltipOpen) skipDelayUntil = Date.now() + 300;
+        // Uninspectable text keeps the current hover session ready until the pointer leaves its hot zone.
+        if (tooltipOpen) skipDelayUntil = hovering ? Infinity : Date.now() + 300;
         tooltipOpen = false;
+    }
+
+    function inspectionKeydown(event: KeyboardEvent): void {
+        if (event.key === "Control" && !event.repeat) {
+            const dismissed = controlDismissed;
+            controlDismissed = false;
+            if (dismissed && inspection?.control) inspect(inspection, true);
+        }
+        if (event.key !== "Escape" || !tooltipOpen) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        controlDismissed = !!inspection?.control;
+        dismissedHover = !inspection?.control && !inspection?.keyboard ? "inside" : null;
+        closeTooltip();
+        skipDelayUntil = 0;
     }
 
     function inspect(value: TranscriptInspection | null, force = false): void {
@@ -313,7 +332,7 @@
             const range = value?.information.range;
             transcript.setInspection(range ? { mediaId: vestige.media.id, runId: run.id, range } : null);
         }
-        if (!value || value.pressed || informationDisplay !== "tooltip" || !changed) return;
+        if (!value || value.pressed || controlDismissed || dismissedHover && !value.control || informationDisplay !== "tooltip" || !changed) return;
         if (value.control || value.keyboard || !released && Date.now() < skipDelayUntil) tooltipOpen = true;
         else openTimer = setTimeout(() => {
             openTimer = undefined;
@@ -324,10 +343,19 @@
     $effect(() => {
         const current = vestige;
         const displayed = run;
+        // Dismiss before inspection modifiers, editor shortcuts and the tooltip's Escape layer.
+        window.addEventListener("keydown", inspectionKeydown, true);
         const instance = untrack(() => createTranscriptEditor(element, displayed, $state.snapshot(current.modifications), modifications => {
             if (project.getVestige(current.media.id) === current) projectAPI.updateModifications(current.media.id, displayed.id, modifications);
         }, () => !project.projectState.locked, {
             duration: current.media.duration, onChange: inspect,
+            onHover: hovered => {
+                hovering = hovered;
+                if (!hovered && skipDelayUntil === Infinity) skipDelayUntil = Date.now() + 300;
+                // Crossing token boundaries stays dismissed; only leaving and reentering rearms hover.
+                if (!hovered && dismissedHover) dismissedHover = "outside";
+                else if (hovered && dismissedHover === "outside") dismissedHover = null;
+            },
             onSeek: time => runCommand({ kind: "seekWord", time })
         }));
         instance.registerPlugin(new Plugin({
@@ -343,6 +371,7 @@
         }));
         editor = instance;
         return () => {
+            window.removeEventListener("keydown", inspectionKeydown, true);
             instance.destroy();
             inspect(null);
         };
