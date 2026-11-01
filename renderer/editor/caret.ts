@@ -1,8 +1,19 @@
-import { Plugin } from "@tiptap/pm/state";
+import { Plugin, TextSelection } from "@tiptap/pm/state";
+import { isHistoryTransaction } from "@tiptap/pm/history";
 import { compositionPending } from "./composition";
 
 export function caretPlugin(): Plugin {
     return new Plugin({
+        appendTransaction(transactions, oldState, newState) {
+            if (!transactions.some(isHistoryTransaction)) return null;
+            // History changes content without restoring or mapping its saved selection.
+            // Clamp to both text bounds so select-all excludes the paragraph boundaries.
+            const end = Math.min(oldState.doc.content.size, newState.doc.content.size) - 1;
+            const anchor = Math.max(1, Math.min(end, oldState.selection.anchor));
+            const head = Math.max(1, Math.min(end, oldState.selection.head));
+            const selection = TextSelection.create(newState.doc, anchor, head);
+            return selection.eq(newState.selection) ? null : newState.tr.setSelection(selection);
+        },
         props: {
             attributes(state) {
                 const last = state.doc.firstChild?.lastChild;
