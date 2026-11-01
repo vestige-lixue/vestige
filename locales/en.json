@@ -36,9 +36,9 @@
             "paste": "Paste"
         },
         "other": {
-            "title": "Other",
+            "title": "App",
             "quit": "Quit",
-            "developerTools": "Open developer tools",
+            "developerTools": "Developer tools",
             "repository": "GitHub repository",
             "about": "About"
         },

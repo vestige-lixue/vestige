@@ -400,9 +400,14 @@ export function toggleTranscriptDeletions(element: HTMLElement | null): boolean 
     return editor ? toggleSelectionDeletions(editor.view) : false;
 }
 
-export function transcriptHistoryAvailable(element: HTMLElement | null, action: "undo" | "redo"): boolean | null {
+export function transcriptEditAvailable(element: HTMLElement | null, action: "undo" | "redo" | "cut" | "copy"): boolean | null {
     const editor = transcriptEditorAt(element);
-    return editor ? editor.isEditable && (action === "undo" ? undo : redo)(editor.state) : null;
+    if (!editor) return null;
+    if (action === "cut" || action === "copy") {
+        const { from, to } = editor.state.selection;
+        return (action === "copy" || editor.isEditable) && !!editor.state.doc.textBetween(from, to, "\n", "\n");
+    }
+    return editor.isEditable && (action === "undo" ? undo : redo)(editor.state);
 }
 
 export function handleTranscriptEdit(element: HTMLElement | null, action: EditAction): boolean {

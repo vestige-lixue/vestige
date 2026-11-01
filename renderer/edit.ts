@@ -1,13 +1,20 @@
 import { type EditAction } from "../shared/app";
-import { handleTranscriptEdit, transcriptHistoryAvailable } from "./editor/transcript";
+import { handleTranscriptEdit, transcriptEditAvailable } from "./editor/transcript";
 
 export function editAvailable(target: HTMLElement | null, action: EditAction): boolean {
-    if (action !== "undo" && action !== "redo") return true;
-    const transcript = transcriptHistoryAvailable(target, action);
-    // false belongs to an editor with no history; only null permits native fallback.
+    if (action !== "undo" && action !== "redo" && action !== "cut" && action !== "copy") return true;
+    const transcript = transcriptEditAvailable(target, action);
+    // A recognized transcript owns availability; only null permits native fallback.
     if (transcript !== null) return transcript;
+    const input = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
     const editable = target && (target.isContentEditable
-        || (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) && !target.readOnly && !target.disabled);
+        || input && !target.readOnly && !target.disabled);
+    if (action === "cut" || action === "copy") {
+        if (action === "cut" && !editable) return false;
+        if (input) return !target.disabled && target.selectionStart !== null && target.selectionEnd !== null && target.selectionStart !== target.selectionEnd;
+        const selection = document.getSelection();
+        return !!selection && !selection.isCollapsed && !!selection.toString();
+    }
     return !!editable && document.queryCommandEnabled(action);
 }
 

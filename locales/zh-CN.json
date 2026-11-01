@@ -36,9 +36,9 @@
             "paste": "粘贴"
         },
         "other": {
-            "title": "其他",
+            "title": "应用",
             "quit": "退出应用",
-            "developerTools": "打开开发者工具",
+            "developerTools": "开发者工具",
             "repository": "项目 GitHub 仓库",
             "about": "关于"
         },

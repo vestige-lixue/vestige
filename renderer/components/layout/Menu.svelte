@@ -89,13 +89,13 @@
     {@render commandItems([null, { kind: "moveSelectedMedia", direction: -1 }, { kind: "moveSelectedMedia", direction: 1 }])}
 {/snippet}
 
-{#snippet transcriptionItems()}{@render commandItems(transcriptionActions)}{/snippet}
+{#snippet transcriptionItems()}{@render commandItems([transcriptionCommand, null, ...transcriptionActions])}{/snippet}
 
 {#snippet editItems()}
     {#each editActions as action, index (index)}
         {#if action === null}<Menubar.Separator />
         {:else}
-            <Menubar.Item class="activable focusable" disabled={action === "undo" ? !canUndo : action === "redo" ? !canRedo : false} onSelect={() => runEdit(action)}>
+            <Menubar.Item class="activable focusable" disabled={!availableEdits[action]} onSelect={() => runEdit(action)}>
                 <div>{i18n.t(`menu.edit.${action}`)}</div>
                 <kbd>{editShortcut(action)}</kbd>
             </Menubar.Item>
@@ -256,10 +256,10 @@
         { kind: "newProject" }, { kind: "openProject" }, { kind: "saveProject" }, { kind: "saveProjectAs" }, { kind: "closeProject" }
     ];
     const transcriptionActions: readonly (Command | null)[] = [
-        { kind: "openPanel", panel: "transcription-backends" }, { kind: "openPanel", panel: "transcription-models" },
-        { kind: "openPanel", panel: "transcription-presets" }, null, { kind: "openPanel", panel: "vocabulary" }, { kind: "openPanel", panel: "tasks" }
+        { kind: "openPanel", panel: "vocabulary" }, { kind: "openPanel", panel: "tasks" }, null,
+        { kind: "openPanel", panel: "transcription-backends" }, { kind: "openPanel", panel: "transcription-models" }, { kind: "openPanel", panel: "transcription-presets" }
     ];
-    const editActions: readonly (EditAction | null)[] = ["selectAll", "undo", "redo", null, "cut", "copy", "paste"];
+    const editActions: readonly (EditAction | null)[] = ["undo", "redo", null, "cut", "copy", "paste", null, "selectAll"];
     const playActions: readonly (Command | null)[] = [
         { kind: "playSelectedMedia" }, { kind: "cyclePlaybackMode" }, null,
         { kind: "selectAdjacentMedia", direction: -1 }, { kind: "selectAdjacentMedia", direction: 1 }, null,
@@ -267,8 +267,9 @@
         { kind: "toggleVolumeStabilization" }, { kind: "restorePlaybackSpeed" }
     ];
     const miscActions: readonly (Command | null)[] = [
-        { kind: "quitApp" }, null, { kind: "openPanel", panel: "settings" }, null, { kind: "openDevTools" }, null,
-        { kind: "openPanel", panel: "guide" }, { kind: "openProjectRepository" }, { kind: "openPanel", panel: "licenses" }, { kind: "openPanel", panel: "about" }
+        { kind: "openPanel", panel: "settings" }, { kind: "openDevTools" }, null,
+        { kind: "openPanel", panel: "guide" }, { kind: "openProjectRepository" }, { kind: "openPanel", panel: "licenses" }, { kind: "openPanel", panel: "about" },
+        null, { kind: "quitApp" }
     ];
 
     const menus = [
@@ -299,8 +300,9 @@
     });
     let focusMenuOnOpen = false;
     let editor: HTMLElement | null = null;
-    let canUndo = $state(false);
-    let canRedo = $state(false);
+    let availableEdits = $state<Record<EditAction, boolean>>({
+        undo: false, redo: false, cut: false, copy: false, paste: true, selectAll: true
+    });
     let editorRange: Range | null = null;
     let editorSelection: { start: number; end: number; direction: "forward" | "backward" | "none" } | null = null;
     let restoringEditor = false;
@@ -344,8 +346,9 @@
         if (menu.get()) return;
         const active = document.activeElement;
         editor = active instanceof HTMLElement && (active.matches("input, textarea") || active.isContentEditable || isTranscriptEditorTarget(active)) ? active : null;
-        canUndo = editAvailable(editor, "undo");
-        canRedo = editAvailable(editor, "redo");
+        for (const action of editActions) {
+            if (action) availableEdits[action] = editAvailable(editor, action);
+        }
         editorSelection = (editor instanceof HTMLInputElement || editor instanceof HTMLTextAreaElement) && editor.selectionStart !== null && editor.selectionEnd !== null
             ? { start: editor.selectionStart, end: editor.selectionEnd, direction: editor.selectionDirection ?? "none" } : null;
         const selection = document.getSelection();
@@ -365,7 +368,7 @@
     }
 
     function runEdit(action: EditAction): void {
-        if (interfaceBlocked() || action === "undo" && !canUndo || action === "redo" && !canRedo) return;
+        if (interfaceBlocked() || !availableEdits[action]) return;
         restoringEditor = true;
         menu.set("");
         void tick().then(() => {
