@@ -39,7 +39,7 @@ mac:
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
 linux:
-  icon: resources/logos/logo-square-black.png
+  icon: resources/logos/logo-square.svg
   target:
     - AppImage
     - deb
