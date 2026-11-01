@@ -1,6 +1,8 @@
 import { Editor, Extension, Mark, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type Mark as PMMark, type Schema } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction, type EditorState } from "@tiptap/pm/state";
+import { dropPoint } from "@tiptap/pm/transform";
+import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit } from "./composition";
 import { caretPlugin } from "./caret";
 import { firstTrue } from "../../shared/util/search";
@@ -266,6 +268,15 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             clipboardTextSerializer(slice) {
                 return slice.content.textBetween(0, slice.content.size, "\n", "\n");
             },
+            handleDrop(view, event, slice, moved) {
+                if (!moved) return false;
+                const position = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                if (!position) return false;
+                const target = dropPoint(view.state.doc, position.pos, slice) ?? position.pos;
+                const { from, to } = view.state.selection;
+                // Moving onto the selection, including its edges, must not delete and reinsert its source history.
+                return target >= from && target <= to;
+            },
             handleDOMEvents: {
                 beforeinput(view, event) {
                     if (!view.editable || event.defaultPrevented || event.isComposing || view.composing) return false;
@@ -328,7 +339,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             }
         }
     });
-    return [compositionPlugin(), bridge, caretPlugin(), playback, history()];
+    return [compositionPlugin(), bridge, caretPlugin(), dropCursorPlugin(), playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {

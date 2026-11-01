@@ -88,7 +88,11 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 });
                 expanded.append(original);
                 return dom = expanded;
-            }, { key, side, relaxedSide: true, marks: [], ignoreSelection: true, stopEvent: () => true });
+            }, {
+                key, side, relaxedSide: true, marks: [], ignoreSelection: true,
+                // Text drags over a marker still belong to the editor, including its no-op drop guard.
+                stopEvent: event => event.type !== "drop" && !event.type.startsWith("drag")
+            });
         });
         return { ...model, projection, expanded, labels, pending: false, decorations: DecorationSet.create(state.doc, decorations) };
     }
