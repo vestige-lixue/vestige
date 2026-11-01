@@ -5,6 +5,6 @@
         "composite": false,
         "emitDeclarationOnly": false,
         "noEmit": true,
-        "types": ["node"]
+        "types": ["node", "svelte"]
     }
 }
