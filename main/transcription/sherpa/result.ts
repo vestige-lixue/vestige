@@ -26,14 +26,46 @@ export function normalizeQwenOutput(output: NativeObject): NativeObject {
 }
 
 export function parseBatchResults(raw: string, diagnostic: string, expected: number): unknown[] {
-    let results: unknown[];
+    const results: unknown[] = [];
     try {
-        results = expected === 1 ? [JSON.parse(raw)] : raw.trim().split(/\r?\n/).filter(line => line.trim()).map(line => JSON.parse(line));
+        let start = 0;
+        let depth = 0;
+        let quoted = false;
+        let escaped = false;
+        let fragments: string[] = [];
+        // Frame complete JSON values independently of line breaks in the output.
+        for (let index = 0; index < raw.length; index++) {
+            const character = raw[index];
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (character === "\\") escaped = true;
+                else if (character === "\"") quoted = false;
+                else if (raw.charCodeAt(index) < 0x20) {
+                    // Sherpa's std::quoted escapes quotes/backslashes but leaves
+                    // control characters raw. Preserve existing JSON escapes.
+                    fragments.push(raw.slice(start, index), `\\u${raw.charCodeAt(index).toString(16).padStart(4, "0")}`);
+                    start = index + 1;
+                }
+            }
+            else if (character === "\"") quoted = true;
+            else if (character === "{" || character === "[") depth++;
+            else if (character === "}" || character === "]") {
+                depth--;
+                if (depth === 0) {
+                    results.push(JSON.parse(fragments.join("") + raw.slice(start, index + 1)));
+                    fragments = [];
+                    start = index + 1;
+                }
+            }
+        }
+        const remainder = fragments.join("") + raw.slice(start);
+        if (remainder.trim()) results.push(JSON.parse(remainder));
     }
     catch (error) {
-        throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
+        if (!(error instanceof SyntaxError)) throw error;
+        throw new VestigeErrors({ kind: "transcription-invalid-result", reason: "json", cause: String(error), diagnostic: diagnostic || raw }, { cause: error });
     }
-    if (results.length !== expected) throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw });
+    if (results.length !== expected) throw new VestigeErrors({ kind: "transcription-invalid-result", reason: "count", expected, actual: results.length, diagnostic: diagnostic || raw });
     return results;
 }
 

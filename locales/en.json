@@ -637,7 +637,9 @@
             "paramNull": "Parameter values must not contain null characters.",
             "unknownExecutor": "Unknown executor: {{executor}}",
             "emptyPath": "{{field}} must be a non-empty path.",
-            "invalidResult": "Executor produced no JSON result.",
+            "invalidResult": "Could not parse the executor's JSON result.",
+            "readResult": "Could not read the executor's JSON result file.",
+            "resultCount": "Executor result count mismatch: expected {{expected}}, received {{actual}}.",
             "emptyResult": "The model returned no transcribed text. Check the audio and selected model.",
             "truncatedOutput": "The model truncated the audio or generated text. No transcript was saved. Check custom hotwords and model parameters.",
             "unstableOutput": "The model still repeated or truncated its output for {{start}}–{{end}} s after retrying shorter parts. No transcript was saved. Try another model or adjust its parameters.",
@@ -678,7 +680,10 @@
         "native": {
             "notFound": "Could not find {{executable}}. Check the native program and its libraries in {{directory}}.",
             "outputLimit": "Executor output exceeded {{limitMiB}} MiB.",
-            "failed": "Executor exited with {{reason}}"
+            "failed": "Executor process failed.",
+            "exitCode": "Exit code: {{exitCode}}",
+            "signal": "Termination signal: {{signal}}",
+            "diagnostic": "Original executor output:"
         },
         "drop": {
             "file": "Could not read the dropped file.",

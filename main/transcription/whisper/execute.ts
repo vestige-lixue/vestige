@@ -31,7 +31,7 @@ export async function execute(context: ExecutionContext): Promise<RunDraft> {
     catch (error) {
         if (!isSystemError(error)) throw error;
         // Some native failures exit with 0 without creating their output file.
-        throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: output.stderr || output.stdout || error.message }, { cause: error });
+        throw new VestigeErrors({ kind: "transcription-invalid-result", reason: "read", cause: String(error), diagnostic: output.stderr || output.stdout }, { cause: error });
     }
     feedback?.record?.("Whisper result.json", raw);
     return toRun(id, request, parseResult(raw, output.stderr), duration, elapsed);

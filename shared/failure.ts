@@ -71,9 +71,19 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
     kind: "transcription-empty-path";
     field: "backendDirectory" | "modelDirectory" | "mediaPath";
 } | {
-    kind: "transcription-invalid-result" | "project-invalid-json";
+    kind: "project-invalid-json";
     diagnostic: string;
+} | ({
+    kind: "transcription-invalid-result";
+    diagnostic: string;
+} & ({
+    reason: "json" | "read";
+    cause: string;
 } | {
+    reason: "count";
+    expected: number;
+    actual: number;
+})) | {
     kind: "transcription-invalid-option" | "transcription-managed-option";
     option: string;
 } | {

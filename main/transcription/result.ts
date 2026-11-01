@@ -60,7 +60,7 @@ export function parseResult(raw: string, diagnostic: string): unknown {
     }
     catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
-        throw new VestigeErrors({ kind: "transcription-invalid-result", diagnostic: diagnostic || raw }, { cause: error });
+        throw new VestigeErrors({ kind: "transcription-invalid-result", reason: "json", cause: String(error), diagnostic: diagnostic || raw }, { cause: error });
     }
 }
 

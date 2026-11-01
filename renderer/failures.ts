@@ -46,7 +46,6 @@ const failureKeys = {
     "download-closing": "errors.download.closing",
     "transcription-unknown-executor": "errors.transcription.unknownExecutor",
     "transcription-empty-path": "errors.transcription.emptyPath",
-    "transcription-invalid-result": "errors.transcription.invalidResult",
     "transcription-invalid-option": "errors.transcription.invalidOption",
     "transcription-managed-option": "errors.transcription.managedOption",
     "project-invalid-structure": "errors.project.invalidStructure",
@@ -61,6 +60,10 @@ const outputFields = { transcription: "array", text: "text", "segment.text": "se
 
 function withDiagnostic(message: string, failure: { diagnostic?: string | null }): string {
     return failure.diagnostic ? `${message}\n${failure.diagnostic}` : message;
+}
+
+function withNativeDiagnostic(message: string, failure: { diagnostic: string | null }): string {
+    return failure.diagnostic ? `${message}\n\n${i18n.t("errors.native.diagnostic")}\n${failure.diagnostic}` : message;
 }
 
 // Derive display text at the presentation boundary; state only keeps FailureInfo.
@@ -93,8 +96,14 @@ export function describeFailure(failure: FailureInfo): string {
         case "unexpected": case "native-spawn-failed": case "project-invalid-json":
             return failure.diagnostic;
         case "native-failed":
-            return failure.diagnostic || i18n.t("errors.native.failed", { reason: failure.signal ?? failure.exitCode });
-        case "media-playback-failed": case "transcription-invalid-result":
+            return withNativeDiagnostic(i18n.t("errors.native.failed")
+                + (failure.exitCode !== null ? `\n${i18n.t("errors.native.exitCode", failure)}` : "")
+                + (failure.signal ? `\n${i18n.t("errors.native.signal", failure)}` : ""), failure);
+        case "transcription-invalid-result":
+            return withNativeDiagnostic(failure.reason === "count"
+                ? i18n.t("errors.transcription.resultCount", failure)
+                : withDiagnostic(i18n.t(failure.reason === "read" ? "errors.transcription.readResult" : "errors.transcription.invalidResult"), { diagnostic: failure.cause }), failure);
+        case "media-playback-failed":
             return failure.diagnostic || i18n.t(failureKeys[failure.kind]);
         case "drop-unreadable":
             return i18n.t(`errors.drop.${failure.entry}${failure.diagnostic ? "Diagnostic" : ""}`, failure);
