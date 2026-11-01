@@ -36,10 +36,10 @@ const bindings: readonly Binding[] = [
     { key: "e", mod: true, shift: true, command: { kind: "focus", target: "playback-volume" } },
     { key: "m", mod: true, shift: true, command: { kind: "cyclePlaybackMode" } },
     { key: "d", mod: true, shift: true, command: { kind: "toggleSelectionDeletions" } },
-    { key: "arrowleft", mod: true, command: { kind: "seekAdjacentWord", direction: -1 } },
-    { key: "arrowright", mod: true, command: { kind: "seekAdjacentWord", direction: 1 } },
-    { key: "arrowleft", mod: true, shift: true, command: { kind: "selectAdjacentMedia", direction: -1 } },
-    { key: "arrowright", mod: true, shift: true, command: { kind: "selectAdjacentMedia", direction: 1 } },
+    { key: "arrowleft", mod: isMac(), alt: true, command: { kind: "seekAdjacentWord", direction: -1 } },
+    { key: "arrowright", mod: isMac(), alt: true, command: { kind: "seekAdjacentWord", direction: 1 } },
+    { key: "arrowup", mod: isMac(), alt: true, command: { kind: "selectAdjacentMedia", direction: -1 } },
+    { key: "arrowdown", mod: isMac(), alt: true, command: { kind: "selectAdjacentMedia", direction: 1 } },
     { key: " ", command: { kind: "playSelectedMedia" } },
     { key: "f8", command: { kind: "playSelectedMedia" } },
     { key: "f7", command: { kind: "rewindSelectedMedia" } }
@@ -164,7 +164,8 @@ export function seekProgress(event: KeyboardEvent): void {
 }
 
 function preventSpaceActivation(event: KeyboardEvent): void {
-    if (interfaceBlocked() || event.key !== " " || event.isComposing || editingTarget(event.target) || deletionControl(event.target)) return;
+    if (interfaceBlocked() || event.key !== " " || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
+        || editingTarget(event.target) || deletionControl(event.target)) return;
     event.preventDefault();
     event.stopPropagation();
 }
@@ -180,17 +181,18 @@ function keydown(event: KeyboardEvent): void {
         return;
     }
     alt = "idle";
-    if (interfaceBlocked() || event.defaultPrevented || event.isComposing || event.altKey || event.getModifierState("AltGraph")) {
+    if (interfaceBlocked() || event.defaultPrevented || event.isComposing || event.getModifierState("AltGraph")
+        || event.altKey && event.target instanceof HTMLElement && event.target.closest("select")) {
         wordNavigation = null;
         rewindNavigation = null;
         return;
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.key.toLowerCase();
-    if (!event.ctrlKey && !event.metaKey && !event.shiftKey && (key === " " || key === "enter") && deletionControl(event.target)) return;
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (key === " " || key === "enter") && deletionControl(event.target)) return;
     const editing = editingTarget(event.target);
     const editTarget = event.target instanceof HTMLElement && (editing || isTranscriptEditorTarget(event.target)) ? event.target : null;
-    const edit = mod ? event.shiftKey ? key === "z" ? "redo" : undefined : editKeys[key] : undefined;
+    const edit = mod && !event.altKey ? event.shiftKey ? key === "z" ? "redo" : undefined : editKeys[key] : undefined;
     if (edit && (menu.get() || editTarget && runEdit(editTarget, edit, false))) {
         wordNavigation = null;
         event.preventDefault();
@@ -198,9 +200,9 @@ function keydown(event: KeyboardEvent): void {
         if (menu.get()) menuBindings?.edit(edit);
         return;
     }
-    const binding = bindings.find(candidate => candidate.key === key && !!candidate.mod === mod && !!candidate.shift === event.shiftKey
+    const binding = bindings.find(candidate => candidate.key === key && !!candidate.mod === mod && !!candidate.shift === event.shiftKey && !!candidate.alt === event.altKey
         && (candidate.mod || !event.ctrlKey && !event.metaKey));
-    const action = binding && !(editing && (key === " " || key === "arrowleft" || key === "arrowright")) ? boundCommand(binding) : undefined;
+    const action = binding && !(editing && key === " ") ? boundCommand(binding) : undefined;
     if (action?.kind !== "seekAdjacentWord") wordNavigation = null;
     if (action?.kind !== "rewindSelectedMedia") rewindNavigation = null;
     if (action) {
@@ -217,7 +219,7 @@ function keydown(event: KeyboardEvent): void {
 function keyup(event: KeyboardEvent): void {
     if (event.key === "F7") rewindNavigation = null;
     if (wordNavigation && (event.key === (wordNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")
-        || event.key === (isMac() ? "Meta" : "Control"))) wordNavigation = null;
+        || event.key === "Alt" || isMac() && event.key === "Meta")) wordNavigation = null;
     if (progressNavigation && event.key === (progressNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")) cancelProgressNavigation();
     preventSpaceActivation(event);
     const toggle = alt === "pressed" && event.key === "Alt" && !event.defaultPrevented

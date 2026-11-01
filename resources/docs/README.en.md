@@ -76,10 +76,12 @@ On macOS, ⌘ means Command, ⇧ means Shift, and ␣ means Space. Space inserts
 | View transcription tasks | Ctrl+T | ⌘T |
 | Play / Pause | Space / F8 | ␣ / F8 |
 | Rewind | F7 | F7 |
-| Previous word / Next word | Ctrl+← / Ctrl+→ | ⌘← / ⌘→ |
-| Previous media / Next media | Ctrl+Shift+← / Ctrl+Shift+→ | ⌘⇧← / ⌘⇧→ |
+| Previous word / Next word | Alt+← / Alt+→ | ⌘⌥← / ⌘⌥→ |
+| Previous media / Next media | Alt+↑ / Alt+↓ | ⌘⌥↑ / ⌘⌥↓ |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | ⌘Z / ⌘⇧Z |
 | Expand/collapse deletions in the transcript selection | Ctrl+Shift+D | ⌘⇧D |
+
+Alt navigation uses Command and Option (⌘⌥) on macOS, where ⌥ means Option. Word and media navigation work while editing; hold a word-navigation key to move one word at a time. Unbound arrow combinations retain native cursor behavior, and composition keys remain available to the input method.
 
 ## Settings and documentation
 
