@@ -37,8 +37,7 @@ export default defineConfig({
         base: "./",
         server: {
             host: "127.0.0.1",
-            port: 5173,
-            strictPort: true
+            port: 0
         },
         build: {
             outDir: "dist/renderer",
@@ -47,6 +46,16 @@ export default defineConfig({
             }
         },
         plugins: [
+            {
+                name: "electron-renderer-port",
+                configureServer(server) {
+                    server.httpServer?.once("listening", () => {
+                        const address = server.httpServer?.address();
+                        // electron-vite reads this option to construct ELECTRON_RENDERER_URL after listen.
+                        if (address && typeof address !== "string") server.config.server.port = address.port;
+                    });
+                }
+            },
             UnpluginTypia({
                 tsconfig: "configs/tsconfig.web.json",
                 // Validators live in TypeScript modules; component text can mention typia.
