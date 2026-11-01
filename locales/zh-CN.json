@@ -122,7 +122,6 @@
                 "description": "{{path}}\n\n{{error}}\n请确认文件可读取且为支持的音视频格式。"
             }
         },
-        "queuedTranscription": "等待转写",
         "summary": "{{kind}}，{{duration}}",
         "empty": {
             "description": "拖入媒体文件、<action/>或按下 <shortcut/> 导入媒体。",
@@ -228,7 +227,7 @@
         "actions": {
             "new": "新建转写",
             "reviewFailure": "转写失败详情",
-            "cancelQueued": "取消排队",
+            "cancelQueued": "取消",
             "stop": "停止转写"
         },
         "tasks": {

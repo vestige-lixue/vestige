@@ -46,13 +46,12 @@
                         {vestige && item.stage !== "relocating" ? i18n.t("media.reference.checking") : importStages[item.stage]}
                     </span>
                 {/if}
-                {#if task?.status === "queued"}<span>{i18n.t("media.queuedTranscription")}</span>{/if}
             </div>
             <div class="media-actions">
                 <MediaRuns {mediaId} anchor={mediaElement} disabled={!vestige || project.projectState.locked}
                     tabindex={tabStop === 3 ? 0 : -1} onfocus={() => focusedTarget = 3} />
                 <Tooltip
-                    text={i18n.t(transcriptionCommand.kind === "openTranscriptionConfig" ? "transcription.actions.new" : "transcription.tasks.title")}
+                    text={commandLabel(transcriptionCommand)}
                     shortcut={shortcut(transcriptionCommand)}
                     disabled={commandDisabled(transcriptionCommand)}
                     tabindex={tabStop === 4 ? 0 : -1}
@@ -62,7 +61,7 @@
                     {#snippet child({ props })}
                         <button {...props} class="icon-button hoverable activable focusable" class:translate={!hasActiveTask} class:danger={task?.status === "failed"}>
                             {#if hasActiveTask}
-                                <Spinner />
+                                <Spinner paused={task?.status === "queued"} />
                             {:else}
                                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                                 {@html task?.status === "failed" ? taskRemoveIcon : taskAddIcon}
@@ -191,7 +190,7 @@
     import * as transcription from "../../states/transcription.svelte";
     import { formatDuration } from "../../format";
     import { focusIndex } from "../../dom";
-    import { commandDisabled, runCommand, type Command } from "../../states/commands";
+    import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import Spinner from "../util/Spinner.svelte";
     import NiceLabel from "../util/NiceLabel.svelte";
@@ -208,7 +207,7 @@
     const task = $derived(transcription.getTask(mediaId));
     const hasActiveTask = $derived(transcription.isPending(task));
     const transcriptionCommand = $derived<Command>({
-        kind: hasActiveTask || task?.status === "failed" ? "openTranscriptionTask" : "openTranscriptionConfig",
+        kind: task?.status === "failed" ? "reviewTranscriptionError" : hasActiveTask ? "openTranscriptionTask" : "openTranscriptionConfig",
         mediaId
     });
     let mediaElement = $state<HTMLDivElement | null>(null);

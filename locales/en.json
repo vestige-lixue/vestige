@@ -122,7 +122,6 @@
                 "description": "{{path}}\n\n{{error}}\nMake sure the file is readable and uses a supported audio or video format."
             }
         },
-        "queuedTranscription": "Queued for transcription",
         "summary": "{{kind}}, {{duration}}",
         "empty": {
             "description": "Drag in media files, <action/>, or press <shortcut/> to import.",
@@ -228,7 +227,7 @@
         "actions": {
             "new": "New transcription",
             "reviewFailure": "Transcription error details",
-            "cancelQueued": "Cancel queued task",
+            "cancelQueued": "Cancel",
             "stop": "Stop transcription"
         },
         "tasks": {

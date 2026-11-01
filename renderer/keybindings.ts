@@ -81,7 +81,6 @@ function boundCommand(binding: Binding): Command {
 
 export function shortcut(command: Command): string | undefined {
     if (command.kind === "openDevTools") return formatShortcut({ key: "F12" }); // Electron owns this native shortcut.
-    if (command.kind === "openTranscriptionTask" || command.kind === "reviewTranscriptionError") return shortcut({ kind: "openPanel", panel: "tasks" });
     const identity = commandIdentity(command);
     const binding = bindings.find(candidate => commandIdentity(boundCommand(candidate)) === identity);
     return binding ? formatShortcut(binding) : undefined;
