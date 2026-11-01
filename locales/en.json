@@ -381,6 +381,11 @@
                 "description": "How far to rewind each time. Playback continues if already playing.",
                 "invalid": "Enter a whole number from {{min}} to {{max}} milliseconds."
             },
+            "startRewind": {
+                "label": "Rewind when starting playback",
+                "description": "Rewind from the starting position each time playback starts. Set to 0 to disable.",
+                "invalid": "Enter a whole number from {{min}} to {{max}} milliseconds."
+            },
             "volumeSliderMapping": {
                 "label": "Volume slider mapping",
                 "description": "Equal dB steps help distinguish quiet sounds, but damage the relationship between volume adjustment and perceived loudness.",

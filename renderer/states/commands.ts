@@ -193,9 +193,12 @@ const panelLabels = {
 function seekWord(time: number | null): void {
     if (time === null) return;
     const playing = player.isPlaying();
+    const nextPlaying = { pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback];
     // Pausing captures the current transport position before the new seek is requested.
-    playerAPI.setPlaying({ pause: false, play: true, keep: playing, invert: !playing }[settings.getPlayback().wordSwitchPlayback]);
+    if (!nextPlaying) playerAPI.setPlaying(false);
     projectAPI.seekPlayback(time);
+    // Starting playback applies its rewind to the word's target, not the prior position.
+    if (nextPlaying) playerAPI.setPlaying(true);
 }
 
 const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {

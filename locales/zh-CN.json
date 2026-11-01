@@ -381,6 +381,11 @@
                 "description": "每次回退的时长；正在播放时保持播放。",
                 "invalid": "请输入 {{min}} 到 {{max}} 之间的整数毫秒。"
             },
+            "startRewind": {
+                "label": "开始播放时回退",
+                "description": "每次开始播放时，从本次起点回退指定时长；设为 0 可关闭。",
+                "invalid": "请输入 {{min}} 到 {{max}} 之间的整数毫秒。"
+            },
             "volumeSliderMapping": {
                 "label": "音量滑块映射",
                 "description": "dB 等距有助于分辨小声内容，但会使音量调节与听感不匹配。",

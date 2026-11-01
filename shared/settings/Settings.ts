@@ -1,5 +1,5 @@
 import { type tags } from "typia";
-import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits, type minRewindStepMs, type maxRewindStepMs } from "../constants";
+import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits, type minRewindStepMs, type maxRewindStepMs, type minStartRewindMs, type maxStartRewindMs } from "../constants";
 import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
@@ -58,6 +58,7 @@ export type Settings = {
         readonly mediaSwitchPlayback: typeof switchPlaybackModes[number];
         readonly wordSwitchPlayback: typeof switchPlaybackModes[number];
         readonly rewindStepMs: number & tags.Type<"uint32"> & tags.Minimum<typeof minRewindStepMs> & tags.Maximum<typeof maxRewindStepMs>;
+        readonly startRewindMs: number & tags.Type<"uint32"> & tags.Minimum<typeof minStartRewindMs> & tags.Maximum<typeof maxStartRewindMs>;
         readonly rememberPlaybackPosition: boolean;
         readonly pauseOnOutputDeviceChange: boolean;
         readonly audioOffsetMs: number & tags.Type<"int32"> & tags.Minimum<typeof minAudioOffsetMs> & tags.Maximum<typeof maxAudioOffsetMs>;

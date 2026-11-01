@@ -49,9 +49,13 @@ export function togglePlaying(): void {
 }
 
 export function setPlaying(playing: boolean): void {
+    const starting = playing && player.state.url !== null && !player.state.playing;
     player.state.playVersion++;
     const media = project.getMedia(mediaSelection.get());
     if (playing && media && media.duration > 0 && player.state.currentTime >= media.duration) projectAPI.seekPlayback(0);
+    if (starting && settings.getPlayback().startRewindMs > 0) {
+        projectAPI.seekPlayback(Math.max(0, player.state.currentTime - settings.getPlayback().startRewindMs / 1000));
+    }
     player.state.playing = player.state.url !== null && playing;
     mediaImportAPI.updateValidationPlayback(player.state.playing);
     if (!player.state.playing) captureProgress();

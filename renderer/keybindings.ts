@@ -129,7 +129,8 @@ function runWord(direction: -1 | 1, repeat: boolean): void {
     const navigation = wordNavigation;
     run({ kind: "seekAdjacentWord", direction, fromWordIndex: navigation.index });
     const nextVersion = player.getSeekVersion();
-    if (nextVersion === seekVersion + 1) {
+    // This synchronous command can also seek for rewind-on-start; retain its logical word index.
+    if (nextVersion > seekVersion && mediaSelection.get() === mediaId && transcript.getWordStarts() === starts) {
         navigation.index += direction;
         navigation.seekVersion = nextVersion;
     }
