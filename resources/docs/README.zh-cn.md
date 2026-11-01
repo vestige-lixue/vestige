@@ -64,21 +64,22 @@ Vestige 将音视频播放、转写与文本校对放在同一个工作空间中
 
 ## 常用快捷键
 
-下表中的 Mod 在 Windows 和 Linux 上表示 Ctrl，在 macOS 上表示 Command。输入框或正文编辑器具有自己的键盘操作，空格在编辑文字时用于输入空格。
+macOS 上的 ⌘ 表示 Command，⇧ 表示 Shift，␣ 表示空格。编辑文字时，空格用于输入空格；F8 播放或暂停，F7 回退，在编辑器和输入框中同样有效。按住 F7 可连续回退，回退量可在播放设置中调整，回退不改变播放或暂停状态。
 
-| 操作 | 快捷键 |
-| --- | --- |
-| 新建项目 | Mod + N |
-| 打开项目 | Mod + O |
-| 保存 / 另存为 | Mod + S / Mod + Shift + S |
-| 导入媒体 | Mod + I |
-| 打开转写配置 | Mod + B |
-| 查看转写任务 | Mod + T |
-| 播放 / 暂停 | Space |
-| 上一词 / 下一词 | Mod + Left / Mod + Right |
-| 上一媒体 / 下一媒体 | Mod + Shift + Left / Mod + Shift + Right |
-| 撤销 / 重做 | Mod + Z / Mod + Y |
-| 展开/收起正文选区内的删除 | Mod + Shift + D |
+| 操作 | Windows / Linux | macOS |
+| --- | --- | --- |
+| 新建项目 | Ctrl+N | ⌘N |
+| 打开项目 | Ctrl+O | ⌘O |
+| 保存 / 另存为 | Ctrl+S / Ctrl+Shift+S | ⌘S / ⌘⇧S |
+| 导入媒体 | Ctrl+I | ⌘I |
+| 打开转写配置 | Ctrl+B | ⌘B |
+| 查看转写任务 | Ctrl+T | ⌘T |
+| 播放 / 暂停 | Space / F8 | ␣ / F8 |
+| 回退 | F7 | F7 |
+| 上一词 / 下一词 | Ctrl+← / Ctrl+→ | ⌘← / ⌘→ |
+| 上一媒体 / 下一媒体 | Ctrl+Shift+← / Ctrl+Shift+→ | ⌘⇧← / ⌘⇧→ |
+| 撤销 / 重做 | Ctrl+Z / Ctrl+Y | ⌘Z / ⌘⇧Z |
+| 展开/收起正文选区内的删除 | Ctrl+Shift+D | ⌘⇧D |
 
 ## 设置与阅读文档
 

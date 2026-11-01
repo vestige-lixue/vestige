@@ -1,6 +1,7 @@
 import { type EditAction } from "../shared/app";
 import { runEdit } from "./edit";
 import { isTranscriptEditorTarget } from "./editor/transcript";
+import { formatShortcut, type Shortcut } from "./shortcuts";
 import { interfaceBlocked, runCommand, type Command } from "./states/commands";
 import * as menu from "./states/menu.svelte";
 import * as player from "./states/player.svelte";
@@ -8,7 +9,6 @@ import * as mediaSelection from "./states/mediaSelection.svelte";
 import * as transcript from "./states/transcript.svelte";
 import * as transcriptAPI from "./states/transcript";
 
-type Shortcut = { key: string; mod?: boolean; shift?: boolean };
 type Binding = Shortcut & { command: Command | (() => Command) };
 type MenuBindings = {
     keyboard: () => void;
@@ -40,7 +40,9 @@ const bindings: readonly Binding[] = [
     { key: "arrowright", mod: true, command: { kind: "seekAdjacentWord", direction: 1 } },
     { key: "arrowleft", mod: true, shift: true, command: { kind: "selectAdjacentMedia", direction: -1 } },
     { key: "arrowright", mod: true, shift: true, command: { kind: "selectAdjacentMedia", direction: 1 } },
-    { key: " ", command: { kind: "playSelectedMedia" } }
+    { key: " ", command: { kind: "playSelectedMedia" } },
+    { key: "f8", command: { kind: "playSelectedMedia" } },
+    { key: "f7", command: { kind: "rewindSelectedMedia" } }
 ];
 
 const editKeys: Record<string, EditAction> = { a: "selectAll", z: "undo", y: "redo", x: "cut", c: "copy", v: "paste" };
@@ -51,6 +53,7 @@ let wordNavigation: {
     direction: -1 | 1; mediaId: string | null; starts: readonly number[]; index: number; seekVersion: number;
 } | null = null;
 let progressNavigation: { direction: -1 | 1; mediaId: string | null; time: number; seekVersion: number } | null = null;
+let rewindNavigation: { mediaId: string | null; time: number; seekVersion: number } | null = null;
 
 export function registerMenu(bindings: MenuBindings): () => void {
     menuBindings = bindings;
@@ -61,11 +64,6 @@ export function registerMenu(bindings: MenuBindings): () => void {
 
 function isMac(): boolean {
     return window.api.platform === "darwin";
-}
-
-function formatShortcut(shortcut: Shortcut): string {
-    const key = ({ arrowleft: "←", arrowright: "→", " ": "Space" } as Record<string, string>)[shortcut.key] ?? shortcut.key.toUpperCase();
-    return [...(shortcut.mod ? [isMac() ? "⌘" : "Ctrl"] : []), ...(shortcut.shift ? ["⇧"] : []), key].join("+");
 }
 
 function commandIdentity(command: Command): string {
@@ -80,15 +78,15 @@ function boundCommand(binding: Binding): Command {
 }
 
 export function shortcut(command: Command): string | undefined {
-    if (command.kind === "openDevTools") return formatShortcut({ key: "F12" }); // Electron owns this native shortcut.
+    if (command.kind === "openDevTools") return formatShortcut({ key: "F12" }, isMac()); // Electron owns this native shortcut.
     const identity = commandIdentity(command);
-    const binding = bindings.find(candidate => commandIdentity(boundCommand(candidate)) === identity);
-    return binding ? formatShortcut(binding) : undefined;
+    const matches = bindings.filter(candidate => commandIdentity(boundCommand(candidate)) === identity);
+    return matches.length ? matches.map(binding => formatShortcut(binding, isMac())).join(" / ") : undefined;
 }
 
 export function editShortcut(action: EditAction): string {
-    if (action === "redo" && isMac()) return formatShortcut({ key: "z", mod: true, shift: true });
-    return formatShortcut({ key: Object.keys(editKeys).find(key => editKeys[key] === action)!, mod: true });
+    if (action === "redo" && isMac()) return formatShortcut({ key: "z", mod: true, shift: true }, true);
+    return formatShortcut({ key: Object.keys(editKeys).find(key => editKeys[key] === action)!, mod: true }, isMac());
 }
 
 export function cancelProgressNavigation(): void {
@@ -98,6 +96,7 @@ export function cancelProgressNavigation(): void {
 function cancel(): void {
     alt = "idle";
     wordNavigation = null;
+    rewindNavigation = null;
     cancelProgressNavigation();
 }
 
@@ -137,6 +136,16 @@ function runWord(direction: -1 | 1, repeat: boolean): void {
     else if (nextVersion !== seekVersion) wordNavigation = null;
 }
 
+function runRewind(repeat: boolean): void {
+    const mediaId = mediaSelection.get();
+    const seekVersion = player.getSeekVersion();
+    const from = repeat && rewindNavigation?.mediaId === mediaId && rewindNavigation.seekVersion === seekVersion
+        ? rewindNavigation.time : player.getCurrentTime();
+    run({ kind: "rewindSelectedMedia", from });
+    rewindNavigation = player.getSeekVersion() === seekVersion + 1
+        ? { mediaId, time: player.getCurrentTime(), seekVersion: player.getSeekVersion() } : null;
+}
+
 export function seekProgress(event: KeyboardEvent): void {
     if (interfaceBlocked() || !player.getURL() || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
         || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) {
@@ -173,6 +182,7 @@ function keydown(event: KeyboardEvent): void {
     alt = "idle";
     if (interfaceBlocked() || event.defaultPrevented || event.isComposing || event.altKey || event.getModifierState("AltGraph")) {
         wordNavigation = null;
+        rewindNavigation = null;
         return;
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
@@ -192,10 +202,12 @@ function keydown(event: KeyboardEvent): void {
         && (candidate.mod || !event.ctrlKey && !event.metaKey));
     const action = binding && !(editing && (key === " " || key === "arrowleft" || key === "arrowright")) ? boundCommand(binding) : undefined;
     if (action?.kind !== "seekAdjacentWord") wordNavigation = null;
+    if (action?.kind !== "rewindSelectedMedia") rewindNavigation = null;
     if (action) {
         event.preventDefault();
         event.stopPropagation();
         if (action.kind === "seekAdjacentWord") runWord(action.direction, event.repeat);
+        else if (action.kind === "rewindSelectedMedia") runRewind(event.repeat);
         else if (!event.repeat) run(action);
     }
     // Space cannot also activate the focused button on keydown or keyup.
@@ -203,6 +215,7 @@ function keydown(event: KeyboardEvent): void {
 }
 
 function keyup(event: KeyboardEvent): void {
+    if (event.key === "F7") rewindNavigation = null;
     if (wordNavigation && (event.key === (wordNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")
         || event.key === (isMac() ? "Meta" : "Control"))) wordNavigation = null;
     if (progressNavigation && event.key === (progressNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")) cancelProgressNavigation();

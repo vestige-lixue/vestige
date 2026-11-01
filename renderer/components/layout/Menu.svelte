@@ -263,7 +263,7 @@
     const playActions: readonly (Command | null)[] = [
         { kind: "playSelectedMedia" }, { kind: "cyclePlaybackMode" }, null,
         { kind: "selectAdjacentMedia", direction: -1 }, { kind: "selectAdjacentMedia", direction: 1 }, null,
-        { kind: "seekAdjacentWord", direction: -1 }, { kind: "seekAdjacentWord", direction: 1 }, null,
+        { kind: "rewindSelectedMedia" }, { kind: "seekAdjacentWord", direction: -1 }, { kind: "seekAdjacentWord", direction: 1 }, null,
         { kind: "toggleVolumeStabilization" }, { kind: "restorePlaybackSpeed" }
     ];
     const miscActions: readonly (Command | null)[] = [

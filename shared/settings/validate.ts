@@ -25,6 +25,7 @@ export function validVolumeSliderMinDb(value: unknown): value is Settings["playb
 
 export const validMediaSwitchPlayback = typia.createIs<Settings["playback"]["mediaSwitchPlayback"]>();
 export const validWordSwitchPlayback = typia.createIs<Settings["playback"]["wordSwitchPlayback"]>();
+export const validRewindStepMs = typia.createIs<Settings["playback"]["rewindStepMs"]>();
 export const validAudioOffsetMs = typia.createIs<Settings["playback"]["audioOffsetMs"]>();
 export const validLevelMeterReadout = typia.createIs<Settings["playback"]["levelMeterReadout"]>();
 

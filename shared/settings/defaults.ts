@@ -38,5 +38,5 @@ export const defaultSettings = {
     },
     window: { width: 800, height: 600, maximized: false },
     layout: { sidebarWidth: null, videoHeight: null },
-    playback: { mode: "single", volumeSliderMapping: "amplitude", volumeSliderMinDb: -60, mediaSwitchPlayback: "keep", wordSwitchPlayback: "keep", rememberPlaybackPosition: true, pauseOnOutputDeviceChange: true, audioOffsetMs: 0, showLevelMeter: true, levelMeterReadout: "source", volumeStabilization: false, volume: 1, speed: 1, savedSpeed: null }
+    playback: { mode: "single", volumeSliderMapping: "amplitude", volumeSliderMinDb: -60, mediaSwitchPlayback: "keep", wordSwitchPlayback: "keep", rewindStepMs: 2000, rememberPlaybackPosition: true, pauseOnOutputDeviceChange: true, audioOffsetMs: 0, showLevelMeter: true, levelMeterReadout: "source", volumeStabilization: false, volume: 1, speed: 1, savedSpeed: null }
 } as const satisfies Settings;

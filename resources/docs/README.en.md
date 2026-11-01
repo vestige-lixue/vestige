@@ -64,21 +64,22 @@ When closing a project, opening another one or quitting, follow the prompts for 
 
 ## Common shortcuts
 
-Mod means Ctrl on Windows and Linux, and Command on macOS. Text fields and the transcript editor have their own keyboard behavior; Space inserts a space while editing text.
+On macOS, ⌘ means Command, ⇧ means Shift, and ␣ means Space. Space inserts a space while editing text; F8 plays or pauses and F7 rewinds even when an editor or text field has focus. Hold F7 to rewind repeatedly. The rewind amount is adjustable in Playback settings and does not change whether playback is paused.
 
-| Action | Shortcut |
-| --- | --- |
-| New project | Mod + N |
-| Open project | Mod + O |
-| Save / Save as | Mod + S / Mod + Shift + S |
-| Import media | Mod + I |
-| Open transcription configuration | Mod + B |
-| View transcription tasks | Mod + T |
-| Play / Pause | Space |
-| Previous word / Next word | Mod + Left / Mod + Right |
-| Previous media / Next media | Mod + Shift + Left / Mod + Shift + Right |
-| Undo / Redo | Mod + Z / Mod + Y |
-| Expand/collapse deletions in the transcript selection | Mod + Shift + D |
+| Action | Windows / Linux | macOS |
+| --- | --- | --- |
+| New project | Ctrl+N | ⌘N |
+| Open project | Ctrl+O | ⌘O |
+| Save / Save as | Ctrl+S / Ctrl+Shift+S | ⌘S / ⌘⇧S |
+| Import media | Ctrl+I | ⌘I |
+| Open transcription configuration | Ctrl+B | ⌘B |
+| View transcription tasks | Ctrl+T | ⌘T |
+| Play / Pause | Space / F8 | ␣ / F8 |
+| Rewind | F7 | F7 |
+| Previous word / Next word | Ctrl+← / Ctrl+→ | ⌘← / ⌘→ |
+| Previous media / Next media | Ctrl+Shift+← / Ctrl+Shift+→ | ⌘⇧← / ⌘⇧→ |
+| Undo / Redo | Ctrl+Z / Ctrl+Y | ⌘Z / ⌘⇧Z |
+| Expand/collapse deletions in the transcript selection | Ctrl+Shift+D | ⌘⇧D |
 
 ## Settings and documentation
 

@@ -94,6 +94,11 @@ type SeekWordCommand = {
     time: number;
 };
 
+type RewindSelectedMediaCommand = {
+    kind: "rewindSelectedMedia";
+    from?: number;
+};
+
 type SetPlaybackSpeedCommand = {
     kind: "setPlaybackSpeed";
     speed: number;
@@ -119,6 +124,7 @@ export type Command = (
     AdjacentCommand |
     SeekSelectedMediaCommand |
     SeekWordCommand |
+    RewindSelectedMediaCommand |
     SetPlaybackSpeedCommand |
     SetPlaybackVolumeCommand
 );
@@ -274,6 +280,10 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         label: () => i18n.t(player.isVolumeStabilizationEnabled() ? "player.actions.disableStabilization" : "player.actions.enableStabilization")
     },
     seekSelectedMedia: { run: command => projectAPI.seekPlayback(command.time, command.mode), enabled: hasPlayback, label: label("player.actions.focusSlider") },
+    rewindSelectedMedia: {
+        run: command => projectAPI.seekPlayback(Math.max(0, (command.from ?? player.getCurrentTime()) - settings.getPlayback().rewindStepMs / 1000)),
+        enabled: hasPlayback, label: label("player.actions.rewind")
+    },
     selectAdjacentMedia: {
         run: command => projectAPI.selectMedia(mediaSelection.adjacent(command.direction, true)),
         enabled: command => mediaSelection.adjacent(command.direction, true) !== null,

@@ -11,6 +11,8 @@ export const maxPlaybackSpeed = 3;
 export const maxVolumeSliderMinDb = -10;
 export const minAudioOffsetMs = -3000;
 export const maxAudioOffsetMs = 3000;
+export const minRewindStepMs = 100;
+export const maxRewindStepMs = 60000;
 
 export const volumeStabilizationLimits = {
     maxGainDb: { min: 0, max: 36 },

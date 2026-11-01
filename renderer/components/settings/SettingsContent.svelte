@@ -378,10 +378,10 @@
     import { mediaPathModes as mediaPathModeValues } from "../../../shared/project/file";
     import { informationDisplays as informationDisplayValues, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs } from "../../../shared/settings/validate";
+    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { levelStages } from "../../audio/levels";
-    import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits } from "../../../shared/constants";
+    import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits, minRewindStepMs, maxRewindStepMs } from "../../../shared/constants";
     import { VestigeErrors, toFailureInfo } from "../../../shared/failure";
     import { describeFailure } from "../../failures";
     import languageIcon from "../../../resources/icons/carbon--language.svg?raw";
@@ -409,6 +409,7 @@
     let volumeSliderMinDb = $state<number | undefined>(current.playback.volumeSliderMinDb);
     let mediaSwitchPlayback = $state(current.playback.mediaSwitchPlayback);
     let wordSwitchPlayback = $state(current.playback.wordSwitchPlayback);
+    let rewindStepMs = $state<number | undefined>(current.playback.rewindStepMs);
     let rememberPlaybackPosition = $state(current.playback.rememberPlaybackPosition);
     let pauseOnOutputDeviceChange = $state(current.playback.pauseOnOutputDeviceChange);
     let audioOffsetMs = $state<number | undefined>(current.playback.audioOffsetMs);
@@ -502,6 +503,10 @@
             () => informationDisplay, value => informationDisplay = value, validInformationDisplay, value => ({ editing: { informationDisplay: value } }), () => informationDisplays)
     ];
     const playbackFields: Field[] = [
+        numberField({ id: "rewind-step", label: "settings.playback.rewindStep.label", description: "settings.playback.rewindStep.description",
+            min: minRewindStepMs, max: maxRewindStepMs, unit: "ms",
+            invalid: () => i18n.t("settings.playback.rewindStep.invalid", { min: minRewindStepMs, max: maxRewindStepMs }) },
+            () => rewindStepMs, value => rewindStepMs = value, validRewindStepMs, value => ({ playback: { rewindStepMs: value } })),
         selectField({ id: "volume-slider-mapping", label: "settings.playback.volumeSliderMapping.label", description: "settings.playback.volumeSliderMapping.description" },
             () => volumeSliderMapping, value => volumeSliderMapping = value, validVolumeSliderMapping, value => ({ playback: { volumeSliderMapping: value } }), () => volumeSliderMappings),
         numberField({ id: "volume-slider-min-db", label: "settings.playback.volumeSliderMinDb.label", description: "settings.playback.volumeSliderMinDb.description",
