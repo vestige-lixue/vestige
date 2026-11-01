@@ -37,6 +37,7 @@
     import { projectTitle } from "../../projectTitle";
     import { onMount } from "svelte";
     import * as keybindings from "../../keybindings";
+    import * as mediaSession from "../../states/mediaSession.svelte";
     import { Tooltip } from "bits-ui";
     import Menu from "./Menu.svelte";
     import Player from "../player/Player.svelte";
@@ -59,11 +60,13 @@
 
     onMount(() => {
         const stopKeybindings = keybindings.mount();
+        const stopMediaSession = mediaSession.mount();
         void settingsAPI.initialize();
         const stopTranscription = transcriptionAPI.startLifecycle();
         const stopProject = projectAPI.startLifecycle(prepareSettingsForQuit);
         return () => {
             stopKeybindings();
+            stopMediaSession();
             stopTranscription();
             stopProject();
             settingsAPI.dispose();

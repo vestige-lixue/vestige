@@ -83,6 +83,8 @@ On macOS, ⌘ means Command, ⇧ means Shift, and ␣ means Space. Space inserts
 
 Alt navigation uses Command and Option (⌘⌥) on macOS, where ⌥ means Option. Word and media navigation work while editing; hold a word-navigation key to move one word at a time. Unbound arrow combinations retain native cursor behavior, and composition keys remain available to the input method.
 
+When the macOS top row uses media controls, F7/F8 also rewind and play/pause without Fn; with Fn, the function-key shortcuts perform the same actions. Windows hardware play/pause keys are supported as well. System media controls remain available when Vestige is in the background.
+
 ## Settings and documentation
 
 Settings control the interface language, theme colors, transcription concurrency, editing and playback preferences. Drag the divider to adjust the video preview height.

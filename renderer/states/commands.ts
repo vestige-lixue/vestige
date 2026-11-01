@@ -30,9 +30,10 @@ type ImportMediaCommand = {
     kind: "importMedia";
 };
 
-// Toggle playback of the selected media between playing and paused.
+// Toggle playback, or request an explicit state for system media controls.
 type PlaySelectedMediaCommand = {
     kind: "playSelectedMedia";
+    playing?: boolean;
 };
 
 type FocusCommand = {
@@ -259,7 +260,10 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
     ignoreMediaImportError: { run: command => projectAPI.ignoreMedia(command.mediaId), enabled: always, label: label("media.reference.actions.ignore") },
     reviewMediaImportError: { run: command => projectAPI.reviewMedia(command.mediaId), enabled: always, label: label("media.import.failure.title") },
     playSelectedMedia: {
-        run: () => playerAPI.togglePlaying(), enabled: hasPlayback,
+        run: command => {
+            if (command.playing === undefined) playerAPI.togglePlaying();
+            else if (command.playing !== player.isPlaying()) playerAPI.setPlaying(command.playing);
+        }, enabled: hasPlayback,
         label: () => i18n.t(player.isPlaying() ? "player.actions.pause" : "player.actions.play")
     },
     cyclePlaybackMode: { run: () => playerAPI.cycleMode(), enabled: always, label: () => i18n.t(`player.modes.${player.getMode()}`) },
