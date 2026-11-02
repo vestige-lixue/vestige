@@ -79,7 +79,7 @@ function addedInformation(from: number, to: number): AddedInformation {
 export function transcriptMenuController(
     view: EditorView, index: TextIndex, projectionOf: (state: EditorState) => TextProjection, duration: number,
     events: () => Map<string, TranscriptInformation>, geometry: InspectionGeometry,
-    pin: (target: (() => InspectionTarget | null) | null) => void, callbacks: TranscriptMenuCallbacks
+    pin: (target: (() => InspectionTarget | null) | null, pending?: boolean) => void, callbacks: TranscriptMenuCallbacks
 ): MenuController {
     let pending: TranscriptMenuRequest | null = null;
     let current: TranscriptMenuRequest | null = null;
@@ -111,11 +111,13 @@ export function transcriptMenuController(
             const information = events().get(marker.dataset.inspection!);
             if (information && information.kind !== "token") return { kind: information.kind, information, from: information.from + 1, to: information.to + 1, position: information.from + 1 };
         }
-        const position = fromKeyboard ? view.state.selection.head : view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
-        if (position === undefined || position < 1 || position > view.state.doc.content.size - 1) return null;
+        const hitPosition = fromKeyboard ? view.state.selection.head : view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        if (hitPosition === undefined) return null;
+        // Editor padding maps outside the paragraph, but still supports paste at Blink's native caret.
+        const position = Math.max(1, Math.min(view.state.doc.content.size - 1, hitPosition));
         const projection = projectionOf(view.state);
         const selection = view.state.selection;
-        if (!selection.empty && (fromKeyboard || position >= selection.from && position <= selection.to)) {
+        if (!selection.empty && (fromKeyboard || hitPosition >= selection.from && hitPosition <= selection.to)) {
             const from = selection.from - 1, to = selection.to - 1;
             const pieces = textPieces(index, projection, from, to, true).filter(piece => Math.max(from, piece.utf16From) < Math.min(to, piece.utf16To));
             const original = pieces.some(piece => piece.source.kind === "segment");
@@ -145,9 +147,10 @@ export function transcriptMenuController(
         clearTimeout(timer);
         timer = undefined;
         pending = null;
-        if (!current) return;
-        current = null;
-        callbacks.open(null);
+        if (current) {
+            current = null;
+            callbacks.open(null);
+        }
         pin(null);
     }
 
@@ -155,16 +158,17 @@ export function transcriptMenuController(
         clearTimeout(timer);
         timer = undefined;
         pending = null;
-        if (blocked() || request.doc !== view.state.doc) return;
+        if (blocked() || request.doc !== view.state.doc) return close();
         if (request.target.kind !== "deletion" && request.target.kind !== "gap") {
             // Blink may select a misspelling after contextmenu but before the main-process push.
             const selection = document.getSelection();
             if (selection?.anchorNode && selection.focusNode && view.dom.contains(selection.anchorNode) && view.dom.contains(selection.focusNode)) {
-                request.selection = TextSelection.create(view.state.doc, view.posAtDOM(selection.anchorNode, selection.anchorOffset), view.posAtDOM(selection.focusNode, selection.focusOffset));
+                const position = (node: Node, offset: number): number => Math.max(1, Math.min(view.state.doc.content.size - 1, view.posAtDOM(node, offset)));
+                request.selection = TextSelection.create(view.state.doc, position(selection.anchorNode, selection.anchorOffset), position(selection.focusNode, selection.focusOffset));
                 if (!view.state.selection.eq(request.selection)) view.dispatch(view.state.tr.setSelection(request.selection).setMeta("addToHistory", false));
             }
         }
-        if (!callbacks.open(request)) return;
+        if (!callbacks.open(request)) return close();
         current = request;
         pin(() => measure(request.target, request.keyboard, request.keyboard ? undefined : { x: request.anchor.x, y: request.anchor.y }));
     }
@@ -173,12 +177,21 @@ export function transcriptMenuController(
         if (event.type === "pointerdown") {
             close();
             composingRequest = event.button === 2 && blocked();
+            // Suppress inspection through mouseup and the asynchronous main-process push.
+            if (event.button === 2 && !composingRequest) pin(null, true);
         }
         keyboard = false;
         if (event.button === 2 && (composingRequest || blocked() || eventMarker(view, event.target))) event.preventDefault();
     }
     view.dom.addEventListener("pointerdown", down, capture);
     view.dom.addEventListener("mousedown", down, capture);
+    window.addEventListener("pointerup", event => {
+        if (event.button !== 2 || current || pending) return;
+        // A release outside the editor may not generate contextmenu; don't leave inspection suppressed.
+        clearTimeout(timer);
+        timer = setTimeout(close, 0);
+    }, capture);
+    window.addEventListener("pointercancel", close, { signal: listeners.signal });
     view.dom.addEventListener("keydown", event => {
         keyboard = event.key === "ContextMenu" || event.key === "F10" && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey;
         composingRequest = keyboard && blocked();
@@ -196,6 +209,7 @@ export function transcriptMenuController(
         }
         const target = resolve(event, fromKeyboard);
         if (!target) return;
+        pin(null, true);
         const marker = target.kind === "deletion" || target.kind === "gap";
         if (marker) event.preventDefault();
         const caret = view.coordsAtPos(view.state.selection.head);

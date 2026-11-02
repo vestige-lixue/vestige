@@ -333,6 +333,7 @@
         const changed = force || informationChanged || inspection?.pressed !== value?.pressed
             || inspection?.keyboard !== value?.keyboard || inspection?.control !== value?.control || inspection?.menu !== value?.menu;
         if (changed || !value) closeTooltip();
+        if (value?.menu) skipDelayUntil = 0;
         inspection = value;
         if (informationChanged) {
             onInspect?.(value?.information ?? null);

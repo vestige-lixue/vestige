@@ -44,7 +44,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     blur: (event: FocusEvent) => void;
     refresh: () => void;
     update: (previous: EditorState) => void;
-    pinMenu: (target: (() => InspectionTarget | null) | null) => void;
+    pinMenu: (target: (() => InspectionTarget | null) | null, pending?: boolean) => void;
 } {
     const state: InspectionState = {
         inspection: null, control: false, pointer: null, hovered: null, keyboard: null,
@@ -52,6 +52,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     };
     let displayed: TranscriptInspection | null = null;
     let menuTarget: (() => InspectionTarget | null) | null = null;
+    let menuPending = false;
     let focused: HTMLElement | null = null;
     let focusTimer: ReturnType<typeof setTimeout> | undefined;
     function settleFocus(element: EventTarget | null): void {
@@ -74,10 +75,11 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         view.dom.classList.toggle("transcript-seek", state.control && !!state.hovered?.information.range);
         // Ending the latest input reveals the other target rather than discarding it.
         const target = menuTarget ? menuTarget() : state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
-        const next = target ? { ...target, control: menuTarget ? false : state.control, menu: !!menuTarget } : null;
+        const menu = menuPending || !!menuTarget;
+        const next = target ? { ...target, control: menu ? false : state.control, menu } : null;
         // Commands follow native focus immediately; only the visual details wait for Tab to settle.
         state.inspection = next;
-        if (!menuTarget && focusTimer !== undefined && next?.keyboard && !next.control || sameInspection(displayed, next)) return;
+        if (!menu && focusTimer !== undefined && next?.keyboard && !next.control || sameInspection(displayed, next)) return;
         displayed = next;
         options.onChange(next);
     }
@@ -110,7 +112,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
             state.hovered = geometry.hover(state.pointer, state.hovered);
             inspect(state.control ? "keyboard" : state.priority);
         }
-        if (!menuTarget && event.type === "keydown" && event.key === "Enter" && state.control && !event.shiftKey && (view.dom.contains(document.activeElement) || state.hovered)) {
+        if (!menuPending && !menuTarget && event.type === "keydown" && event.key === "Enter" && state.control && !event.shiftKey && (view.dom.contains(document.activeElement) || state.hovered)) {
             event.preventDefault();
             event.stopPropagation();
             if (!event.repeat && state.inspection?.information.range) options.onSeek(state.inspection.information.range.start);
@@ -183,8 +185,9 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
             inspect(state.control ? "keyboard" : state.priority);
         }
     }
-    function pinMenu(target: (() => InspectionTarget | null) | null): void {
+    function pinMenu(target: (() => InspectionTarget | null) | null, pending = false): void {
         menuTarget = target;
+        menuPending = pending;
         refresh();
     }
     return { move, leave, down, up, click, modifiers, reset, focus, blur, refresh, update, pinMenu };
