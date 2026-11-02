@@ -9,7 +9,7 @@ export function formatShortcut(shortcut: Shortcut, mac: boolean): string {
     return [
         ...(shortcut.mod ? [mac ? "⌘" : "Ctrl"] : []),
         ...(shortcut.alt ? [mac ? "⌥" : "Alt"] : []),
-        ...(shortcut.shift ? [mac ? "⇧" : "Shift"] : []),
+        ...(shortcut.shift ? ["⇧"] : []),
         arrows[key] ?? names[key] ?? key.toUpperCase()
     ].join(mac ? "" : "+");
 }

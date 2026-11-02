@@ -64,13 +64,13 @@ When closing a project, opening another one or quitting, follow the prompts for 
 
 ## Common shortcuts
 
-On macOS, ⌘ means Command, ⇧ means Shift, and ␣ means Space. Space inserts a space while editing text; F8 plays or pauses and F7 rewinds even when an editor or text field has focus. Hold F7 to rewind repeatedly. The rewind amount is adjustable in Playback settings and does not change whether playback is paused.
+⇧ means Shift. On macOS, ⌘ means Command and ␣ means Space. Space inserts a space while editing text; F8 plays or pauses and F7 rewinds even when an editor or text field has focus. Hold F7 to rewind repeatedly. The rewind amount is adjustable in Playback settings and does not change whether playback is paused.
 
 | Action | Windows / Linux | macOS |
 | --- | --- | --- |
 | New project | Ctrl+N | ⌘N |
 | Open project | Ctrl+O | ⌘O |
-| Save / Save as | Ctrl+S / Ctrl+Shift+S | ⌘S / ⌘⇧S |
+| Save / Save as | Ctrl+S / Ctrl+⇧+S | ⌘S / ⌘⇧S |
 | Import media | Ctrl+I | ⌘I |
 | Open transcription configuration | Ctrl+B | ⌘B |
 | View transcription tasks | Ctrl+T | ⌘T |
@@ -79,7 +79,7 @@ On macOS, ⌘ means Command, ⇧ means Shift, and ␣ means Space. Space inserts
 | Previous word / Next word | Alt+← / Alt+→ | ⌘⌥← / ⌘⌥→ |
 | Previous media / Next media | Alt+↑ / Alt+↓ | ⌘⌥↑ / ⌘⌥↓ |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | ⌘Z / ⌘⇧Z |
-| Expand/collapse deletions in the transcript selection | Ctrl+Shift+D | ⌘⇧D |
+| Expand/collapse deletions in the transcript selection | Ctrl+⇧+D | ⌘⇧D |
 
 Alt navigation uses Command and Option (⌘⌥) on macOS, where ⌥ means Option. Word and media navigation work while editing; hold a word-navigation key to move one word at a time. Unbound arrow combinations retain native cursor behavior, and composition keys remain available to the input method.
 
