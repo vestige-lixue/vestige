@@ -26,6 +26,11 @@ export function readSettings(path: string): { settings: Settings; savedText: str
         && !("hideTrivialInformation" in value.editing)) {
         value.editing = { ...value.editing, hideTrivialInformation: defaultSettings.editing.hideTrivialInformation };
     }
+    // 0.5.1 settings also predate the rewind amounts; saved values override these defaults.
+    if (value && typeof value === "object" && "playback" in value && value.playback && typeof value.playback === "object") {
+        const { rewindStepMs, startRewindMs } = defaultSettings.playback;
+        value.playback = { rewindStepMs, startRewindMs, ...value.playback };
+    }
     if (validSettings(value)) return { settings: value, savedText };
     return { settings: structuredClone(defaultSettings), savedText: null };
 }
