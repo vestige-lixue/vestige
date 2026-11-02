@@ -386,13 +386,13 @@
             "title": "播放",
             "rewindStep": {
                 "label": "F7 回退量",
-                "description": "每次回退的时长；正在播放时保持播放。",
-                "invalid": "请输入 {{min}} 到 {{max}} 之间的整数毫秒。"
+                "description": "每按一次 F7 回退的时长，不会暂停或继续播放。",
+                "invalid": "请输入 {{min}} 到 {{max}} 之间的整数（毫秒）。"
             },
             "startRewind": {
                 "label": "开始播放时回退",
-                "description": "每次开始播放时，从本次起点回退指定时长；设为 0 可关闭。",
-                "invalid": "请输入 {{min}} 到 {{max}} 之间的整数毫秒。"
+                "description": "每次开始播放时，先从起点往前回退这段时长。设为 0 即关闭。",
+                "invalid": "请输入 {{min}} 到 {{max}} 之间的整数（毫秒）。"
             },
             "volumeSliderMapping": {
                 "label": "音量滑块映射",
@@ -657,7 +657,7 @@
             "emptyPath": "{{field}} 必须是非空路径。",
             "invalidResult": "无法解析执行器返回的 JSON 结果。",
             "readResult": "无法读取执行器生成的 JSON 结果文件。",
-            "resultCount": "执行器返回的结果数量不符：预期 {{expected}} 条，实际 {{actual}} 条。",
+            "resultCount": "执行器返回了 {{actual}} 条结果，应为 {{expected}} 条。",
             "emptyResult": "模型未返回可转写的正文。请检查音频和所选模型。",
             "truncatedOutput": "模型截断了音频或生成的文本，本次转写未保存。请检查自定义热词和模型参数。",
             "unstableOutput": "已缩短片段重试，但模型在 {{start}}–{{end}} 秒仍重复生成或截断输出，本次转写未保存。请尝试其他模型或调整参数。",
@@ -698,7 +698,7 @@
         "native": {
             "notFound": "找不到 {{executable}}。请检查 {{directory}} 中的原生程序及其依赖库。",
             "outputLimit": "执行器输出超过了 {{limitMiB}} MiB。",
-            "failed": "执行器进程失败。",
+            "failed": "执行器异常退出。",
             "exitCode": "退出码：{{exitCode}}",
             "signal": "终止信号：{{signal}}",
             "diagnostic": "执行器原始输出："

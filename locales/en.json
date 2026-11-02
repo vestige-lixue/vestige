@@ -386,12 +386,12 @@
             "title": "Playback",
             "rewindStep": {
                 "label": "F7 rewind amount",
-                "description": "How far to rewind each time. Playback continues if already playing.",
+                "description": "How far F7 goes back on each press, without pausing or resuming playback.",
                 "invalid": "Enter a whole number from {{min}} to {{max}} milliseconds."
             },
             "startRewind": {
                 "label": "Rewind when starting playback",
-                "description": "Rewind from the starting position each time playback starts. Set to 0 to disable.",
+                "description": "Each time playback starts, begin this far before the starting point. Set to 0 to turn it off.",
                 "invalid": "Enter a whole number from {{min}} to {{max}} milliseconds."
             },
             "volumeSliderMapping": {
@@ -657,7 +657,7 @@
             "emptyPath": "{{field}} must be a non-empty path.",
             "invalidResult": "Could not parse the executor's JSON result.",
             "readResult": "Could not read the executor's JSON result file.",
-            "resultCount": "Executor result count mismatch: expected {{expected}}, received {{actual}}.",
+            "resultCount": "The executor returned {{actual}} results instead of {{expected}}.",
             "emptyResult": "The model returned no transcribed text. Check the audio and selected model.",
             "truncatedOutput": "The model truncated the audio or generated text. No transcript was saved. Check custom hotwords and model parameters.",
             "unstableOutput": "The model still repeated or truncated its output for {{start}}–{{end}} s after retrying shorter parts. No transcript was saved. Try another model or adjust its parameters.",
@@ -698,10 +698,10 @@
         "native": {
             "notFound": "Could not find {{executable}}. Check the native program and its libraries in {{directory}}.",
             "outputLimit": "Executor output exceeded {{limitMiB}} MiB.",
-            "failed": "Executor process failed.",
+            "failed": "The executor exited with an error.",
             "exitCode": "Exit code: {{exitCode}}",
             "signal": "Termination signal: {{signal}}",
-            "diagnostic": "Original executor output:"
+            "diagnostic": "Raw executor output:"
         },
         "drop": {
             "file": "Could not read the dropped file.",

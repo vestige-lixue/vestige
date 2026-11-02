@@ -48,16 +48,16 @@ describe.each([
         locale: "en" as const,
         json: "Could not parse the executor's JSON result.",
         read: "Could not read the executor's JSON result file.",
-        count: (actual: number): string => `Executor result count mismatch: expected 2, received ${actual}.`,
-        native: "Executor process failed.", exit: "Exit code: 7", signal: "Termination signal: SIGTERM",
-        output: "Original executor output:"
+        count: (actual: number): string => `The executor returned ${actual} results instead of 2.`,
+        native: "The executor exited with an error.", exit: "Exit code: 7", signal: "Termination signal: SIGTERM",
+        output: "Raw executor output:"
     },
     {
         locale: "zh-CN" as const,
         json: "无法解析执行器返回的 JSON 结果。",
         read: "无法读取执行器生成的 JSON 结果文件。",
-        count: (actual: number): string => `执行器返回的结果数量不符：预期 2 条，实际 ${actual} 条。`,
-        native: "执行器进程失败。", exit: "退出码：7", signal: "终止信号：SIGTERM",
+        count: (actual: number): string => `执行器返回了 ${actual} 条结果，应为 2 条。`,
+        native: "执行器异常退出。", exit: "退出码：7", signal: "终止信号：SIGTERM",
         output: "执行器原始输出："
     }
 ])("$locale failure summaries", labels => {
@@ -148,7 +148,7 @@ describe("native failure capture", () => {
         }
         const failure = transported(error);
         expect(failure).toEqual({ kind: "native-failed", exitCode: 7, signal: null, diagnostic: "native failure\n" });
-        expect(describeFailure(failure)).toBe("Executor process failed.\nExit code: 7\n\nOriginal executor output:\nnative failure\n");
+        expect(describeFailure(failure)).toBe("The executor exited with an error.\nExit code: 7\n\nRaw executor output:\nnative failure\n");
     });
 
     it("retains raw result output when no native stderr is available", () => {
@@ -156,6 +156,6 @@ describe("native failure capture", () => {
         const error = captured(() => parseBatchResults(raw, "", 1));
         const failure = transported(error);
         expect(failure).toMatchObject({ reason: "json", cause: String(error.cause), diagnostic: raw });
-        expect(describeFailure(failure).endsWith(`Original executor output:\n${raw}`)).toBe(true);
+        expect(describeFailure(failure).endsWith(`Raw executor output:\n${raw}`)).toBe(true);
     });
 });
