@@ -36,8 +36,10 @@ export type Settings = {
     };
     readonly editing: {
         readonly spellcheck: boolean;
+        readonly followPlayback: boolean;
         readonly fontSize: number & tags.Minimum<typeof minEditorFontSize> & tags.Maximum<typeof maxEditorFontSize>;
         readonly informationDisplay: typeof informationDisplays[number];
+        readonly hideTrivialInformation: boolean;
     };
     readonly volumeStabilization: VolumeStabilizationSettings;
     readonly window: {

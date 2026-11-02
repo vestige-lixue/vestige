@@ -5,7 +5,7 @@
         {#if preview.length}
             <div class="original" class:comparison={information?.kind === "selection"} use:fitPreview={{ units: preview, compact, suffix, deletion: information?.kind === "deletion" }}></div>
         {/if}
-        {#if !information || information.kind === "token" || information.kind === "gap"}
+        {#if (!information || information.kind === "token" || information.kind === "gap") && !hideProbabilities}
             <div class="probabilities">
                 {@render statistic(i18n.t("transcript.information.tokenProbability"), formatProbability(information?.probability))}
                 {@render statistic(i18n.t("transcript.information.blankProbability"), formatProbability(information?.kind === "gap" ? 1 : information?.blankProbability))}
@@ -210,7 +210,11 @@
     import { type InspectionInformation } from "../../editor/information";
     import { fitPreview, previewUnits, comparisonPreview } from "../../editor/preview";
 
-    let { information, compact = false }: { information: InspectionInformation | null; compact?: boolean } = $props();
+    let { information, compact = false, hideTrivialInformation = false }: {
+        information: InspectionInformation | null; compact?: boolean; hideTrivialInformation?: boolean;
+    } = $props();
+    const hideProbabilities = $derived(!compact && hideTrivialInformation && (information?.kind === "gap"
+        || information?.kind === "token" && information.probability === 1 && information.blankProbability === 0));
     const preview = $derived(information?.kind === "selection" ? comparisonPreview(information.comparison)
         : information?.original ? previewUnits(information.original, "deleted", information.gaps, information.sourceFrom) : []);
     const suffix = $derived(information?.kind === "deletion" ? `(${Array.from(information.original ?? "").length})` : undefined);

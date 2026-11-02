@@ -36,6 +36,30 @@ export function toggleSelectionDeletions(view: EditorView): boolean {
     return true;
 }
 
+function playingKeys(state: InformationState, time: number): Set<string> {
+    const { events, latestEnd } = state;
+    const result = new Set<string>();
+    const first = firstTrue(events.length, index => events[index].start > time);
+    for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
+        const event = events[i];
+        if (time >= event.end) continue;
+        result.add(event.key);
+        if (event.parentKey) result.add(event.parentKey);
+    }
+    return result;
+}
+
+export function transcriptPlaybackMarkers(view: EditorView, time: number): HTMLElement[] {
+    const state = informationKey.getState(view.state);
+    if (!state || state.pending) return [];
+    const markers: HTMLElement[] = [];
+    for (const key of playingKeys(state, time)) {
+        const marker = view.dom.querySelector<HTMLElement>(`.transcript-event[data-inspection="${CSS.escape(key)}"]`);
+        if (marker) markers.push(marker);
+    }
+    return markers;
+}
+
 export function informationPlugin(index: TextIndex, projectionOf: (state: EditorState) => TextProjection, playbackOf: (state: EditorState) => number, options: InspectionOptions): Plugin {
     const cache = new WeakMap<TextProjection, InformationModel>();
     function modelOf(projection: TextProjection): InformationModel {
@@ -131,17 +155,8 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             function updatePlayback(): void {
                 if (compositionPending(view.state)) return;
                 const time = playbackOf(view.state);
-                const { events, latestEnd } = informationKey.getState(view.state)!;
-                const keys = new Set<string>();
-                const first = firstTrue(events.length, index => events[index].start > time);
                 // Separate deletions can share token times; absorbed gaps highlight their deletion marker.
-                for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
-                    const event = events[i];
-                    if (time < event.end) {
-                        keys.add(event.key);
-                        if (event.parentKey) keys.add(event.parentKey);
-                    }
-                }
+                const keys = playingKeys(informationKey.getState(view.state)!, time);
                 for (const [key, shape] of current) {
                     if (keys.has(key) && shape.isConnected) continue;
                     shape.classList.remove("current");

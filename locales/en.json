@@ -357,6 +357,10 @@
         },
         "editing": {
             "title": "Edit",
+            "followPlayback": {
+                "label": "Follow playback",
+                "description": "Scroll the transcript to keep the playing text in view, the same way it follows the caret."
+            },
             "informationDisplay": {
                 "label": "Information display",
                 "description": "Choose where token probabilities, original text and audio ranges appear.",
@@ -372,6 +376,10 @@
             "fontSize": {
                 "label": "Editor font size",
                 "description": "Applies only to transcript text."
+            },
+            "hideTrivialInformation": {
+                "label": "Hide unremarkable probabilities",
+                "description": "Leave probabilities out of tooltips for tokens at 100% with 0% no-speech, and for no-speech gaps."
             }
         },
         "playback": {

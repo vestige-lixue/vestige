@@ -5,6 +5,7 @@ import { dropPoint } from "@tiptap/pm/transform";
 import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit } from "./composition";
 import { caretPlugin } from "./caret";
+import { transcriptScrollPlugin, scrollTranscriptPlayback } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep } from "./projectionStep";
 import { history, undo, redo } from "@tiptap/pm/history";
@@ -12,7 +13,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
-import { informationPlugin, toggleSelectionDeletions, type InspectionOptions } from "./information";
+import { informationPlugin, toggleSelectionDeletions, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
     type TextIndex, type TextProjection
@@ -21,7 +22,8 @@ import {
 type DirtyRange = { from: number; to: number };
 type BridgeState = { projection: TextProjection; saved: TextProjection; dirty: DirtyRange[] };
 const bridgeKey = new PluginKey<BridgeState>("vestigeTranscript");
-const playbackKey = new PluginKey<number>("vestigePlayback");
+type PlaybackState = { time: number; follow: boolean };
+const playbackKey = new PluginKey<PlaybackState>("vestigePlayback");
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new WeakMap<HTMLElement, Editor>();
 const texts = new WeakMap<PMNode, string>();
@@ -310,12 +312,12 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
     let previousTime = NaN;
     let previousRanges: number[] = [];
     let previousDecorations = DecorationSet.empty;
-    const playback = new Plugin<number>({
+    const playback = new Plugin<PlaybackState>({
         key: playbackKey,
-        state: { init: () => -1, apply: (transaction, time) => transaction.getMeta(playbackKey) ?? time },
+        state: { init: () => ({ time: -1, follow: false }), apply: (transaction, previous) => transaction.getMeta(playbackKey) ?? previous },
         props: {
             decorations(state) {
-                const time = playbackKey.getState(state) ?? -1;
+                const time = playbackKey.getState(state)?.time ?? -1;
                 const projection = transcriptProjection(state);
                 if (projection === previousProjection && time === previousTime) return previousDecorations;
                 const ranges: number[] = [];
@@ -337,9 +339,25 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 previousDecorations = DecorationSet.create(state.doc, decorations);
                 return previousDecorations;
             }
+        },
+        view() {
+            let followedRanges: readonly number[] | undefined;
+            let followedMarkers: HTMLElement[] = [];
+            return {
+                update(view) {
+                    const playback = playbackKey.getState(view.state);
+                    const ranges = playback?.follow ? previousRanges : undefined;
+                    const markers = playback?.follow ? transcriptPlaybackMarkers(view, playback.time) : [];
+                    if (ranges === followedRanges && markers.length === followedMarkers.length
+                        && markers.every((marker, index) => marker === followedMarkers[index])) return;
+                    followedRanges = ranges;
+                    followedMarkers = markers;
+                    if (ranges) scrollTranscriptPlayback(view, ranges, markers);
+                }
+            };
         }
     });
-    return [compositionPlugin(), bridge, caretPlugin(), dropCursorPlugin(), playback, history()];
+    return [compositionPlugin(), bridge, caretPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {
@@ -389,7 +407,7 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
             onChange(next);
         }
     });
-    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state) ?? -1, inspection));
+    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state)?.time ?? -1, inspection));
     editors.set(editor.view.dom, editor);
     return editor;
 }
@@ -436,8 +454,10 @@ export function handleTranscriptEdit(element: HTMLElement | null, action: EditAc
     return true;
 }
 
-export function setTranscriptPlayback(editor: Editor, time: number): void {
-    if (!editor.isDestroyed && playbackKey.getState(editor.state) !== time) {
-        editor.view.dispatch(editor.state.tr.setMeta(playbackKey, time).setMeta("addToHistory", false));
+export function setTranscriptPlayback(editor: Editor, time: number, follow = false): void {
+    if (editor.isDestroyed) return;
+    const previous = playbackKey.getState(editor.state);
+    if (previous?.time !== time || previous.follow !== follow) {
+        editor.view.dispatch(editor.state.tr.setMeta(playbackKey, { time, follow }).setMeta("addToHistory", false));
     }
 }

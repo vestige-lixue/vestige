@@ -357,6 +357,10 @@
         },
         "editing": {
             "title": "编辑",
+            "followPlayback": {
+                "label": "随播放位置滚动",
+                "description": "自动滚动正文，让正在播放的文字保持可见，滚动方式与跟随光标时相同。"
+            },
             "informationDisplay": {
                 "label": "信息显示位置",
                 "description": "选择 token 概率、原文和音频范围的显示位置。",
@@ -372,6 +376,10 @@
             "fontSize": {
                 "label": "编辑器字号",
                 "description": "仅应用于转写正文。"
+            },
+            "hideTrivialInformation": {
+                "label": "隐藏无需关注的概率",
+                "description": "浮动提示中，置信度 100% 且无语音 0% 的 token，以及无语音标记，都不显示概率。"
             }
         },
         "playback": {

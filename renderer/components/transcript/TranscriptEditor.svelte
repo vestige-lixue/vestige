@@ -23,7 +23,7 @@
     <Tooltip.Portal>
         {#if tooltipOpen && inspection && informationDisplay === "tooltip"}
             <Tooltip.Content class="tooltip-content transcript-tooltip" customAnchor={anchor} side="top" sideOffset={7} collisionPadding={8}>
-                <TranscriptInformation information={inspection.information} />
+                <TranscriptInformation information={inspection.information} hideTrivialInformation={settings.getEditing().hideTrivialInformation} />
             </Tooltip.Content>
         {/if}
     </Tooltip.Portal>
@@ -83,6 +83,7 @@
     .editor :global(.tiptap) {
         flex: 1;
         padding: 28px;
+        padding-bottom: max(28px, var(--transcript-scroll-padding, 0px));
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         font-variant-ligatures: none;
@@ -441,6 +442,7 @@
     $effect(() => {
         const current = editor;
         const time = player.getCurrentTime();
-        if (current) untrack(() => setTranscriptPlayback(current, time));
+        const follow = settings.getEditing().followPlayback;
+        if (current) untrack(() => setTranscriptPlayback(current, time, follow));
     });
 </script>

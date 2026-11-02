@@ -17,6 +17,15 @@ export function readSettings(path: string): { settings: Settings; savedText: str
         // Reading never writes, creates backups or reports recovery warnings.
         value = null;
     }
+    // Older settings predate playback following; retain their other preferences.
+    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
+        && !("followPlayback" in value.editing)) {
+        value.editing = { ...value.editing, followPlayback: defaultSettings.editing.followPlayback };
+    }
+    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
+        && !("hideTrivialInformation" in value.editing)) {
+        value.editing = { ...value.editing, hideTrivialInformation: defaultSettings.editing.hideTrivialInformation };
+    }
     if (validSettings(value)) return { settings: value, savedText };
     return { settings: structuredClone(defaultSettings), savedText: null };
 }
