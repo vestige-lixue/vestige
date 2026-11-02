@@ -301,7 +301,7 @@
         clearTimeout(openTimer);
         openTimer = undefined;
         // Uninspectable text keeps the current hover session ready until the pointer leaves its hot zone.
-        if (tooltipOpen) skipDelayUntil = hovering ? Infinity : Date.now() + 300;
+        if (tooltipOpen && !inspection?.control) skipDelayUntil = hovering ? Infinity : Date.now() + 300;
         tooltipOpen = false;
     }
 
@@ -314,10 +314,10 @@
         if (event.key !== "Escape" || !tooltipOpen) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        controlDismissed = !!inspection?.control;
-        dismissedHover = !inspection?.control && !inspection?.keyboard ? "inside" : null;
+        if (inspection?.control) controlDismissed = true;
+        else if (!inspection?.keyboard) dismissedHover = "inside";
         closeTooltip();
-        skipDelayUntil = 0;
+        if (!inspection?.control) skipDelayUntil = 0;
     }
 
     function inspect(value: TranscriptInspection | null, force = false): void {
@@ -332,7 +332,8 @@
             const range = value?.information.range;
             transcript.setInspection(range ? { mediaId: vestige.media.id, runId: run.id, range } : null);
         }
-        if (!value || value.pressed || controlDismissed || dismissedHover && !value.control || informationDisplay !== "tooltip" || !changed) return;
+        if (!value || value.pressed || informationDisplay !== "tooltip" || !changed) return;
+        if (value.control ? controlDismissed : dismissedHover) return;
         if (value.control || value.keyboard || !released && Date.now() < skipDelayUntil) tooltipOpen = true;
         else openTimer = setTimeout(() => {
             openTimer = undefined;
