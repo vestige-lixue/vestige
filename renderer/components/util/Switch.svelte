@@ -38,11 +38,11 @@
         height: 16px;
         border-radius: 50%;
         background: var(--c-background);
-        transition: left .15s ease, transform .15s ease;
+        transform: translateX(0);
+        transition: transform .15s ease;
     }
     .thumb[data-state="checked"] {
-        left: calc(100% - 4px);
-        transform: translateX(-100%);
+        transform: translateX(22px);
     }
 </style>
 
