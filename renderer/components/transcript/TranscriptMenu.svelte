@@ -4,6 +4,14 @@
             align="start" side="bottom" sideOffset={2} collisionPadding={8} preventScroll={false}
             style={`z-index: ${layerIndex + 1};`} onOpenAutoFocus={focusMenu} onCloseAutoFocus={returnFocus}
             onkeydown={keydown}>
+            {#if restoreCommand}
+                <DropdownMenu.Item class="activable focusable" disabled={project.projectState.locked} onSelect={() => deletionAction(true)}>
+                    <div>{commandLabel(restoreCommand)}</div>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item class="activable focusable" onSelect={() => deletionAction(false)}>
+                    <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
+                </DropdownMenu.Item>
+            {/if}
             {#each actions as action (action)}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled(action)} onSelect={() => edit(action)}>
                     <div>{i18n.t(`menu.edit.${action}`)}</div>
@@ -53,7 +61,8 @@
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
-    import { dismissTranscriptMenu } from "../../editor/transcript";
+    import { dismissTranscriptMenu, toggleTranscriptDeletion } from "../../editor/transcript";
+    import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { editAvailable, runEdit } from "../../edit";
     import { editShortcut } from "../../keybindings";
     import * as project from "../../states/project.svelte";
@@ -65,6 +74,8 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
+    const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
+        ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
     const layer = Symbol();
     const layerIndex = $derived(modal.getLayerIndex(layer));
@@ -74,7 +85,7 @@
             open = false;
             return false;
         }
-        if (!transcriptMenuClipboardActions(value.target).length) return false;
+        if (value.target.kind !== "deletion" && !transcriptMenuClipboardActions(value.target).length) return false;
         request = value;
         keyboard.current = value.keyboard;
         open = true;
@@ -102,6 +113,17 @@
         void tick().then(() => {
             if (open || request !== current || disabled(action) || !restoreTranscriptMenuSelection(current) || !editAvailable(current.view.dom, action)) return;
             runEdit(current.view.dom, action);
+        });
+    }
+
+    function deletionAction(restore: boolean): void {
+        if (!request || !restoreCommand || restore && commandDisabled(restoreCommand)) return;
+        const current = request, command = restoreCommand;
+        changeOpen(false);
+        void tick().then(() => {
+            if (open || request !== current || !restoreTranscriptMenuSelection(current)) return;
+            if (restore) runCommand(command);
+            else toggleTranscriptDeletion(current.view.dom, command.key);
         });
     }
 

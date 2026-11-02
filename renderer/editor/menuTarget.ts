@@ -1,6 +1,7 @@
 import { TextSelection, type EditorState, type Selection } from "@tiptap/pm/state";
-import { type Node as PMNode } from "@tiptap/pm/model";
+import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
 import { type EditorView } from "@tiptap/pm/view";
+import { closeHistory } from "@tiptap/pm/history";
 import { type ContextMenuParams, type EditAction } from "../../shared/app";
 import { textPieces, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { transcriptSelection, transcriptTokenGroup, type AddedInformation, type InspectionInformation, type TranscriptInformation } from "./informationModel";
@@ -16,6 +17,7 @@ export type TranscriptMenuTarget = {
     information: InspectionInformation | null;
     selectionKind?: "original" | "mixed" | "added";
     word?: string;
+    expanded?: boolean;
 };
 export type TranscriptMenuRequest = {
     view: EditorView;
@@ -60,6 +62,24 @@ export function restoreTranscriptMenuSelection(request: TranscriptMenuRequest): 
     const { view, doc, selection } = request;
     if (view.isDestroyed || view.state.doc !== doc || view.composing || compositionPending(view.state)) return false;
     if (!view.state.selection.eq(selection)) view.dispatch(view.state.tr.setSelection(selection).setMeta("addToHistory", false));
+    view.focus();
+    return true;
+}
+
+export function canRestoreDeletion(view: EditorView, information: TranscriptInformation | null): information is TranscriptInformation & { original: string } {
+    return !view.isDestroyed && view.editable && !view.composing && !compositionPending(view.state)
+        && information?.kind === "deletion" && !!information.original;
+}
+
+export function restoreDeletion(view: EditorView, information: TranscriptInformation | null): boolean {
+    if (!canRestoreDeletion(view, information)) return false;
+    const nodes = information.original.split("\n").flatMap((line, index) => [
+        ...index ? [view.state.schema.nodes.hardBreak.create()] : [],
+        ...line ? [view.state.schema.text(line)] : []
+    ]);
+    const position = information.from + 1;
+    // The transaction maps the existing selection; restoring elsewhere must not move it to this deletion.
+    view.dispatch(closeHistory(view.state.tr).replaceWith(position, position, Fragment.fromArray(nodes)).scrollIntoView());
     view.focus();
     return true;
 }
@@ -109,7 +129,8 @@ export function transcriptMenuController(
         const marker = eventMarker(view, fromKeyboard ? document.activeElement : event.target);
         if (marker) {
             const information = events().get(marker.dataset.inspection!);
-            if (information && information.kind !== "token") return { kind: information.kind, information, from: information.from + 1, to: information.to + 1, position: information.from + 1 };
+            if (information && information.kind !== "token") return { kind: information.kind, information, from: information.from + 1, to: information.to + 1,
+                position: information.from + 1, expanded: marker.getAttribute("aria-expanded") === "true" };
         }
         const hitPosition = fromKeyboard ? view.state.selection.head : view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
         if (hitPosition === undefined) return null;

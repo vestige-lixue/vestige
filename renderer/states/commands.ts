@@ -14,7 +14,7 @@ import * as transcriptionAPI from "./transcription";
 import * as transcriptAPI from "./transcript";
 import * as projectAPI from "./project";
 import * as playerAPI from "./player";
-import { isTranscriptEditorTarget, toggleTranscriptDeletions } from "../editor/transcript";
+import { isTranscriptEditorTarget, toggleTranscriptDeletions, transcriptDeletionRestorable, restoreTranscriptDeletion } from "../editor/transcript";
 
 type ParameterlessCommand = {
     kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode" | "toggleSelectionDeletions";
@@ -110,6 +110,12 @@ type SetPlaybackVolumeCommand = {
     volume: number;
 };
 
+type RestoreTranscriptDeletionCommand = {
+    kind: "restoreTranscriptDeletion";
+    target: HTMLElement;
+    key: string;
+};
+
 export type Command = (
     ParameterlessCommand |
     OpenProjectCommand |
@@ -127,7 +133,8 @@ export type Command = (
     SeekWordCommand |
     RewindSelectedMediaCommand |
     SetPlaybackSpeedCommand |
-    SetPlaybackVolumeCommand
+    SetPlaybackVolumeCommand |
+    RestoreTranscriptDeletionCommand
 );
 
 export function interfaceBlocked(): boolean {
@@ -273,6 +280,13 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         },
         enabled: () => isTranscriptEditorTarget(document.activeElement instanceof HTMLElement ? document.activeElement : null),
         label: label("transcript.information.toggleSelectionDeletions")
+    },
+    restoreTranscriptDeletion: {
+        run: command => {
+            restoreTranscriptDeletion(command.target, command.key);
+        },
+        enabled: command => !project.projectState.locked && transcriptDeletionRestorable(command.target, command.key),
+        label: label("transcript.information.restore")
     },
     focus: {
         // Closing menus must release focus before the target receives it.

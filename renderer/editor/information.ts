@@ -37,6 +37,18 @@ export function toggleSelectionDeletions(view: EditorView): boolean {
     return true;
 }
 
+export function transcriptDeletion(view: EditorView, key: string): TranscriptInformation | null {
+    const item = !view.isDestroyed ? informationKey.getState(view.state)?.byKey.get(key) : null;
+    return item?.kind === "deletion" ? item : null;
+}
+
+export function toggleDeletion(view: EditorView, key: string): boolean {
+    const item = transcriptDeletion(view, key);
+    if (!item || view.composing || compositionPending(view.state)) return false;
+    view.dispatch(view.state.tr.setMeta(informationKey, { ranges: [{ from: item.sourceFrom, to: item.sourceTo }] } satisfies InformationAction).setMeta("addToHistory", false));
+    return true;
+}
+
 function playingKeys(state: InformationState, time: number): Set<string> {
     const { events, latestEnd } = state;
     const result = new Set<string>();
@@ -179,10 +191,8 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             function activate(element: HTMLElement): void {
                 if (view.composing || compositionPending(view.state)) return;
                 const key = element.dataset.inspection!;
-                const item = informationKey.getState(view.state)?.byKey.get(key);
-                if (item?.kind !== "deletion") return;
                 const focused = document.activeElement === element;
-                view.dispatch(view.state.tr.setMeta(informationKey, { ranges: [{ from: item.sourceFrom, to: item.sourceTo }] } satisfies InformationAction).setMeta("addToHistory", false));
+                if (!toggleDeletion(view, key)) return;
                 if (focused) view.dom.querySelector<HTMLElement>(`[data-inspection="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
             }
             updatePlayback();

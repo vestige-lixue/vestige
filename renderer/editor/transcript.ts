@@ -13,8 +13,8 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type ContextMenuParams, type EditAction } from "../../shared/app";
-import { receiveTranscriptMenu, closeTranscriptMenu, editTranscriptMenu } from "./menuTarget";
-import { informationPlugin, toggleSelectionDeletions, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
+import { receiveTranscriptMenu, closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDeletion } from "./menuTarget";
+import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
     type TextIndex, type TextProjection
@@ -442,6 +442,21 @@ export function isTranscriptEditorTarget(element: HTMLElement | null): boolean {
 export function toggleTranscriptDeletions(element: HTMLElement | null): boolean {
     const editor = transcriptEditorAt(element);
     return editor ? toggleSelectionDeletions(editor.view) : false;
+}
+
+export function toggleTranscriptDeletion(element: HTMLElement | null, key: string): boolean {
+    const editor = transcriptEditorAt(element);
+    return editor ? toggleDeletion(editor.view, key) : false;
+}
+
+export function transcriptDeletionRestorable(element: HTMLElement | null, key: string): boolean {
+    const editor = transcriptEditorAt(element);
+    return editor ? canRestoreDeletion(editor.view, transcriptDeletion(editor.view, key)) : false;
+}
+
+export function restoreTranscriptDeletion(element: HTMLElement | null, key: string): boolean {
+    const editor = transcriptEditorAt(element);
+    return editor ? restoreDeletion(editor.view, transcriptDeletion(editor.view, key)) : false;
 }
 
 export function receiveTranscriptContextMenu(element: HTMLElement | null, params: ContextMenuParams): void {
