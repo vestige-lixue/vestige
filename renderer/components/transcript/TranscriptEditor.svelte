@@ -6,7 +6,7 @@
             </svg>
         {/if}
         <div
-            class="editor" spellcheck={settings.getEditing().spellcheck} style:--transcript-font-size={`${settings.getEditing().fontSize}px`}
+            class="editor" spellcheck={false} style:--transcript-font-size={`${settings.getEditing().fontSize}px`}
             tabindex={-1} bind:this={element}
         ></div>
         {#if inspection?.rectangles.length}
@@ -163,7 +163,7 @@
         user-select: none;
     }
     .editor :global(.transcript-events) {
-        /* A block splits Chromium's spelling words; inline markers need frozen token highlights during IME composition. */
+        /* A block breaks double-click word selection and Ctrl+Arrow at markers; inline markers need frozen token highlights during IME composition. */
         position: relative;
         bottom: .05em;
         left: 0;
@@ -261,7 +261,7 @@
     import { Plugin, type Transaction } from "@tiptap/pm/state";
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
-    import { createTranscriptEditor, setTranscriptPlayback, receiveTranscriptContextMenu } from "../../editor/transcript";
+    import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
     import { refreshTranscriptInformation, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
     import { textRectangles } from "../../editor/geometry";
     import * as project from "../../states/project.svelte";
@@ -380,9 +380,7 @@
             }
         }));
         editor = instance;
-        const unsubscribeMenu = window.api.onContextMenu(params => receiveTranscriptContextMenu(instance.view.dom, params));
         return () => {
-            unsubscribeMenu();
             window.removeEventListener("keydown", inspectionKeydown, true);
             instance.destroy();
             inspect(null);

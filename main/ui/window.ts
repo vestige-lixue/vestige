@@ -4,9 +4,6 @@ import iconWhite from "../../resources/logos/logo-square-white.png?asset";
 import windowsIconBlack from "../../resources/logos/logo-square-black.ico?asset";
 import windowsIconWhite from "../../resources/logos/logo-square-white.ico?asset";
 import { type LogFile } from "../logging";
-import { appChannels } from "../../shared/app/ipc";
-import { type ContextMenuParams } from "../../shared/app";
-import { handle } from "../util/ipc";
 
 function openExternal(url: string): void {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(console.error);
@@ -20,13 +17,6 @@ export function getWindowIcon(): string {
 
 export function registerWindowBehavior(window: BrowserWindow, packaged: boolean, log: LogFile | null): void {
     const contents = window.webContents;
-    contents.on("context-menu", (_event, { x, y, misspelledWord, dictionarySuggestions }) => {
-        contents.send(appChannels.contextMenu, { x, y, misspelledWord, dictionarySuggestions } satisfies ContextMenuParams);
-    });
-    handle(contents, appChannels.addToDictionary, word => {
-        if (typeof word !== "string" || !word.trim()) return false;
-        return contents.session.addWordToSpellCheckerDictionary(word);
-    });
     contents.on("console-message", details => {
         log?.record(`renderer ${details.level} ${details.sourceId}:${details.lineNumber}`, details.message);
     });

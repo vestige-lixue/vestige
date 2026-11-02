@@ -270,9 +270,6 @@
         }
     },
     "transcript": {
-        "spelling": {
-            "addToDictionary": "Add to dictionary"
-        },
         "information": {
             "tokenProbability": "Prob:",
             "blankProbability": "No-speech:",
@@ -372,10 +369,6 @@
                     "tooltip": "Tooltip",
                     "bar": "Information bar"
                 }
-            },
-            "spellcheck": {
-                "label": "Spell check",
-                "description": "Enable the browser's built-in spell checking in the transcript editor."
             },
             "fontSize": {
                 "label": "Editor font size",

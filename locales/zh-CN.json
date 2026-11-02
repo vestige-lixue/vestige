@@ -270,9 +270,6 @@
         }
     },
     "transcript": {
-        "spelling": {
-            "addToDictionary": "添加到词典"
-        },
         "information": {
             "tokenProbability": "置信度",
             "blankProbability": "无语音",
@@ -372,10 +369,6 @@
                     "tooltip": "浮动提示",
                     "bar": "信息栏"
                 }
-            },
-            "spellcheck": {
-                "label": "拼写检查",
-                "description": "在转写编辑区启用浏览器原生拼写检查。"
             },
             "fontSize": {
                 "label": "编辑器字号",

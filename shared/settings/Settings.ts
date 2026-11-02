@@ -35,7 +35,6 @@ export type Settings = {
         } | null;
     };
     readonly editing: {
-        readonly spellcheck: boolean;
         readonly followPlayback: boolean;
         readonly fontSize: number & tags.Minimum<typeof minEditorFontSize> & tags.Maximum<typeof maxEditorFontSize>;
         readonly informationDisplay: typeof informationDisplays[number];

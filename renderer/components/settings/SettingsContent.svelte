@@ -402,7 +402,6 @@
     let language = $state<Locale>(current.language);
     let compressProjectFiles = $state(current.compressProjectFiles);
     let mediaPathMode = $state(current.mediaPathMode);
-    let spellcheck = $state(current.editing.spellcheck);
     let followPlayback = $state(current.editing.followPlayback);
     let editorFontSize = $state<number | undefined>(current.editing.fontSize);
     let informationDisplay = $state(current.editing.informationDisplay);
@@ -499,8 +498,6 @@
     const editingFields: Field[] = [
         switchField({ id: "follow-playback", label: "settings.editing.followPlayback.label", description: "settings.editing.followPlayback.description" },
             () => followPlayback, value => followPlayback = value, value => ({ editing: { followPlayback: value } })),
-        switchField({ id: "spellcheck", label: "settings.editing.spellcheck.label", description: "settings.editing.spellcheck.description" },
-            () => spellcheck, value => spellcheck = value, value => ({ editing: { spellcheck: value } })),
         numberField({ id: "editor-font-size", label: "settings.editing.fontSize.label", description: "settings.editing.fontSize.description",
             min: minEditorFontSize, max: maxEditorFontSize, unit: "px", invalid: () => i18n.t("settings.validation.number", { min: minEditorFontSize, max: maxEditorFontSize }) },
             () => editorFontSize, value => editorFontSize = value, validEditorFontSize, value => ({ editing: { fontSize: value } })),

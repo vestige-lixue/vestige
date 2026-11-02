@@ -44,7 +44,7 @@ Play or pause from the player, seek with the progress slider, and adjust speed a
 
 Insert, delete or replace text directly in the transcript. You can also add line breaks, copy and paste, and undo or redo edits. The player marks the text corresponding to the playback position. Proofreading edits are stored separately from the original transcription result.
 
-Enable volume stabilization to make quiet passages easier to hear. It affects playback without rewriting the original media. Settings also control editor font size, spellchecking, playback-position retention, playback behavior after switching media or words, and the level meter.
+Enable volume stabilization to make quiet passages easier to hear. It affects playback without rewriting the original media. Settings also control editor font size, playback-position retention, playback behavior after switching media or words, and the level meter.
 
 ## Review previous transcription results
 

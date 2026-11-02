@@ -2,21 +2,20 @@ import { TextSelection, type EditorState, type Selection } from "@tiptap/pm/stat
 import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
 import { type EditorView } from "@tiptap/pm/view";
 import { closeHistory } from "@tiptap/pm/history";
-import { type ContextMenuParams, type EditAction } from "../../shared/app";
+import { type EditAction } from "../../shared/app";
 import { textPieces, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { transcriptSelection, transcriptTokenGroup, type AddedInformation, type InspectionInformation, type TranscriptInformation } from "./informationModel";
 import { keyboardRectangle, pointerRectangle, transcriptRectangles, type InspectionGeometry, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 
 export type TranscriptMenuTarget = {
-    kind: "deletion" | "gap" | "token" | "selection" | "word";
+    kind: "deletion" | "gap" | "token" | "selection" | "text";
     // ProseMirror positions; inspection information continues to use displayed UTF-16 offsets.
     from: number;
     to: number;
     position: number;
     information: InspectionInformation | null;
     selectionKind?: "original" | "mixed" | "added";
-    word?: string;
     expanded?: boolean;
 };
 export type TranscriptMenuRequest = {
@@ -26,19 +25,12 @@ export type TranscriptMenuRequest = {
     selection: Selection;
     anchor: DOMRect;
     keyboard: boolean;
-    spelling: ContextMenuParams | null;
 };
 export type TranscriptMenuCallbacks = {
     open: (request: TranscriptMenuRequest | null) => boolean;
     edit: (action: EditAction) => void;
 };
-export type TranscriptMenuSpelling = {
-    word: string;
-    suggestions: readonly string[];
-    range: { from: number; to: number } | null;
-};
 type MenuController = {
-    receive: (params: ContextMenuParams) => void;
     close: () => void;
     edit: (action: EditAction) => boolean;
     update: () => void;
@@ -48,11 +40,7 @@ const controllers = new WeakMap<EditorView, MenuController>();
 const clipboardActions = ["cut", "copy", "paste"] as const;
 
 export function transcriptMenuClipboardActions(target: TranscriptMenuTarget): readonly EditAction[] {
-    return target.kind === "selection" ? clipboardActions : target.kind === "token" || target.kind === "word" ? ["paste"] : [];
-}
-
-export function receiveTranscriptMenu(view: EditorView, params: ContextMenuParams): void {
-    controllers.get(view)?.receive(params);
+    return target.kind === "selection" ? clipboardActions : target.kind === "token" || target.kind === "text" ? ["paste"] : [];
 }
 
 export function closeTranscriptMenu(view: EditorView): void {
@@ -68,38 +56,6 @@ export function restoreTranscriptMenuSelection(request: TranscriptMenuRequest): 
     if (view.isDestroyed || view.state.doc !== doc || view.composing || compositionPending(view.state)) return false;
     if (!view.state.selection.eq(selection)) view.dispatch(view.state.tr.setSelection(selection).setMeta("addToHistory", false));
     view.focus();
-    return true;
-}
-
-export function transcriptMenuSpelling(request: TranscriptMenuRequest): TranscriptMenuSpelling | null {
-    const { doc, target, selection, spelling } = request;
-    if (target.kind !== "token" && target.kind !== "word" || !spelling?.misspelledWord.trim()) return null;
-    const word = spelling.misspelledWord;
-    let range: TranscriptMenuSpelling["range"] = null;
-    if (doc.textBetween(selection.from, selection.to, "", "\n") === word) range = { from: selection.from, to: selection.to };
-    else {
-        // Blink's word can cross token marks and deletion widgets. Search only around this click.
-        const start = Math.max(1, target.position - word.length);
-        const end = Math.min(doc.content.size - 1, target.position + word.length);
-        const text = doc.textBetween(start, end, "", "\n");
-        for (let offset = text.indexOf(word); offset !== -1; offset = text.indexOf(word, offset + 1)) {
-            const from = start + offset, to = from + word.length;
-            if (from <= target.position && target.position <= to) {
-                range = { from, to };
-                break;
-            }
-        }
-    }
-    return { word, suggestions: spelling.dictionarySuggestions, range };
-}
-
-export function replaceTranscriptSpelling(request: TranscriptMenuRequest, suggestion: string): boolean {
-    const { view, doc } = request;
-    if (view.isDestroyed || view.state.doc !== doc || !view.editable || view.composing || compositionPending(view.state)) return false;
-    const spelling = transcriptMenuSpelling(request);
-    if (!spelling?.range || !spelling.suggestions.includes(suggestion) || !restoreTranscriptMenuSelection(request)) return false;
-    const { from, to } = spelling.range;
-    view.dispatch(closeHistory(view.state.tr).insertText(suggestion, from, to).scrollIntoView());
     return true;
 }
 
@@ -138,14 +94,12 @@ export function transcriptMenuController(
     events: () => Map<string, TranscriptInformation>, geometry: InspectionGeometry,
     pin: (target: (() => InspectionTarget | null) | null, pending?: boolean) => void, callbacks: TranscriptMenuCallbacks
 ): MenuController {
-    let pending: TranscriptMenuRequest | null = null;
     let current: TranscriptMenuRequest | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let keyboard = false;
     let composingRequest = false;
     const listeners = new AbortController();
     const capture = { capture: true, signal: listeners.signal };
-    const segmenter = new Intl.Segmenter(undefined, { granularity: "word" });
     const blocked = (): boolean => view.isDestroyed || view.composing || compositionPending(view.state);
 
     function measure(target: TranscriptMenuTarget, keyboard: boolean, point?: { x: number; y: number }): InspectionTarget | null {
@@ -155,11 +109,14 @@ export function transcriptMenuController(
             const marker = view.dom.querySelector<HTMLElement>(`.transcript-event[data-inspection="${CSS.escape(information.key)}"]`);
             return marker ? { information, rectangles: [], anchor: marker.getBoundingClientRect(), keyboard, pressed: false } : null;
         }
-        const rectangles = transcriptRectangles(view, { from: target.from - 1, to: target.to - 1 }, true);
+        const rectangles = information.kind === "token"
+            ? transcriptTokenGroup(index, projectionOf(view.state), information).map(item => transcriptRectangles(view, item))
+            : [transcriptRectangles(view, { from: target.from - 1, to: target.to - 1 }, true)];
+        const rects = rectangles.flat();
         const caret = view.coordsAtPos(target.position);
-        const anchor = point && pointerRectangle(rectangles, point, { top: 0, right: 0, bottom: 0, left: 0 })
-            || keyboardRectangle(rectangles, caret) || new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
-        return { information, rectangles: [rectangles], anchor, keyboard, pressed: false };
+        const anchor = point && pointerRectangle(rects, point, { top: 0, right: 0, bottom: 0, left: 0 })
+            || keyboardRectangle(rects, caret) || new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+        return { information, rectangles, anchor, keyboard, pressed: false };
     }
 
     function resolve(event: MouseEvent, fromKeyboard: boolean): TranscriptMenuTarget | null {
@@ -190,21 +147,12 @@ export function transcriptMenuController(
             const fragments = transcriptTokenGroup(index, projection, hit.information);
             return { kind: "token", from: Math.min(...fragments.map(item => item.from)) + 1, to: Math.max(...fragments.map(item => item.to)) + 1, position, information: hit.information };
         }
-        const segments = segmenter.segment(projection.text);
-        const offset = position - 1;
-        for (const part of [segments.containing(offset), segments.containing(offset - 1)]) {
-            if (!part?.isWordLike) continue;
-            const from = part.index, to = from + part.segment.length;
-            if (!fromKeyboard && !pointerRectangle(transcriptRectangles(view, { from, to }), point, { top: 0, right: 0, bottom: 0, left: 0 })) continue;
-            return { kind: "word", from: from + 1, to: to + 1, position, information: addedInformation(from, to), word: part.segment };
-        }
-        return { kind: "word", from: position, to: position, position, information: null };
+        return { kind: "text", from: position, to: position, position, information: null };
     }
 
     function close(): void {
         clearTimeout(timer);
         timer = undefined;
-        pending = null;
         if (current) {
             current = null;
             callbacks.open(null);
@@ -213,12 +161,9 @@ export function transcriptMenuController(
     }
 
     function show(request: TranscriptMenuRequest): void {
-        clearTimeout(timer);
-        timer = undefined;
-        pending = null;
         if (blocked() || request.doc !== view.state.doc) return close();
         if (request.target.kind !== "deletion" && request.target.kind !== "gap") {
-            // Blink may select a misspelling after contextmenu but before the main-process push.
+            // Native right-button down can move the DOM caret before ProseMirror observes it.
             const selection = document.getSelection();
             if (selection?.anchorNode && selection.focusNode && view.dom.contains(selection.anchorNode) && view.dom.contains(selection.focusNode)) {
                 const position = (node: Node, offset: number): number => Math.max(1, Math.min(view.state.doc.content.size - 1, view.posAtDOM(node, offset)));
@@ -235,7 +180,7 @@ export function transcriptMenuController(
         if (event.type === "pointerdown") {
             close();
             composingRequest = event.button === 2 && blocked();
-            // Suppress inspection through mouseup and the asynchronous main-process push.
+            // Suppress inspection from right-button down until contextmenu opens the menu.
             if (event.button === 2 && !composingRequest) pin(null, true);
         }
         keyboard = false;
@@ -244,7 +189,7 @@ export function transcriptMenuController(
     view.dom.addEventListener("pointerdown", down, capture);
     view.dom.addEventListener("mousedown", down, capture);
     window.addEventListener("pointerup", event => {
-        if (event.button !== 2 || current || pending) return;
+        if (event.button !== 2 || current) return;
         // A release outside the editor may not generate contextmenu; don't leave inspection suppressed.
         clearTimeout(timer);
         timer = setTimeout(close, 0);
@@ -256,40 +201,23 @@ export function transcriptMenuController(
         if (composingRequest) event.preventDefault();
     }, capture);
     view.dom.addEventListener("contextmenu", event => {
+        event.preventDefault();
         const fromKeyboard = keyboard;
         const composing = composingRequest;
         keyboard = false;
         composingRequest = false;
         close();
-        if (composing || blocked()) {
-            event.preventDefault();
-            return;
-        }
+        if (composing || blocked()) return;
         const target = resolve(event, fromKeyboard);
         if (!target) return;
         pin(null, true);
-        const marker = target.kind === "deletion" || target.kind === "gap";
-        if (marker) event.preventDefault();
         const caret = view.coordsAtPos(view.state.selection.head);
         const anchor = fromKeyboard ? measure(target, true)?.anchor ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top)
             : new DOMRect(event.clientX, event.clientY, 0, 0);
-        const request = { view, doc: view.state.doc, target, selection: view.state.selection, anchor, keyboard: fromKeyboard, spelling: null } satisfies TranscriptMenuRequest;
-        if (marker) show(request);
-        else {
-            pending = request;
-            timer = setTimeout(() => {
-                if (pending === request) show(request);
-            }, 200);
-        }
+        show({ view, doc: view.state.doc, target, selection: view.state.selection, anchor, keyboard: fromKeyboard });
     }, capture);
     window.addEventListener("blur", close, { signal: listeners.signal });
     const controller: MenuController = {
-        receive(params) {
-            if (!pending) return;
-            // Ignore a delayed push for a different click; keyboard anchoring uses our own rectangles.
-            if (!pending.keyboard && (Math.abs(params.x - pending.anchor.x) > 1 || Math.abs(params.y - pending.anchor.y) > 1)) return;
-            show({ ...pending, spelling: params });
-        },
         close,
         edit(action) {
             if (!current) return false;
@@ -297,7 +225,7 @@ export function transcriptMenuController(
             return true;
         },
         update() {
-            const request = current ?? pending;
+            const request = current;
             if (request && (blocked() || request.doc !== view.state.doc)) close();
         },
         destroy() {

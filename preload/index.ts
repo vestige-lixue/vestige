@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
-import { type AppAPI, type ContextMenuParams } from "../shared/app";
+import { type AppAPI } from "../shared/app";
 import { appChannels, settingsChannels, fileChannels, projectChannels } from "../shared/ipc";
 import { type SettingsSnapshot } from "../shared/settings/Settings";
 import { transcriptionChannels } from "../shared/transcription/ipc";
@@ -26,12 +26,6 @@ const api: AppAPI = {
     supportsMica: () => ipcRenderer.invoke(appChannels.supportsMica),
     quit: () => ipcRenderer.send(appChannels.quit),
     edit: action => ipcRenderer.send(appChannels.edit, action),
-    onContextMenu(callback) {
-        const listener = (_event: IpcRendererEvent, params: ContextMenuParams): void => callback(params);
-        ipcRenderer.on(appChannels.contextMenu, listener);
-        return () => ipcRenderer.removeListener(appChannels.contextMenu, listener);
-    },
-    addToDictionary: word => ipcRenderer.invoke(appChannels.addToDictionary, word),
     clearLogs: () => ipcRenderer.invoke(appChannels.clearLogs),
     beforeQuit(check) {
         const listener = (_event: IpcRendererEvent, id: string): void => {

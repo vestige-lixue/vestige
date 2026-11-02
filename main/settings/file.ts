@@ -17,6 +17,11 @@ export function readSettings(path: string): { settings: Settings; savedText: str
         // Reading never writes, creates backups or reports recovery warnings.
         value = null;
     }
+    // Spell checking was removed; discard its legacy field before strict validation.
+    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
+        && "spellcheck" in value.editing) {
+        delete value.editing.spellcheck;
+    }
     // Older settings predate playback following; retain their other preferences.
     if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
         && !("followPlayback" in value.editing)) {

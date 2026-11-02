@@ -12,8 +12,8 @@ import { history, undo, redo } from "@tiptap/pm/history";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
-import { type ContextMenuParams, type EditAction } from "../../shared/app";
-import { receiveTranscriptMenu, closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDeletion } from "./menuTarget";
+import { type EditAction } from "../../shared/app";
+import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDeletion } from "./menuTarget";
 import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
@@ -457,11 +457,6 @@ export function transcriptDeletionRestorable(element: HTMLElement | null, key: s
 export function restoreTranscriptDeletion(element: HTMLElement | null, key: string): boolean {
     const editor = transcriptEditorAt(element);
     return editor ? restoreDeletion(editor.view, transcriptDeletion(editor.view, key)) : false;
-}
-
-export function receiveTranscriptContextMenu(element: HTMLElement | null, params: ContextMenuParams): void {
-    const editor = transcriptEditorAt(element);
-    if (editor) receiveTranscriptMenu(editor.view, params);
 }
 
 export function dismissTranscriptMenu(element: HTMLElement | null): void {

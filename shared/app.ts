@@ -12,7 +12,6 @@ import { type DownloadListResult, type DownloadStartResult, type DownloadKind } 
 import { type OperationResult } from "./failure";
 
 export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
-export type ContextMenuParams = { x: number; y: number; misspelledWord: string; dictionarySuggestions: string[] };
 
 export type AppAPI = {
     platform: NodeJS.Platform;
@@ -21,8 +20,6 @@ export type AppAPI = {
     supportsMica(): Promise<boolean>;
     quit(): void;
     edit(action: EditAction): void;
-    onContextMenu(listener: (params: ContextMenuParams) => void): () => void;
-    addToDictionary(word: string): Promise<boolean>;
     clearLogs(): Promise<OperationResult>;
     // The renderer prompts/saves and returns true to block, false to allow quitting.
     beforeQuit(check: () => boolean | Promise<boolean>): () => void;

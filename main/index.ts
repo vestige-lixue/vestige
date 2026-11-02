@@ -95,6 +95,7 @@ function startApplication(): void {
                 preload: fileURLToPath(new URL("../preload/index.cjs", import.meta.url)),
                 contextIsolation: true,
                 nodeIntegration: false,
+                spellcheck: false,
                 sandbox: true
             }
         });
