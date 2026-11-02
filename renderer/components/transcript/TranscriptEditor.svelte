@@ -161,10 +161,11 @@
         user-select: none;
     }
     .editor :global(.transcript-events) {
+        /* A block splits Chromium's spelling words; inline markers need frozen token highlights during IME composition. */
         position: relative;
         bottom: .05em;
         left: 0;
-        display: block;
+        display: inline-block;
         transform: translateX(-50%);
         font-size: var(--transcript-font-size);
         line-height: 0;

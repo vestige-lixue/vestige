@@ -22,7 +22,7 @@ import {
 type DirtyRange = { from: number; to: number };
 type BridgeState = { projection: TextProjection; saved: TextProjection; dirty: DirtyRange[] };
 const bridgeKey = new PluginKey<BridgeState>("vestigeTranscript");
-type PlaybackState = { time: number; follow: boolean };
+type PlaybackState = { time: number; follow: boolean; projection: TextProjection; ranges: number[]; decorations: DecorationSet };
 const playbackKey = new PluginKey<PlaybackState>("vestigePlayback");
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new Map<HTMLElement, Editor>();
@@ -308,18 +308,21 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         .sort((left, right) => left.start - right.start);
     const latestEnd: number[] = [];
     for (const interval of intervals) latestEnd.push(Math.max(latestEnd.at(-1) ?? -Infinity, interval.end));
-    let previousProjection: TextProjection | undefined;
-    let previousTime = NaN;
-    let previousRanges: number[] = [];
-    let previousDecorations = DecorationSet.empty;
     const playback = new Plugin<PlaybackState>({
         key: playbackKey,
-        state: { init: () => ({ time: -1, follow: false }), apply: (transaction, previous) => transaction.getMeta(playbackKey) ?? previous },
-        props: {
-            decorations(state) {
-                const time = playbackKey.getState(state)?.time ?? -1;
+        state: {
+            init: () => ({ time: -1, follow: false, projection: initial, ranges: [], decorations: DecorationSet.empty }),
+            apply(transaction, previous, oldState, state) {
+                const { time, follow } = (transaction.getMeta(playbackKey) as Pick<PlaybackState, "time" | "follow"> | undefined) ?? previous;
+                // Changing token spans during composition corrupts Chromium's IME offsets beside inline markers.
+                // Keep their identities, but map positions so text inserted before a highlight does not shift it.
+                if (compositionActive(state)) {
+                    return { ...previous, time, follow, decorations: previous.decorations.map(transaction.mapping, transaction.doc) };
+                }
                 const projection = transcriptProjection(state);
-                if (projection === previousProjection && time === previousTime) return previousDecorations;
+                // Even a cancelled composition must resume at the latest playback time.
+                const unchanged = !compositionActive(oldState) && projection === previous.projection;
+                if (unchanged && time === previous.time) return follow === previous.follow ? previous : { ...previous, follow };
                 const ranges: number[] = [];
                 const first = firstTrue(intervals.length, index => intervals[index].start > time);
                 for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
@@ -329,24 +332,24 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                         if (piece.source.kind === "segment" && piece.source.index === segmentIdx) ranges.push(piece.utf16From + 1, piece.utf16To + 1);
                     }
                 }
-                previousTime = time;
-                if (projection === previousProjection && ranges.length === previousRanges.length
-                    && ranges.every((position, index) => position === previousRanges[index])) return previousDecorations;
+                if (unchanged && ranges.length === previous.ranges.length
+                    && ranges.every((position, index) => position === previous.ranges[index])) return { ...previous, time, follow };
                 const decorations: Decoration[] = [];
                 for (let i = 0; i < ranges.length; i += 2) decorations.push(Decoration.inline(ranges[i], ranges[i + 1], { class: "current" }));
-                previousProjection = projection;
-                previousRanges = ranges;
-                previousDecorations = DecorationSet.create(state.doc, decorations);
-                return previousDecorations;
+                return { time, follow, projection, ranges, decorations: DecorationSet.create(state.doc, decorations) };
             }
+        },
+        props: {
+            decorations: state => playbackKey.getState(state)?.decorations ?? DecorationSet.empty
         },
         view() {
             let followedRanges: readonly number[] | undefined;
             let followedMarkers: HTMLElement[] = [];
             return {
                 update(view) {
+                    if (compositionActive(view.state)) return;
                     const playback = playbackKey.getState(view.state);
-                    const ranges = playback?.follow ? previousRanges : undefined;
+                    const ranges = playback?.follow ? playback.ranges : undefined;
                     const markers = playback?.follow ? transcriptPlaybackMarkers(view, playback.time) : [];
                     if (ranges === followedRanges && markers.length === followedMarkers.length
                         && markers.every((marker, index) => marker === followedMarkers[index])) return;
