@@ -25,7 +25,7 @@ const bridgeKey = new PluginKey<BridgeState>("vestigeTranscript");
 type PlaybackState = { time: number; follow: boolean };
 const playbackKey = new PluginKey<PlaybackState>("vestigePlayback");
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
-const editors = new WeakMap<HTMLElement, Editor>();
+const editors = new Map<HTMLElement, Editor>();
 const texts = new WeakMap<PMNode, string>();
 const sourceDOM = new WeakMap<HTMLElement, { kind: string; index: number }>();
 
@@ -408,8 +408,19 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
         }
     });
     if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state)?.time ?? -1, inspection));
-    editors.set(editor.view.dom, editor);
+    const target = editor.view.dom;
+    editors.set(target, editor);
+    editor.on("destroy", () => {
+        editors.delete(target);
+    });
     return editor;
+}
+
+export function transcriptEditorTarget(): HTMLElement | null {
+    for (const [element, editor] of editors) {
+        if (element.isConnected && !editor.isDestroyed) return element;
+    }
+    return null;
 }
 
 function transcriptEditorAt(element: HTMLElement | null): Editor | null {
@@ -429,9 +440,11 @@ export function toggleTranscriptDeletions(element: HTMLElement | null): boolean 
     return editor ? toggleSelectionDeletions(editor.view) : false;
 }
 
-export function transcriptEditAvailable(element: HTMLElement | null, action: "undo" | "redo" | "cut" | "copy"): boolean | null {
+export function transcriptEditAvailable(element: HTMLElement | null, action: EditAction): boolean | null {
     const editor = transcriptEditorAt(element);
     if (!editor) return null;
+    if (action === "selectAll") return true;
+    if (action === "paste") return editor.isEditable;
     if (action === "cut" || action === "copy") {
         const { from, to } = editor.state.selection;
         return (action === "copy" || editor.isEditable) && !!editor.state.doc.textBetween(from, to, "\n", "\n");
@@ -440,16 +453,21 @@ export function transcriptEditAvailable(element: HTMLElement | null, action: "un
 }
 
 export function handleTranscriptEdit(element: HTMLElement | null, action: EditAction): boolean {
-    if (action !== "selectAll" && action !== "undo" && action !== "redo") return false;
     const editor = transcriptEditorAt(element);
     if (!editor) return false;
-    if (action === "selectAll") editor.commands.selectAll();
-    else if (editor.isEditable) {
+    if (!transcriptEditAvailable(element, action)) return true;
+    if (action === "undo" || action === "redo") {
         (action === "undo" ? undo : redo)(editor.state, transaction => {
             // Undo can remove a focused event marker. Keep the next edit command inside this editor.
             if (document.activeElement !== editor.view.dom && editor.view.dom.contains(document.activeElement)) editor.view.focus();
             editor.view.dispatch(transaction);
         });
+    }
+    else {
+        // Restore the editor's stored selection before selecting or using the native clipboard.
+        editor.view.focus();
+        if (action === "selectAll") editor.commands.selectAll();
+        else window.api.edit(action);
     }
     return true;
 }

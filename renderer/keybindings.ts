@@ -194,7 +194,7 @@ function keydown(event: KeyboardEvent): void {
     const editing = editingTarget(event.target);
     const editTarget = event.target instanceof HTMLElement && (editing || isTranscriptEditorTarget(event.target)) ? event.target : null;
     const edit = mod && !event.altKey ? event.shiftKey ? key === "z" ? "redo" : undefined : editKeys[key] : undefined;
-    if (edit && (menu.get() || editTarget && runEdit(editTarget, edit, false))) {
+    if (edit && (menu.get() || runEdit(editTarget, edit, false))) {
         wordNavigation = null;
         event.preventDefault();
         event.stopPropagation();
