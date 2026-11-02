@@ -5,7 +5,7 @@
                 <TranscriptInformation {information} compact />
             </div>
         {/if}
-        <div class="transcript-scroll">
+        <div class="transcript-scroll" use:scrollWithControl>
             <TranscriptEditor {vestige} {run} onInspect={value => information = value} />
         </div>
     {:else}
@@ -56,4 +56,21 @@
     let information = $state.raw<InspectionInformation | null>(null);
     const run = $derived(transcript.getRun());
     const vestige = $derived(project.getVestige(mediaSelection.get()));
+
+    function scrollWithControl(element: HTMLElement): { destroy: () => void } {
+        function wheel(event: WheelEvent): void {
+            if (!event.ctrlKey || event.defaultPrevented) return;
+            // Ctrl-wheel normally zooms the page instead of scrolling the editor.
+            event.preventDefault();
+            const line = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(element).lineHeight) || 16 : 1;
+            const page = event.deltaMode === WheelEvent.DOM_DELTA_PAGE;
+            element.scrollBy({
+                left: event.deltaX * (page ? element.clientWidth : line),
+                top: event.deltaY * (page ? element.clientHeight : line),
+                behavior: "instant"
+            });
+        }
+        element.addEventListener("wheel", wheel, { passive: false });
+        return { destroy: () => element.removeEventListener("wheel", wheel) };
+    }
 </script>
