@@ -270,6 +270,9 @@
         }
     },
     "transcript": {
+        "spelling": {
+            "addToDictionary": "Add to dictionary"
+        },
         "information": {
             "tokenProbability": "Prob:",
             "blankProbability": "No-speech:",

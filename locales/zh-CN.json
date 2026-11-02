@@ -270,6 +270,9 @@
         }
     },
     "transcript": {
+        "spelling": {
+            "addToDictionary": "添加到词典"
+        },
         "information": {
             "tokenProbability": "置信度",
             "blankProbability": "无语音",

@@ -4,6 +4,10 @@
             align="start" side="bottom" sideOffset={2} collisionPadding={8} preventScroll={false}
             style={`z-index: ${layerIndex + 1};`} onOpenAutoFocus={focusMenu} onCloseAutoFocus={returnFocus}
             onkeydown={keydown}>
+            {#if request?.target.kind === "word" && request.target.word}
+                <DropdownMenu.Item class="transcript-menu-word" disabled>{request.target.word}</DropdownMenu.Item>
+                <DropdownMenu.Separator />
+            {/if}
             {#if restoreCommand}
                 <DropdownMenu.Item class="activable focusable" disabled={project.projectState.locked} onSelect={() => deletionAction(true)}>
                     <div>{commandLabel(restoreCommand)}</div>
@@ -11,6 +15,17 @@
                 <DropdownMenu.Item class="activable focusable" onSelect={() => deletionAction(false)}>
                     <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
                 </DropdownMenu.Item>
+            {/if}
+            {#if spelling}
+                {#each spelling.suggestions as suggestion, index (index)}
+                    <DropdownMenu.Item class="activable focusable" disabled={project.projectState.locked || !spelling.range} onSelect={() => spellingAction(suggestion)}>
+                        <div>{suggestion}</div>
+                    </DropdownMenu.Item>
+                {/each}
+                <DropdownMenu.Item class="activable focusable" disabled={project.projectState.locked} onSelect={() => spellingAction()}>
+                    <div>{i18n.t("transcript.spelling.addToDictionary")}</div>
+                </DropdownMenu.Item>
+                {#if actions.length}<DropdownMenu.Separator />{/if}
             {/if}
             {#each actions as action (action)}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled(action)} onSelect={() => edit(action)}>
@@ -28,6 +43,9 @@
         display: flex;
         flex-flow: column nowrap;
         min-width: 190px;
+        max-width: min(400px, calc(100vw - 16px));
+        max-height: var(--bits-dropdown-menu-content-available-height, calc(100vh - 16px));
+        overflow-y: auto;
         padding: 4px;
         border-radius: 8px;
         background: var(--bg);
@@ -38,6 +56,7 @@
     }
     :global(.transcript-menu [role="menuitem"]) {
         display: flex;
+        flex-shrink: 0;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
@@ -46,10 +65,25 @@
         font-size: 14px;
         cursor: pointer;
     }
+    :global(.transcript-menu [role="menuitem"] > div) {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    :global(.transcript-menu [role="separator"]) {
+        flex-shrink: 0;
+        height: 1px;
+        margin: 4px 0;
+        background: var(--c-border-110p);
+    }
     :global(.transcript-menu [data-disabled]) {
         cursor: default;
         opacity: .5;
         pointer-events: none;
+    }
+    :global(.transcript-menu .transcript-menu-word) {
+        overflow-wrap: anywhere;
+        color: var(--c-text-80p);
+        opacity: 1;
     }
     :global(.transcript-menu[data-keyboard="false"] .focusable:focus-visible) {
         outline: none;
@@ -60,13 +94,14 @@
     import { onDestroy, tick, untrack } from "svelte";
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
     import { type EditAction } from "../../../shared/app";
-    import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
+    import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, transcriptMenuSpelling, replaceTranscriptSpelling, type TranscriptMenuRequest } from "../../editor/menuTarget";
     import { dismissTranscriptMenu, toggleTranscriptDeletion } from "../../editor/transcript";
     import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { editAvailable, runEdit } from "../../edit";
     import { editShortcut } from "../../keybindings";
     import * as project from "../../states/project.svelte";
     import * as modal from "../../states/modal.svelte";
+    import * as settings from "../../states/settings.svelte";
     import * as i18n from "../../i18n.svelte";
 
     let request = $state.raw<TranscriptMenuRequest | null>(null);
@@ -74,6 +109,7 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
+    const spelling = $derived(request && settings.getEditing().spellcheck ? transcriptMenuSpelling(request) : null);
     const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
@@ -124,6 +160,17 @@
             if (open || request !== current || !restoreTranscriptMenuSelection(current)) return;
             if (restore) runCommand(command);
             else toggleTranscriptDeletion(current.view.dom, command.key);
+        });
+    }
+
+    function spellingAction(suggestion?: string): void {
+        if (!request || !spelling || project.projectState.locked) return;
+        const current = request, word = spelling.word;
+        changeOpen(false);
+        void tick().then(() => {
+            if (open || request !== current || project.projectState.locked || !settings.getEditing().spellcheck || !restoreTranscriptMenuSelection(current)) return;
+            if (suggestion !== undefined) replaceTranscriptSpelling(current, suggestion);
+            else void window.api.addToDictionary(word).catch(console.error);
         });
     }
 

@@ -32,6 +32,11 @@ export type TranscriptMenuCallbacks = {
     open: (request: TranscriptMenuRequest | null) => boolean;
     edit: (action: EditAction) => void;
 };
+export type TranscriptMenuSpelling = {
+    word: string;
+    suggestions: readonly string[];
+    range: { from: number; to: number } | null;
+};
 type MenuController = {
     receive: (params: ContextMenuParams) => void;
     close: () => void;
@@ -63,6 +68,38 @@ export function restoreTranscriptMenuSelection(request: TranscriptMenuRequest): 
     if (view.isDestroyed || view.state.doc !== doc || view.composing || compositionPending(view.state)) return false;
     if (!view.state.selection.eq(selection)) view.dispatch(view.state.tr.setSelection(selection).setMeta("addToHistory", false));
     view.focus();
+    return true;
+}
+
+export function transcriptMenuSpelling(request: TranscriptMenuRequest): TranscriptMenuSpelling | null {
+    const { doc, target, selection, spelling } = request;
+    if (target.kind !== "token" && target.kind !== "word" || !spelling?.misspelledWord.trim()) return null;
+    const word = spelling.misspelledWord;
+    let range: TranscriptMenuSpelling["range"] = null;
+    if (doc.textBetween(selection.from, selection.to, "", "\n") === word) range = { from: selection.from, to: selection.to };
+    else {
+        // Blink's word can cross token marks and deletion widgets. Search only around this click.
+        const start = Math.max(1, target.position - word.length);
+        const end = Math.min(doc.content.size - 1, target.position + word.length);
+        const text = doc.textBetween(start, end, "", "\n");
+        for (let offset = text.indexOf(word); offset !== -1; offset = text.indexOf(word, offset + 1)) {
+            const from = start + offset, to = from + word.length;
+            if (from <= target.position && target.position <= to) {
+                range = { from, to };
+                break;
+            }
+        }
+    }
+    return { word, suggestions: spelling.dictionarySuggestions, range };
+}
+
+export function replaceTranscriptSpelling(request: TranscriptMenuRequest, suggestion: string): boolean {
+    const { view, doc } = request;
+    if (view.isDestroyed || view.state.doc !== doc || !view.editable || view.composing || compositionPending(view.state)) return false;
+    const spelling = transcriptMenuSpelling(request);
+    if (!spelling?.range || !spelling.suggestions.includes(suggestion) || !restoreTranscriptMenuSelection(request)) return false;
+    const { from, to } = spelling.range;
+    view.dispatch(closeHistory(view.state.tr).insertText(suggestion, from, to).scrollIntoView());
     return true;
 }
 
