@@ -3,7 +3,7 @@ import { type EditorView } from "@tiptap/pm/view";
 import { type InspectionGeometry, type InspectionPointer, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 
-export type TranscriptInspection = InspectionTarget & { control: boolean };
+export type TranscriptInspection = InspectionTarget & { control: boolean; menu?: boolean };
 export type InspectionCallbacks = {
     onChange: (inspection: TranscriptInspection | null) => void;
     onSeek: (time: number) => void;
@@ -19,7 +19,7 @@ export function sameInspection(left: TranscriptInspection | null, right: Transcr
     if (!left || !right) return false;
     // Information and measured rectangle groups are cached by identity; the anchor is a value snapshot.
     return left.information === right.information && left.rectangles === right.rectangles && sameRect(left.anchor, right.anchor)
-        && left.keyboard === right.keyboard && left.pressed === right.pressed && left.control === right.control;
+        && left.keyboard === right.keyboard && left.pressed === right.pressed && left.control === right.control && left.menu === right.menu;
 }
 
 type InspectionState = {
@@ -44,12 +44,14 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     blur: (event: FocusEvent) => void;
     refresh: () => void;
     update: (previous: EditorState) => void;
+    pinMenu: (target: (() => InspectionTarget | null) | null) => void;
 } {
     const state: InspectionState = {
         inspection: null, control: false, pointer: null, hovered: null, keyboard: null,
         priority: "pointer", activation: null
     };
     let displayed: TranscriptInspection | null = null;
+    let menuTarget: (() => InspectionTarget | null) | null = null;
     let focused: HTMLElement | null = null;
     let focusTimer: ReturnType<typeof setTimeout> | undefined;
     function settleFocus(element: EventTarget | null): void {
@@ -71,11 +73,11 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         state.priority = preferred;
         view.dom.classList.toggle("transcript-seek", state.control && !!state.hovered?.information.range);
         // Ending the latest input reveals the other target rather than discarding it.
-        const target = state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
-        const next = target ? { ...target, control: state.control } : null;
+        const target = menuTarget ? menuTarget() : state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
+        const next = target ? { ...target, control: menuTarget ? false : state.control, menu: !!menuTarget } : null;
         // Commands follow native focus immediately; only the visual details wait for Tab to settle.
         state.inspection = next;
-        if (focusTimer !== undefined && next?.keyboard && !next.control || sameInspection(displayed, next)) return;
+        if (!menuTarget && focusTimer !== undefined && next?.keyboard && !next.control || sameInspection(displayed, next)) return;
         displayed = next;
         options.onChange(next);
     }
@@ -108,7 +110,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
             state.hovered = geometry.hover(state.pointer, state.hovered);
             inspect(state.control ? "keyboard" : state.priority);
         }
-        if (event.type === "keydown" && event.key === "Enter" && state.control && !event.shiftKey && (view.dom.contains(document.activeElement) || state.hovered)) {
+        if (!menuTarget && event.type === "keydown" && event.key === "Enter" && state.control && !event.shiftKey && (view.dom.contains(document.activeElement) || state.hovered)) {
             event.preventDefault();
             event.stopPropagation();
             if (!event.repeat && state.inspection?.information.range) options.onSeek(state.inspection.information.range.start);
@@ -181,5 +183,9 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
             inspect(state.control ? "keyboard" : state.priority);
         }
     }
-    return { move, leave, down, up, click, modifiers, reset, focus, blur, refresh, update };
+    function pinMenu(target: (() => InspectionTarget | null) | null): void {
+        menuTarget = target;
+        refresh();
+    }
+    return { move, leave, down, up, click, modifiers, reset, focus, blur, refresh, update, pinMenu };
 }

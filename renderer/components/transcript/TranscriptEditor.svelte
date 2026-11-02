@@ -29,6 +29,8 @@
     </Tooltip.Portal>
 </Tooltip.Root>
 
+<TranscriptMenu bind:this={contextMenu} />
+
 
 <style>
     .editor-shell {
@@ -253,11 +255,13 @@
     import { untrack } from "svelte";
     import { Tooltip } from "bits-ui";
     import TranscriptInformation from "./TranscriptInformation.svelte";
+    import TranscriptMenu from "./TranscriptMenu.svelte";
+    import { type TranscriptMenuCallbacks } from "../../editor/menuTarget";
     import { type Editor } from "@tiptap/core";
     import { Plugin, type Transaction } from "@tiptap/pm/state";
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
-    import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
+    import { createTranscriptEditor, setTranscriptPlayback, receiveTranscriptContextMenu } from "../../editor/transcript";
     import { refreshTranscriptInformation, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
     import { textRectangles } from "../../editor/geometry";
     import * as project from "../../states/project.svelte";
@@ -271,6 +275,7 @@
     let { vestige, run, onInspect }: { vestige: Vestige; run: Run; onInspect?: (information: InspectionInformation | null) => void } = $props();
     let element: HTMLDivElement;
     let editor = $state.raw<Editor>();
+    let contextMenu: { show: TranscriptMenuCallbacks["open"]; edit: TranscriptMenuCallbacks["edit"] };
     let inspection = $state.raw<TranscriptInspection | null>(null);
     let selectionRectangles = $state.raw<DOMRect[]>([]);
     let tooltipOpen = $state(false);
@@ -326,7 +331,7 @@
         const released = inspection?.control && !value?.control;
         const informationChanged = inspection?.information !== value?.information;
         const changed = force || informationChanged || inspection?.pressed !== value?.pressed
-            || inspection?.keyboard !== value?.keyboard || inspection?.control !== value?.control;
+            || inspection?.keyboard !== value?.keyboard || inspection?.control !== value?.control || inspection?.menu !== value?.menu;
         if (changed || !value) closeTooltip();
         inspection = value;
         if (informationChanged) {
@@ -334,7 +339,7 @@
             const range = value?.information.range;
             transcript.setInspection(range ? { mediaId: vestige.media.id, runId: run.id, range } : null);
         }
-        if (!value || value.pressed || informationDisplay !== "tooltip" || !changed) return;
+        if (!value || value.menu || value.pressed || informationDisplay !== "tooltip" || !changed) return;
         if (value.control ? controlDismissed : dismissedHover) return;
         if (value.control || value.keyboard || !released && Date.now() < skipDelayUntil) tooltipOpen = true;
         else openTimer = setTimeout(() => {
@@ -352,6 +357,7 @@
             if (project.getVestige(current.media.id) === current) projectAPI.updateModifications(current.media.id, displayed.id, modifications);
         }, () => !project.projectState.locked, {
             duration: current.media.duration, onChange: inspect,
+            menu: { open: request => contextMenu.show(request), edit: action => contextMenu.edit(action) },
             onHover: hovered => {
                 hovering = hovered;
                 if (!hovered && skipDelayUntil === Infinity) skipDelayUntil = Date.now() + 300;
@@ -373,7 +379,9 @@
             }
         }));
         editor = instance;
+        const unsubscribeMenu = window.api.onContextMenu(params => receiveTranscriptContextMenu(instance.view.dom, params));
         return () => {
+            unsubscribeMenu();
             window.removeEventListener("keydown", inspectionKeydown, true);
             instance.destroy();
             inspect(null);

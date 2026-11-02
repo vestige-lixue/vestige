@@ -1,5 +1,5 @@
 import { type EditAction } from "../shared/app";
-import { handleTranscriptEdit, isTranscriptEditorTarget, transcriptEditAvailable, transcriptEditorTarget } from "./editor/transcript";
+import { handleTranscriptEdit, handleTranscriptMenuEdit, isTranscriptEditorTarget, transcriptEditAvailable, transcriptEditorTarget } from "./editor/transcript";
 
 function editTarget(target: HTMLElement | null): HTMLElement | null {
     if (target && (target.matches("input, textarea") || target.isContentEditable || isTranscriptEditorTarget(target))) return target;
@@ -25,6 +25,7 @@ export function editAvailable(element: HTMLElement | null, action: EditAction): 
 }
 
 export function runEdit(target: HTMLElement | null, action: EditAction, nativeFallback = true): boolean {
+    if (handleTranscriptMenuEdit(editTarget(target), action)) return true;
     if (handleTranscriptEdit(editTarget(target), action)) return true;
     // Other text inputs retain the browser's native editing/clipboard behavior.
     if (!nativeFallback) return false;

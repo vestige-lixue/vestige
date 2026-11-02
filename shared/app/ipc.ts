@@ -2,6 +2,8 @@ export const appChannels = {
     ready: "app:ready",
     quit: "app:quit",
     edit: "app:edit",
+    contextMenu: "app:context-menu",
+    addToDictionary: "app:add-to-dictionary",
     clearLogs: "app:clear-logs",
     beforeQuit: "app:before-quit",
     beforeQuitResult: "app:before-quit-result",

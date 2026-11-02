@@ -62,6 +62,15 @@ export type InspectionTarget = {
     keyboard: boolean;
     pressed: boolean;
 };
+
+export function transcriptRectangles(view: EditorView, item: { from: number; to: number }, includeBreaks = false): DOMRect[] {
+    const start = view.domAtPos(item.from + 1, 1);
+    const end = view.domAtPos(item.to + 1, -1);
+    const range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    return textRectangles(view.dom, range, includeBreaks);
+}
 export type InspectionPointer = { x: number; y: number; pressed: boolean };
 export type Spacing = { top: number; right: number; bottom: number; left: number };
 type Point = { x: number; y: number };
@@ -107,12 +116,7 @@ export function inspectionGeometry(
         return target instanceof Element ? target.closest<HTMLElement>(".transcript-event") : null;
     }
     function rectangles(item: { from: number; to: number }): DOMRect[] {
-        const start = view.domAtPos(item.from + 1, 1);
-        const end = view.domAtPos(item.to + 1, -1);
-        const range = document.createRange();
-        range.setStart(start.node, start.offset);
-        range.setEnd(end.node, end.offset);
-        return textRectangles(view.dom, range);
+        return transcriptRectangles(view, item);
     }
     function tokenRectangles(item: TranscriptInformation): DOMRect[][] {
         return transcriptTokenGroup(index, projectionOf(view.state), item).map(rectangles);

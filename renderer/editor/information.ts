@@ -8,11 +8,12 @@ import { compositionPending } from "./composition";
 import { firstTrue } from "../../shared/util/search";
 import { previewUnits, renderPreview } from "./preview";
 import { transcriptMarker, transcriptMarkerAnchor } from "./markers";
+import { transcriptMenuController, type TranscriptMenuCallbacks } from "./menuTarget";
 
 export { type InspectionInformation } from "./informationModel";
 export { type TranscriptInspection } from "./interaction";
 export type InspectionLabels = { expand: string; collapse: string };
-export type InspectionOptions = InspectionCallbacks & { duration: number; labels?: InspectionLabels };
+export type InspectionOptions = InspectionCallbacks & { duration: number; labels?: InspectionLabels; menu?: TranscriptMenuCallbacks };
 type SourceRange = { from: number; to: number };
 type PlaybackEvent = { start: number; end: number; key: string; parentKey?: string };
 type InformationModel = { information: TranscriptInformation[]; byKey: Map<string, TranscriptInformation>; events: PlaybackEvent[]; latestEnd: number[] };
@@ -187,6 +188,8 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             updatePlayback();
             const geometry = inspectionGeometry(view, index, projectionOf, () => informationKey.getState(view.state)!.byKey, options.duration);
             const interaction = inspectionController(view, geometry, options);
+            const menu = options.menu ? transcriptMenuController(view, index, projectionOf, options.duration,
+                () => informationKey.getState(view.state)!.byKey, geometry, interaction.pinMenu, options.menu) : null;
             const observer = new ResizeObserver(interaction.refresh);
             observer.observe(view.dom);
             const listeners = new AbortController();
@@ -234,11 +237,13 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             window.addEventListener("scroll", interaction.refresh, capture);
             return {
                 update(_view, previous) {
+                    menu?.update();
                     updatePlayback();
                     interaction.update(previous);
                     if (informationKey.getState(previous)?.decorations !== informationKey.getState(view.state)?.decorations) interaction.refresh();
                 },
                 destroy() {
+                    menu?.destroy();
                     release();
                     listeners.abort();
                     observer.disconnect();

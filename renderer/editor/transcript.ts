@@ -12,7 +12,8 @@ import { history, undo, redo } from "@tiptap/pm/history";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
-import { type EditAction } from "../../shared/app";
+import { type ContextMenuParams, type EditAction } from "../../shared/app";
+import { receiveTranscriptMenu, closeTranscriptMenu, editTranscriptMenu } from "./menuTarget";
 import { informationPlugin, toggleSelectionDeletions, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
@@ -441,6 +442,21 @@ export function isTranscriptEditorTarget(element: HTMLElement | null): boolean {
 export function toggleTranscriptDeletions(element: HTMLElement | null): boolean {
     const editor = transcriptEditorAt(element);
     return editor ? toggleSelectionDeletions(editor.view) : false;
+}
+
+export function receiveTranscriptContextMenu(element: HTMLElement | null, params: ContextMenuParams): void {
+    const editor = transcriptEditorAt(element);
+    if (editor) receiveTranscriptMenu(editor.view, params);
+}
+
+export function dismissTranscriptMenu(element: HTMLElement | null): void {
+    const editor = transcriptEditorAt(element);
+    if (editor) closeTranscriptMenu(editor.view);
+}
+
+export function handleTranscriptMenuEdit(element: HTMLElement | null, action: EditAction): boolean {
+    const editor = transcriptEditorAt(element);
+    return editor ? editTranscriptMenu(editor.view, action) : false;
 }
 
 export function transcriptEditAvailable(element: HTMLElement | null, action: EditAction): boolean | null {
