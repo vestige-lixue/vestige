@@ -384,7 +384,7 @@
     import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits, minRewindStepMs, maxRewindStepMs, minStartRewindMs, maxStartRewindMs } from "../../../shared/constants";
     import { VestigeErrors, toFailureInfo } from "../../../shared/failure";
     import { describeFailure } from "../../failures";
-    import languageIcon from "../../../resources/icons/carbon--language.svg?raw";
+    import languageIcon from "../../../resources/icons/lucide--languages.svg?raw";
     import externalLinkIcon from "../../../resources/icons/cil--external-link.svg?raw";
     import lightIcon from "../../../resources/icons/carbon--light.svg?raw";
     import contrastIcon from "../../../resources/icons/carbon--contrast.svg?raw";
