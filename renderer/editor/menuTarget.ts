@@ -5,7 +5,7 @@ import { closeHistory } from "@tiptap/pm/history";
 import { type EditAction } from "../../shared/app";
 import { textPieces, restoreTextDeletion, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { transcriptSelection, transcriptTokenGroup, type InspectionInformation, type TranscriptInformation } from "./informationModel";
-import { keyboardRectangle, pointerRectangle, transcriptRectangles, type InspectionGeometry, type InspectionTarget } from "./geometry";
+import { keyboardRectangle, pointerRectangle, type InspectionGeometry, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 import { projectionTransaction } from "./projectionStep";
 
@@ -83,18 +83,12 @@ function eventMarker(view: EditorView, target: EventTarget | null): HTMLElement 
     return expanded ? expanded.querySelector<HTMLElement>(".transcript-event.deletion") : target.closest<HTMLElement>(".transcript-event");
 }
 
-function selectionPosition(view: EditorView, point: { x: number; y: number }): number | undefined {
-    const { from, to, empty } = view.state.selection;
-    if (empty) return;
-    const paragraph = view.dom.firstElementChild?.getBoundingClientRect();
-    if (!paragraph) return;
-    // Padding maps to the document edges. Clamp horizontally into the paragraph to keep the clicked line.
-    const left = Math.max(paragraph.left + .5, Math.min(paragraph.right - .5, point.x));
-    const position = view.posAtCoords({ left, top: point.y })?.pos;
-    if (position === undefined || position < from || position > to) return;
-    // The same position can occur above/below a line; only its selected visual rows own the side margins.
-    const rows = transcriptRectangles(view, { from: from - 1, to: to - 1 }, true);
-    return rows.some(row => point.y >= row.top && point.y <= row.bottom) ? position : undefined;
+function synchronizeNativeSelection(view: EditorView): void {
+    const selection = document.getSelection();
+    if (!selection?.anchorNode || !selection.focusNode || !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return;
+    const position = (node: Node, offset: number): number => Math.max(1, Math.min(view.state.doc.content.size - 1, view.posAtDOM(node, offset)));
+    const next = TextSelection.create(view.state.doc, position(selection.anchorNode, selection.anchorOffset), position(selection.focusNode, selection.focusOffset));
+    if (!view.state.selection.eq(next)) view.dispatch(view.state.tr.setSelection(next).setMeta("addToHistory", false));
 }
 
 export function transcriptMenuController(
@@ -132,14 +126,13 @@ export function transcriptMenuController(
             if (information && information.kind !== "token") return { kind: information.kind, information, from: information.from + 1, to: information.to + 1,
                 position: information.from + 1, expanded: marker.getAttribute("aria-expanded") === "true" };
         }
-        const selectedPosition = fromKeyboard ? undefined : selectionPosition(view, { x: event.clientX, y: event.clientY });
-        const hitPosition = fromKeyboard ? view.state.selection.head : selectedPosition ?? view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
-        if (hitPosition === undefined) return null;
-        // Editor padding maps outside the paragraph, but still supports paste at Blink's native caret.
-        const position = Math.max(1, Math.min(view.state.doc.content.size - 1, hitPosition));
+        // Blink has already kept or collapsed the selection on right-button down; ProseMirror may still hold the old selection.
+        // Read that result before the menu takes focus, without reinterpreting its visual boundaries.
+        if (!fromKeyboard) synchronizeNativeSelection(view);
         const projection = projectionOf(view.state);
         const selection = view.state.selection;
-        if (!selection.empty && (fromKeyboard || selectedPosition !== undefined)) {
+        const position = selection.head;
+        if (!selection.empty) {
             const from = selection.from - 1, to = selection.to - 1;
             const pieces = textPieces(index, projection, from, to, true).filter(piece => Math.max(from, piece.utf16From) < Math.min(to, piece.utf16To));
             const original = pieces.some(piece => piece.source.kind === "segment");
@@ -169,15 +162,6 @@ export function transcriptMenuController(
 
     function show(request: TranscriptMenuRequest): void {
         if (blocked() || request.doc !== view.state.doc) return close();
-        if (request.target.kind === "token" || request.target.kind === "text") {
-            // Native right-button down can move the DOM caret before ProseMirror observes it.
-            const selection = document.getSelection();
-            if (selection?.anchorNode && selection.focusNode && view.dom.contains(selection.anchorNode) && view.dom.contains(selection.focusNode)) {
-                const position = (node: Node, offset: number): number => Math.max(1, Math.min(view.state.doc.content.size - 1, view.posAtDOM(node, offset)));
-                request.selection = TextSelection.create(view.state.doc, position(selection.anchorNode, selection.anchorOffset), position(selection.focusNode, selection.focusOffset));
-                if (!view.state.selection.eq(request.selection)) view.dispatch(view.state.tr.setSelection(request.selection).setMeta("addToHistory", false));
-            }
-        }
         if (!callbacks.open(request)) return close();
         current = request;
         pin(() => measure(request.target, request.keyboard, request.keyboard ? undefined : { x: request.anchor.x, y: request.anchor.y }));
@@ -191,8 +175,7 @@ export function transcriptMenuController(
             if (event.button === 2 && !composingRequest) pin(null, true);
         }
         keyboard = false;
-        if (event.button === 2 && (composingRequest || blocked() || eventMarker(view, event.target)
-            || selectionPosition(view, { x: event.clientX, y: event.clientY }) !== undefined)) event.preventDefault();
+        if (event.button === 2 && (composingRequest || blocked() || eventMarker(view, event.target))) event.preventDefault();
     }
     view.dom.addEventListener("pointerdown", down, capture);
     view.dom.addEventListener("mousedown", down, capture);
