@@ -3,7 +3,7 @@ import { runEdit } from "./edit";
 import { isTranscriptEditorTarget } from "./editor/transcript";
 import { formatShortcut } from "./shortcuts";
 import { type Shortcut } from "../shared/shortcuts";
-import { commandDisabled, interfaceBlocked, runCommand, type Command } from "./states/commands";
+import { canRunCommand, interfaceBlocked, runCommand, type Command } from "./states/commands";
 import * as menu from "./states/menu.svelte";
 import * as modal from "./states/modal.svelte";
 import * as player from "./states/player.svelte";
@@ -207,7 +207,7 @@ function keydown(event: KeyboardEvent): void {
         wordNavigation = null;
         rewindNavigation = null;
         const command = binding ? boundCommand(binding) : null;
-        if (command && !commandDisabled(command)) {
+        if (command && canRunCommand(command)) {
             event.preventDefault();
             event.stopPropagation();
             if (!event.repeat) run(command);

@@ -339,8 +339,11 @@ function definition<Kind extends Command["kind"]>(kind: Kind): CommandDefinition
 }
 
 export function commandDisabled(command: Command): boolean {
-    const current = definition(command.kind);
-    return !current.allowedWhileBlocked && interfaceBlocked() || !current.enabled(command);
+    return !definition(command.kind).enabled(command);
+}
+
+export function canRunCommand(command: Command): boolean {
+    return (definition(command.kind).allowedWhileBlocked || !interfaceBlocked()) && !commandDisabled(command);
 }
 
 export function commandLabel(command: Command): string {
@@ -348,5 +351,5 @@ export function commandLabel(command: Command): string {
 }
 
 export function runCommand(command: Command): void {
-    if (!commandDisabled(command)) definition(command.kind).run(command);
+    if (canRunCommand(command)) definition(command.kind).run(command);
 }

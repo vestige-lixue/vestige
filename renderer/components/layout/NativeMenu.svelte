@@ -23,16 +23,24 @@
         return document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
 
-    function canEdit(target: HTMLElement | null): boolean {
-        return !interfaceBlocked() || !!target && (target.matches("input:not(:disabled), textarea:not(:disabled)") || target.isContentEditable);
+    function canEdit(target: HTMLElement | null, action: EditAction): boolean {
+        if (interfaceBlocked()) {
+            const input = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+            if (action === "copy") {
+                if (input) return !target.disabled && target.selectionStart !== null && target.selectionEnd !== null && target.selectionStart !== target.selectionEnd;
+                const selection = document.getSelection();
+                return !!selection && !selection.isCollapsed && !!selection.toString();
+            }
+            if (!target || !(input ? !target.disabled && !target.readOnly : target.isContentEditable)) return false;
+        }
+        return editAvailable(target, action);
     }
 
     function refreshEdits(): void {
         const target = editTarget();
-        const allowed = canEdit(target);
         for (const action of editActions) {
             if (!action) continue;
-            const enabled = allowed && editAvailable(target, action);
+            const enabled = canEdit(target, action);
             if (availableEdits[action] !== enabled) availableEdits[action] = enabled;
         }
     }
@@ -109,7 +117,10 @@
             if (!action) return;
             if (action.kind === "edit") {
                 const target = editTarget();
-                if (canEdit(target) && editAvailable(target, action.action)) runEdit(target, action.action);
+                if (canEdit(target, action.action)) {
+                    if (interfaceBlocked() && action.action === "copy") window.api.edit("copy");
+                    else runEdit(target, action.action);
+                }
                 scheduleEditRefresh();
             }
             else if (action.kind === "removeSelectedMedia") {
