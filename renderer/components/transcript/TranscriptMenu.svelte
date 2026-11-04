@@ -12,7 +12,7 @@
                     <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
                 </DropdownMenu.Item>
             {/if}
-            {#if alignment}
+            {#if canAlign}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled("cut")} onSelect={align}>
                     <div>{i18n.t("transcript.information.align")}</div>
                 </DropdownMenu.Item>
@@ -83,7 +83,7 @@
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
-    import { dismissTranscriptMenu, toggleTranscriptDeletion, transcriptAlignment, alignTranscriptSelection } from "../../editor/transcript";
+    import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection } from "../../editor/transcript";
     import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { editAvailable, runEdit } from "../../edit";
     import { editShortcut } from "../../keybindings";
@@ -96,7 +96,7 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
-    const alignment = $derived(request?.target.kind === "selection" ? transcriptAlignment(request.view, request.selection) : null);
+    const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
     const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
@@ -151,7 +151,7 @@
     }
 
     function align(): void {
-        if (!request || !alignment || disabled("cut")) return;
+        if (!request || !canAlign || disabled("cut")) return;
         const current = request;
         changeOpen(false);
         void tick().then(() => {

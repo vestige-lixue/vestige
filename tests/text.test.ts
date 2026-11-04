@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
     createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications,
-    provenanceChange, commitText, alignText, restoreTextDeletion
+    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary, textArbitrary } from "./support/generators";
@@ -432,18 +432,44 @@ describe("text projection and editing", () => {
         const spans = transcript([original]), index = createTextIndex(spans);
         const before = editText(index, projectText(index, []), 0, index.characters.length, added, false);
         const aligned = alignText(index, before, 0, before.length);
+        expect(canAlignText(index, before, 0, before.length)).toBe(aligned !== before);
         expect(aligned.text).toBe(before.text);
         expect(aligned.modifications).toEqual(expected.flatMap(change => modification(spans, ...change)));
         expect(alignText(index, aligned, 0, aligned.length)).toBe(aligned);
+        expect(canAlignText(index, aligned, 0, aligned.length)).toBe(false);
     });
 
     it.each<[number, number, boolean]>([[1, 2, true], [0, 1, true], [0, 2, true], [2, 4, false], [1, 1, false]])("includes marker edges %i/%i without requiring selected original text", (from, to, included) => {
         const spans = transcript(["LwhatR"]), index = createTextIndex(spans);
         const before = editText(index, projectText(index, []), 1, 5, "want", false);
         const aligned = alignText(index, before, from, to);
+        expect(canAlignText(index, before, from, to)).toBe(included);
         expect(aligned.text).toBe("LwantR");
         expect(aligned === before).toBe(!included);
         if (included) expect(aligned.modifications).toEqual([...modification(spans, 2, 4, ""), ...modification(spans, 4, 4, "an")]);
+    });
+
+    it("checks alignment availability consistently for random partial selections", () => {
+        checkProperty("alignment-availability", fc.property(editingArbitrary, fc.nat(), fc.nat(), ({ spans, edits }, start, end) => {
+            const index = createTextIndex(spans);
+            let value = projectText(index, []);
+            for (const edit of edits) {
+                const { from, to } = editRange(index, value, edit);
+                value = editText(index, value, from, to, edit.text, false);
+            }
+            const range = [start % (value.length + 1), end % (value.length + 1)].sort((a, b) => a - b);
+            expect(canAlignText(index, value, range[0], range[1])).toBe(alignText(index, value, range[0], range[1]) !== value);
+        }));
+    });
+
+    it.each([
+        ["😀x", "😀y", true], ["x😀", "y😀", true],
+        ["\uD83D", "😀", false], ["\uDE00", "😀", false], ["x\uDE00", "y😀", false]
+    ] as [string, string, boolean][])("checks complete endpoint codepoints for %s / %s", (original, added, expected) => {
+        const index = createTextIndex(transcript([original]));
+        const value = editText(index, projectText(index, []), 0, index.characters.length, added, false);
+        expect(canAlignText(index, value, 0, value.length)).toBe(expected);
+        expect(alignText(index, value, 0, value.length) !== value).toBe(expected);
     });
 
     it("aligns random edits without changing display and leaves neither matching end", () => {

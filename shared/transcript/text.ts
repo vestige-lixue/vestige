@@ -274,23 +274,39 @@ function characterSources(index: TextIndex, projection: TextProjection, from: nu
 }
 
 // Deletions and insertions are independent operations; use their current positions to find adjacent text.
+function alignmentCandidate(index: TextIndex, projection: TextProjection, position: number, from: number, to: number): { start: number; end: number; text: string } | null {
+    const deletion = projection.modifications[position];
+    const insertion = projection.modifications[position + 1];
+    if (deletion.type !== "delete" || insertion?.type !== "insert") return null;
+    const start = textOffset(index, deletion.range.start), end = textOffset(index, deletion.range.end);
+    const offset = projectionOffset(projection, projectedOffset(projection, start), false);
+    return offset < from || offset > to || textOffset(index, insertion.pos) !== end ? null : { start, end, text: insertion.text };
+}
+
+export function canAlignText(index: TextIndex, projection: TextProjection, from: number, to: number): boolean {
+    if (from >= to) return false;
+    for (let i = 0; i < projection.modifications.length; i++) {
+        const candidate = alignmentCandidate(index, projection, i, from, to);
+        if (!candidate) continue;
+        // A shared endpoint guarantees a nonempty prefix or suffix; inspect at most two UTF-16 units.
+        if (candidate.text.codePointAt(0) === index.characters[candidate.start].codePointAt(0)
+            || Array.from(candidate.text.slice(-2)).at(-1) === index.characters[candidate.end - 1]) return true;
+        i++;
+    }
+    return false;
+}
+
 export function alignText(index: TextIndex, projection: TextProjection, from: number, to: number): TextProjection {
     if (from >= to) return projection;
     const modifications: Modification[] = [];
     for (let i = 0; i < projection.modifications.length; i++) {
-        const deletion = projection.modifications[i];
-        const insertion = projection.modifications[i + 1];
-        if (deletion.type !== "delete" || insertion?.type !== "insert") {
-            modifications.push(deletion);
+        const candidate = alignmentCandidate(index, projection, i, from, to);
+        if (!candidate) {
+            modifications.push(projection.modifications[i]);
             continue;
         }
-        const start = textOffset(index, deletion.range.start), end = textOffset(index, deletion.range.end);
-        const position = projectionOffset(projection, projectedOffset(projection, start), false);
-        if (position < from || position > to || textOffset(index, insertion.pos) !== end) {
-            modifications.push(deletion);
-            continue;
-        }
-        const characters = Array.from(insertion.text);
+        const { start, end, text } = candidate;
+        const characters = Array.from(text);
         let prefix = 0, suffix = 0;
         while (start + prefix < end && prefix < characters.length && index.characters[start + prefix] === characters[prefix]) prefix++;
         while (end - suffix > start + prefix && characters.length - suffix > prefix

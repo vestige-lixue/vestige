@@ -17,7 +17,7 @@ import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDel
 import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
-    alignText, type TextIndex, type TextProjection
+    alignText, canAlignText, type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
 type DirtyRange = { from: number; to: number };
@@ -498,7 +498,13 @@ export function restoreTranscriptDeletion(element: HTMLElement | null, key: stri
     return restoreDeletion(editor.view, transcriptDeletion(editor.view, key), index, projection);
 }
 
-export function transcriptAlignment(view: EditorView, selection: Selection = view.state.selection): TextProjection | null {
+export function canAlignTranscriptSelection(view: EditorView, selection: Selection = view.state.selection): boolean {
+    if (view.isDestroyed || view.composing || compositionPending(view.state) || selection.empty) return false;
+    const { index, projection } = bridgeKey.getState(view.state)!;
+    return canAlignText(index, projection, projectionOffset(projection, selection.from - 1, false), projectionOffset(projection, selection.to - 1, false));
+}
+
+function transcriptAlignment(view: EditorView, selection: Selection = view.state.selection): TextProjection | null {
     if (view.isDestroyed || view.composing || compositionPending(view.state) || selection.empty) return null;
     const { index, projection } = bridgeKey.getState(view.state)!;
     const aligned = alignText(index, projection, projectionOffset(projection, selection.from - 1, false), projectionOffset(projection, selection.to - 1, false));
