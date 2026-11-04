@@ -31,6 +31,10 @@ export function readSettings(path: string): { settings: Settings; savedText: str
         && !("hideTrivialInformation" in value.editing)) {
         value.editing = { ...value.editing, hideTrivialInformation: defaultSettings.editing.hideTrivialInformation };
     }
+    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
+        && !("referenceOverlap" in value.editing)) {
+        value.editing = { ...value.editing, referenceOverlap: defaultSettings.editing.referenceOverlap };
+    }
     // 0.5.1 settings also predate the rewind amounts; saved values override these defaults.
     if (value && typeof value === "object" && "playback" in value && value.playback && typeof value.playback === "object") {
         const { rewindStepMs, startRewindMs } = defaultSettings.playback;

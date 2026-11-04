@@ -358,6 +358,11 @@
             }
         },
         "editing": {
+            "referenceOverlap": {
+                "label": "Reference overlap threshold",
+                "description": "Show text from other Runs when its overlap reaches this percentage of the shorter time range.",
+                "invalid": "The overlap threshold must be an integer from 0 to 100."
+            },
             "title": "Edit",
             "followPlayback": {
                 "label": "Follow playback",

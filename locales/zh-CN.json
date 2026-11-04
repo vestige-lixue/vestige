@@ -358,6 +358,11 @@
             }
         },
         "editing": {
+            "referenceOverlap": {
+                "label": "参考文字重叠阈值",
+                "description": "与目标的重叠时长达到两者较短时长的这一比例时，显示其他 Run 的文字。",
+                "invalid": "重叠阈值必须是 0 到 100 之间的整数。"
+            },
             "title": "编辑",
             "followPlayback": {
                 "label": "随播放位置滚动",

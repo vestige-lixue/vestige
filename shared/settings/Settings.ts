@@ -39,6 +39,7 @@ export type Settings = {
         readonly fontSize: number & tags.Minimum<typeof minEditorFontSize> & tags.Maximum<typeof maxEditorFontSize>;
         readonly informationDisplay: typeof informationDisplays[number];
         readonly hideTrivialInformation: boolean;
+        readonly referenceOverlap: number & tags.Type<"uint32"> & tags.Maximum<100>;
     };
     readonly volumeStabilization: VolumeStabilizationSettings;
     readonly window: {

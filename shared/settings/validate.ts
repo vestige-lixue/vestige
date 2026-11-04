@@ -15,6 +15,7 @@ export function validPresetNames(presets: Presets): boolean {
 
 export const validEditorFontSize = typia.createIs<Settings["editing"]["fontSize"]>();
 export const validInformationDisplay = typia.createIs<Settings["editing"]["informationDisplay"]>();
+export const validReferenceOverlap = typia.createIs<Settings["editing"]["referenceOverlap"]>();
 
 export const validVolumeSliderMapping = typia.createIs<Settings["playback"]["volumeSliderMapping"]>();
 const isVolumeSliderMinDb = typia.createIs<Settings["playback"]["volumeSliderMinDb"]>();

@@ -429,6 +429,58 @@ export function editText(index: TextIndex, projection: TextProjection, from: num
     return modifiedProjection(index, projection, changes, next.text);
 }
 
+export type TextReplacement = { parts: { from: number; to: number; text: string }[]; main: number };
+
+// All offsets are displayed codepoints. Only unselected added characters separate movable parts.
+export function textReplacement(index: TextIndex, projection: TextProjection, tokens: readonly number[], from: number, to: number, position: number): TextReplacement | null {
+    if (!tokens.length) return null;
+    const selected = new Set(tokens);
+    const first = tokens.reduce((a, b) => Math.min(a, b)), last = tokens.reduce((a, b) => Math.max(a, b));
+    const ranges = sourceTextPieces(index, projection, index.starts[first], index.starts[last + 1])
+        .filter(piece => piece.source.kind === "segment" && selected.has(piece.source.index)).map(piece => ({ from: piece.from, to: piece.to }));
+    if (from < to) {
+        for (const piece of textPieces(index, projection, from, to)) {
+            if (piece.source.kind === "segment") continue;
+            const start = Math.max(from, piece.from), end = Math.min(to, piece.to);
+            if (start < end) ranges.push({ from: start, to: end });
+        }
+    }
+    ranges.sort((a, b) => a.from - b.from);
+    const parts: TextReplacement["parts"] = [];
+    for (const range of ranges) {
+        const previous = parts.at(-1);
+        if (previous && range.from <= previous.to) previous.to = Math.max(previous.to, range.to);
+        else parts.push({ ...range, text: "" });
+    }
+    for (const part of parts) part.text = projection.text.slice(projectionOffset(projection, part.from, true), projectionOffset(projection, part.to, true));
+    const at = from < to ? from : position;
+    let main = parts.findIndex(part => part.from <= at && at < part.to);
+    if (main < 0) main = parts.findIndex(part => part.to === at);
+    return main < 0 ? null : { parts, main };
+}
+
+export function replaceText(index: TextIndex, projection: TextProjection, target: TextReplacement, text: string): TextProjection {
+    const { parts, main } = target;
+    const kept = new Set<number>();
+    let characters = Array.from(text);
+    const prefix = Array.from(parts[0].text), suffix = Array.from(parts[parts.length - 1].text);
+    if (main !== 0 && prefix.every((character, i) => characters[i] === character)) {
+        kept.add(0);
+        characters = characters.slice(prefix.length);
+    }
+    const last = parts.length - 1;
+    if (main !== last && suffix.every((character, i) => characters[characters.length - suffix.length + i] === character)) {
+        kept.add(last);
+        characters = characters.slice(0, characters.length - suffix.length);
+    }
+    text = characters.join("");
+    // Right-to-left edits keep the original displayed coordinates and insertion order valid.
+    for (let i = last; i >= 0; i--) {
+        if (!kept.has(i)) projection = editText(index, projection, parts[i].from, parts[i].to, i === main ? text : "", false);
+    }
+    return projection;
+}
+
 export function codepointToUtf16(text: string, offset: number): number {
     let position = 0;
     let count = 0;

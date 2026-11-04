@@ -12,6 +12,18 @@
                     <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
                 </DropdownMenu.Item>
             {/if}
+            {#each references as reference (reference.text)}
+                {@const lines = timing(reference.range, reference.target)}
+                <DropdownMenu.Item class="reference-item activable focusable" disabled={disabled("paste")} onSelect={() => applyReference(reference.text)}>
+                    <svg class="reference-timing" viewBox="0 0 52 16">
+                        <line class="candidate-time" x1={lines[0]} x2={lines[1]} y1="4" y2="4" />
+                        <line class="target-time" x1={lines[2]} x2={lines[3]} y1="12" y2="12" />
+                    </svg>
+                    <div class="reference-text" use:fitPreview={{ units: previewUnits(reference.text.replace(/\r\n?|\n/g, " "), "original"), compact: true }}></div>
+                    <span class="reference-runs">{reference.runs.map(number => `#${number}`).join(" ")}</span>
+                </DropdownMenu.Item>
+            {/each}
+            {#if references.length && (canAlign || actions.length)}<DropdownMenu.Separator class="menu-separator" />{/if}
             {#if canAlign}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled("cut")} onSelect={align}>
                     <div>{i18n.t("transcript.information.align")}</div>
@@ -76,6 +88,28 @@
         margin: 4px;
         background: var(--c-border);
     }
+    .reference-timing {
+        flex: 0 0 52px;
+        width: 52px;
+        height: 16px;
+        overflow: visible;
+        stroke-width: 2px;
+        stroke-linecap: round;
+    }
+    .candidate-time { stroke: var(--c-accent); }
+    .target-time { stroke: var(--c-text-80p); }
+    .reference-text {
+        flex: 1;
+        overflow: hidden;
+        white-space: pre;
+        line-height: 20px;
+    }
+    .reference-runs {
+        flex-shrink: 0;
+        color: var(--c-text-80p);
+        font-size: 12px;
+        white-space: nowrap;
+    }
 </style>
 
 <script lang="ts">
@@ -83,7 +117,12 @@
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
-    import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection } from "../../editor/transcript";
+    import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection, transcriptReferenceTarget, applyTranscriptReference } from "../../editor/transcript";
+    import { referenceCandidate } from "../../../shared/transcript/reference";
+    import { type Run } from "../../../shared/transcription/Run";
+    import { type Range } from "../../../shared/util/range";
+    import { fitPreview, previewUnits } from "../../editor/preview";
+    import * as settings from "../../states/settings.svelte";
     import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { editAvailable, runEdit } from "../../edit";
     import { editShortcut } from "../../keybindings";
@@ -91,12 +130,15 @@
     import * as modal from "../../states/modal.svelte";
     import * as i18n from "../../i18n.svelte";
 
+    let { runs, run }: { runs: Run[]; run: Run } = $props();
+    type ReferenceItem = { text: string; range: Range; target: Range; runs: number[] };
     let request = $state.raw<TranscriptMenuRequest | null>(null);
     let open = $state(false);
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
     const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
+    const references = $derived(request ? referenceItems(request) : []);
     const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
@@ -108,7 +150,7 @@
             open = false;
             return false;
         }
-        if (value.target.kind !== "deletion" && !transcriptMenuClipboardActions(value.target).length) return false;
+        if (value.target.kind !== "deletion" && !transcriptMenuClipboardActions(value.target).length && !referenceItems(value).length) return false;
         request = value;
         keyboard.current = value.keyboard;
         open = true;
@@ -118,6 +160,43 @@
     function changeOpen(value: boolean): void {
         open = value;
         if (!value && request) dismissTranscriptMenu(request.view.dom);
+    }
+
+    function referenceItems(value: TranscriptMenuRequest): ReferenceItem[] {
+        const target = transcriptReferenceTarget(value);
+        if (!target) return [];
+        const text = target.replacement?.parts.map(part => part.text).join("");
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local grouping is rebuilt for each derived value.
+        const grouped = new Map<string, ReferenceItem>();
+        runs.forEach((source, i) => {
+            if (source.id === run.id) return;
+            const candidate = referenceCandidate(source, target.range, settings.getEditing().referenceOverlap);
+            if (!candidate || candidate.text === text) return;
+            const previous = grouped.get(candidate.text);
+            if (previous) {
+                previous.runs.push(i + 1);
+                previous.range.start = Math.min(previous.range.start, candidate.range.start);
+                previous.range.end = Math.max(previous.range.end, candidate.range.end);
+            }
+            else grouped.set(candidate.text, { text: candidate.text, range: { ...candidate.range }, target: target.range, runs: [i + 1] });
+        });
+        return [...grouped.values()];
+    }
+
+    function timing(candidate: Range, target: Range): number[] {
+        const start = Math.min(candidate.start, target.start), end = Math.max(candidate.end, target.end);
+        return [candidate.start, candidate.end, target.start, target.end].map(time => end === start ? 26 : 1 + (time - start) / (end - start) * 50);
+    }
+
+    function applyReference(text: string): void {
+        if (!request || disabled("paste")) return;
+        const current = request;
+        changeOpen(false);
+        void tick().then(() => {
+            if (open || request !== current || disabled("paste") || !referenceItems(current).some(item => item.text === text)
+                || !restoreTranscriptMenuSelection(current)) return;
+            applyTranscriptReference(current, text);
+        });
     }
 
     function disabled(action: EditAction): boolean {

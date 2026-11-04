@@ -29,7 +29,7 @@
     </Tooltip.Portal>
 </Tooltip.Root>
 
-<TranscriptMenu bind:this={contextMenu} />
+<TranscriptMenu bind:this={contextMenu} runs={vestige.runs} {run} />
 
 
 <style>

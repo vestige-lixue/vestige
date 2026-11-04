@@ -4,7 +4,7 @@ import { AllSelection, EditorState, TextSelection, type Transaction } from "@tip
 import { closeHistory, undo, redo, undoDepth, redoDepth } from "@tiptap/pm/history";
 import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText } from "../renderer/editor/transcript";
 import { projectionTransaction } from "../renderer/editor/projectionStep";
-import { createTextIndex, editText, alignText, restoreTextDeletion } from "../shared/transcript/text";
+import { createTextIndex, editText, alignText, restoreTextDeletion, textReplacement, replaceText } from "../shared/transcript/text";
 import { transcript } from "./support/fixtures";
 
 function editor(text: string): {
@@ -29,6 +29,25 @@ function editor(text: string): {
 }
 
 describe("transcript history selection", () => {
+    it("records a disjoint reference replacement as one undo entry", () => {
+        const value = editor("什么"), index = createTextIndex(transcript(["什么"]));
+        const initial = transcriptProjection(value.state());
+        const before = editText(index, initial, 1, 1, "X", false);
+        value.apply(closeHistory(projectionTransaction(value.state(), initial, before)));
+        value.select(1);
+        const after = replaceText(index, before, textReplacement(index, before, [0], 0, 0, 0)!, "怎样");
+        value.apply(closeHistory(projectionTransaction(value.state(), before, after)));
+        expect(documentText(value.state().doc)).toBe("怎样X");
+        expect(undoDepth(value.state())).toBe(2);
+        expect(transcriptModifications(value.state())).toEqual(after.modifications);
+        value.history("undo");
+        expect(documentText(value.state().doc)).toBe("什X么");
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        value.history("redo");
+        expect(documentText(value.state().doc)).toBe("怎样X");
+        expect(transcriptModifications(value.state())).toEqual(after.modifications);
+    });
+
     it.each([[5, 5], [4, 7], [7, 4]])("keeps the current anchor %i and head %i through undo and redo", (anchor, head) => {
         const value = editor("abcdefghij");
         value.apply(value.state().tr.insertText("XY", 2));

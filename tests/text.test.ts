@@ -2,13 +2,48 @@ import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
     createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications,
-    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion
+    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion, textReplacement, replaceText
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary, textArbitrary } from "./support/generators";
 import { checkProperty } from "./support/properties";
 
 describe("text projection and editing", () => {
+    it.each<{
+        name: string; texts: string[]; edits: [number, number, string][]; tokens: number[];
+        selection: [number, number]; position: number; candidate: string; expected: [number, number, string][];
+    }>([
+        { name: "whole token", texts: ["find", " what"], edits: [], tokens: [1], selection: [0, 0], position: 6, candidate: " want", expected: [[4, 9, " want"]] },
+        { name: "matching leading fragment", texts: ["find", " what"], edits: [[5, 5, "ewgrefth "]], tokens: [1], selection: [0, 0], position: 15, candidate: " want", expected: [[5, 9, "ewgrefth want"]] },
+        { name: "different leading fragment", texts: ["find", " what"], edits: [[5, 5, "ewgrefth "]], tokens: [1], selection: [0, 0], position: 15, candidate: "want", expected: [[4, 9, "ewgrefth want"]] },
+        { name: "matching trailing fragment", texts: ["什么"], edits: [[1, 1, "X"]], tokens: [0], selection: [0, 0], position: 0, candidate: "怎么", expected: [[0, 1, "怎X"]] },
+        { name: "different trailing fragment", texts: ["什么"], edits: [[1, 1, "X"]], tokens: [0], selection: [0, 0], position: 0, candidate: "怎样", expected: [[0, 2, "怎样X"]] },
+        { name: "original selection", texts: ["find", " what", " I", " have"], edits: [], tokens: [2, 3], selection: [10, 16], position: 10, candidate: " I've", expected: [[9, 16, " I've"]] },
+        { name: "unselected addition before selection", texts: ["find", " what", " I", " have"], edits: [[5, 5, "ewgrefth "]], tokens: [1, 2, 3], selection: [16, 25], position: 16, candidate: " what I've", expected: [[5, 16, "ewgrefth what I've"]] },
+        { name: "selected addition joins parts", texts: ["find", " what", " I", " have"], edits: [[9, 9, " really"]], tokens: [1, 2], selection: [5, 18], position: 5, candidate: " want I", expected: [[4, 11, " want I"]] },
+        { name: "selected and unselected additions", texts: ["find", " what", " I"], edits: [[5, 5, "ewgrefth "], [9, 9, "s"]], tokens: [1], selection: [14, 19], position: 14, candidate: " wants", expected: [[5, 9, "ewgrefth wants"]] },
+        { name: "more than three parts", texts: ["abcdefg"], edits: [[1, 1, "X"], [2, 2, "Y"], [3, 3, "Z"], [4, 4, "W"], [6, 6, "V"]], tokens: [0], selection: [0, 0], position: 4, candidate: "abeqg", expected: [[1, 6, "XYbeqZWV"]] },
+        { name: "prefix and suffix cannot reuse candidate characters", texts: ["abXab"], edits: [[2, 2, "L"], [3, 3, "R"]], tokens: [0], selection: [0, 0], position: 3, candidate: "aba", expected: [[2, 5, "LaR"]] },
+        { name: "empty remaining candidate", texts: ["aXb"], edits: [[1, 1, "L"], [2, 2, "R"]], tokens: [0], selection: [0, 0], position: 2, candidate: "ab", expected: [[1, 2, "LR"]] },
+        { name: "partially selected added text", texts: ["ab"], edits: [[1, 1, "XYZ"]], tokens: [0], selection: [2, 5], position: 2, candidate: "ac", expected: [[1, 2, "Xc"]] },
+        { name: "emoji and existing deletion", texts: ["😀中x"], edits: [[1, 2, ""], [2, 2, "Y"]], tokens: [0], selection: [0, 0], position: 2, candidate: "😀文x", expected: [[1, 3, "Y文x"]] },
+        { name: "leading fragment cannot match half an emoji", texts: ["\ud83dA"], edits: [[1, 1, "X"]], tokens: [0], selection: [0, 0], position: 2, candidate: "😀B", expected: [[0, 2, "X😀B"]] },
+        { name: "trailing fragment cannot match half an emoji", texts: ["A\ude00"], edits: [[1, 1, "X"]], tokens: [0], selection: [0, 0], position: 0, candidate: "B😀", expected: [[0, 2, "B😀X"]] }
+    ])("replaces references: $name", ({ texts, edits, tokens, selection, position, candidate, expected }) => {
+        const spans = transcript(texts), index = createTextIndex(spans);
+        const before = projectText(index, edits.flatMap(change => modification(spans, ...change)));
+        const target = textReplacement(index, before, tokens, ...selection, position)!;
+        expect(target).not.toBeNull();
+        const result = replaceText(index, before, target, candidate);
+        const wanted = projectText(index, expected.flatMap(change => modification(spans, ...change)));
+        expect(result.text).toBe(wanted.text);
+        expect(result.modifications).toEqual(wanted.modifications);
+        expect(projectText(index, result.modifications).modifications).toEqual(result.modifications);
+        const extended = editText(index, result, result.length, result.length, "!");
+        const sources = (value: typeof result): (number | null)[] => textPieces(index, value).flatMap(piece => Array.from(piece.text, (_, i) => piece.source.kind === "segment" ? piece.sourceFrom + i : null));
+        expect(sources(extended).slice(0, result.length)).toEqual(sources(result));
+    });
+
     it("projects original-coordinate changes like an independent string reference", () => {
         checkProperty("projection-equivalence", fc.property(patchesArbitrary, ({ spans, modifications }) => {
             const original = structuredClone({ spans, modifications });

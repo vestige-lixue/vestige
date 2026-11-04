@@ -378,7 +378,7 @@
     import { mediaPathModes as mediaPathModeValues } from "../../../shared/project/file";
     import { informationDisplays as informationDisplayValues, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
+    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { levelStages } from "../../audio/levels";
     import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits, minRewindStepMs, maxRewindStepMs, minStartRewindMs, maxStartRewindMs } from "../../../shared/constants";
@@ -406,6 +406,7 @@
     let editorFontSize = $state<number | undefined>(current.editing.fontSize);
     let informationDisplay = $state(current.editing.informationDisplay);
     let hideTrivialInformation = $state(current.editing.hideTrivialInformation);
+    let referenceOverlap = $state<number | undefined>(current.editing.referenceOverlap);
     let volumeSliderMapping = $state(current.playback.volumeSliderMapping);
     let volumeSliderMinDb = $state<number | undefined>(current.playback.volumeSliderMinDb);
     let mediaSwitchPlayback = $state(current.playback.mediaSwitchPlayback);
@@ -505,7 +506,10 @@
             () => informationDisplay, value => informationDisplay = value, validInformationDisplay, value => ({ editing: { informationDisplay: value } }), () => informationDisplays),
         switchField({ id: "hide-trivial-information", label: "settings.editing.hideTrivialInformation.label", description: "settings.editing.hideTrivialInformation.description",
             visible: () => informationDisplay === "tooltip" },
-            () => hideTrivialInformation, value => hideTrivialInformation = value, value => ({ editing: { hideTrivialInformation: value } }))
+            () => hideTrivialInformation, value => hideTrivialInformation = value, value => ({ editing: { hideTrivialInformation: value } })),
+        numberField({ id: "reference-overlap", label: "settings.editing.referenceOverlap.label", description: "settings.editing.referenceOverlap.description",
+            min: 0, max: 100, step: "1", unit: "%", invalid: () => i18n.t("settings.editing.referenceOverlap.invalid") },
+            () => referenceOverlap, value => referenceOverlap = value, validReferenceOverlap, value => ({ editing: { referenceOverlap: value } }))
     ];
     const playbackFields: Field[] = [
         numberField({ id: "start-rewind", label: "settings.playback.startRewind.label", description: "settings.playback.startRewind.description",

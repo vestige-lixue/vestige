@@ -28,7 +28,7 @@ export const defaultSettings = {
         }
     },
     transcription: { concurrency: 2, presets: {}, lastConfig: null },
-    editing: { followPlayback: false, fontSize: 16, informationDisplay: "tooltip", hideTrivialInformation: false },
+    editing: { followPlayback: false, fontSize: 16, informationDisplay: "tooltip", hideTrivialInformation: false, referenceOverlap: 50 },
     volumeStabilization: {
         maxGainDb: 30,
         gainAttackMs: 25,

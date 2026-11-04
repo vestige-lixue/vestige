@@ -13,11 +13,12 @@ import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
-import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDeletion } from "./menuTarget";
+import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDeletion, type TranscriptMenuRequest } from "./menuTarget";
+import { type Range } from "../../shared/util/range";
 import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
-    alignText, canAlignText, type TextIndex, type TextProjection
+    alignText, canAlignText, textReplacement, replaceText, type TextReplacement, type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
 type DirtyRange = { from: number; to: number };
@@ -516,6 +517,42 @@ export function alignTranscriptSelection(view: EditorView): boolean {
     const aligned = transcriptAlignment(view);
     if (!aligned) return false;
     view.dispatch(closeHistory(projectionTransaction(view.state, transcriptProjection(view.state), aligned)));
+    view.focus();
+    return true;
+}
+
+export function transcriptReferenceTarget(request: TranscriptMenuRequest): { range: Range; position: number; replacement: TextReplacement | null } | null {
+    const { view, target, selection } = request;
+    if (view.isDestroyed || view.state.doc !== request.doc || view.composing || compositionPending(view.state)) return null;
+    const { index, projection } = bridgeKey.getState(view.state)!;
+    const information = target.information;
+    if (!information?.range) return null;
+    const position = projectionOffset(projection, target.position - 1, false);
+    if (target.kind === "gap") return { range: information.range, position, replacement: null };
+    const tokens = target.kind === "token" ? [Number(information.key.slice("segment-".length))]
+        : target.kind === "selection" && target.selectionKind !== "added" && information.kind === "selection" ? information.tokens : [];
+    if (!tokens.length) return null;
+    const from = target.kind === "selection" ? projectionOffset(projection, selection.from - 1, false) : position;
+    const to = target.kind === "selection" ? projectionOffset(projection, selection.to - 1, false) : position;
+    const replacement = textReplacement(index, projection, tokens, from, to, position);
+    if (!replacement) return null;
+    const range = target.selectionKind === "mixed" ? {
+        start: tokens.reduce((start, token) => Math.min(start, index.transcript[token].range.start), Infinity),
+        end: tokens.reduce((end, token) => Math.max(end, index.transcript[token].range.end), -Infinity)
+    } : information.range;
+    return { range, position, replacement };
+}
+
+export function applyTranscriptReference(request: TranscriptMenuRequest, text: string): boolean {
+    if (!request.view.editable) return false;
+    const target = transcriptReferenceTarget(request);
+    if (!target) return false;
+    const { view } = request;
+    const { index, projection } = bridgeKey.getState(view.state)!;
+    const next = target.replacement ? replaceText(index, projection, target.replacement, text)
+        : editText(index, projection, target.position, target.position, text, false);
+    if (next === projection) return false;
+    view.dispatch(closeHistory(projectionTransaction(view.state, projection, next)).scrollIntoView());
     view.focus();
     return true;
 }
