@@ -159,6 +159,24 @@ describe("transcript history selection", () => {
         if (action !== "restore" && action !== "insert") expect(value.state().selection.eq(selection)).toBe(true);
     });
 
+    it("undoes partial alignment without changing unselected added text or selection direction", () => {
+        const value = editor("LwhatR"), index = createTextIndex(transcript(["LwhatR"]));
+        const initial = transcriptProjection(value.state()), before = editText(index, initial, 1, 5, "want", false);
+        value.apply(closeHistory(projectionTransaction(value.state(), initial, before)));
+        value.select(3, 2);
+        const aligned = alignText(index, before, 1, 2);
+        value.apply(closeHistory(projectionTransaction(value.state(), before, aligned)));
+        const expected = editText(index, initial, 2, 5, "ant", false).modifications;
+        expect(transcriptModifications(value.state())).toEqual(expected);
+        expect(documentText(value.state().doc)).toBe("LwantR");
+        expect(value.state().selection).toMatchObject({ anchor: 3, head: 2 });
+        expect(value.history("undo")).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        expect(value.history("redo")).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(expected);
+        expect(value.state().selection).toMatchObject({ anchor: 3, head: 2 });
+    });
+
     it("maps restoration at the marker even when adjacent added text is identical", () => {
         const value = editor("Outro"), index = createTextIndex(transcript(["Outro"]));
         const initial = transcriptProjection(value.state()), before = editText(index, initial, 1, 2, "u", false);

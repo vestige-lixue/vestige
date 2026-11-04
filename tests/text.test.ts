@@ -439,17 +439,57 @@ describe("text projection and editing", () => {
         expect(canAlignText(index, aligned, 0, aligned.length)).toBe(false);
     });
 
-    it.each<[number, number, boolean]>([[1, 2, true], [0, 1, true], [0, 2, true], [2, 4, false], [1, 1, false]])("includes marker edges %i/%i without requiring selected original text", (from, to, included) => {
+    it.each<[number, number, [number, number, string][] | null]>([
+        [1, 2, [[2, 5, ""], [5, 5, "ant"]]],
+        [0, 1, null],
+        [0, 2, [[2, 5, ""], [5, 5, "ant"]]],
+        [2, 4, null],
+        [1, 1, null],
+        [1, 5, [[2, 4, ""], [4, 4, "an"]]]
+    ])("limits alignment to selected text beside an included marker %i/%i", (from, to, expected) => {
         const spans = transcript(["LwhatR"]), index = createTextIndex(spans);
         const before = editText(index, projectText(index, []), 1, 5, "want", false);
         const aligned = alignText(index, before, from, to);
-        expect(canAlignText(index, before, from, to)).toBe(included);
+        expect(canAlignText(index, before, from, to)).toBe(expected !== null);
         expect(aligned.text).toBe("LwantR");
-        expect(aligned === before).toBe(!included);
-        if (included) expect(aligned.modifications).toEqual([...modification(spans, 2, 4, ""), ...modification(spans, 4, 4, "an")]);
+        expect(aligned === before).toBe(expected === null);
+        if (expected) expect(aligned.modifications).toEqual(expected.flatMap(change => modification(spans, ...change)));
     });
 
-    it("checks alignment availability consistently for random partial selections", () => {
+    it.each<[string, string, number, [number, number, string][]]>([
+        ["eco", "echo", 1, [[1, 3, ""], [3, 3, "cho"]]],
+        ["eco", "jeco", 1, [[0, 3, ""], [3, 3, "jeco"]]],
+        ["eco", "jecoTAIL", 4, [[0, 0, "j"], [3, 3, "TAIL"]]],
+        ["what", "wantTAIL", 3, [[1, 4, ""], [4, 4, "antTAIL"]]],
+        ["what", "wantTAIL", 4, [[1, 3, ""], [3, 3, "an"], [4, 4, "TAIL"]]],
+        ["what", "thatTAIL", 4, [[0, 1, ""], [1, 1, "t"], [4, 4, "TAIL"]]],
+        ["abc", "abcX", 2, [[2, 3, ""], [3, 3, "cX"]]],
+        ["😀中x", "😀文x尾", 1, [[1, 3, ""], [3, 3, "文x尾"]]],
+        ["😀中x", "😀文x尾", 3, [[1, 2, ""], [2, 2, "文"], [3, 3, "尾"]]]
+    ])("leaves unselected added characters intact for %s / %s through %i", (original, added, to, expected) => {
+        const spans = transcript([original]), index = createTextIndex(spans);
+        const before = editText(index, projectText(index, []), 0, index.characters.length, added, false);
+        const aligned = alignText(index, before, 0, to);
+        expect(aligned.text).toBe(added);
+        expect(aligned.modifications).toEqual(expected.flatMap(change => modification(spans, ...change)));
+        expect(canAlignText(index, before, 0, to)).toBe(aligned !== before);
+        expect(canAlignText(index, aligned, 0, to)).toBe(false);
+        const sources = textPieces(index, aligned).flatMap(piece => Array.from(piece.text, (_, i) => piece.source.kind === "segment" ? piece.sourceFrom + i : null));
+        expect(sources.slice(to)).toEqual(Array.from(added).slice(to).map(() => null));
+    });
+
+    it("does not align a second deletion at the selection's right edge", () => {
+        const spans = transcript(["LwhatMecoR"]), index = createTextIndex(spans);
+        const before = projectText(index, [...modification(spans, 1, 5, "want"), ...modification(spans, 6, 9, "jeco")]);
+        const aligned = alignText(index, before, 1, 6);
+        expect(aligned.text).toBe(before.text);
+        expect(aligned.modifications).toEqual([
+            ...modification(spans, 2, 4, ""), ...modification(spans, 4, 4, "an"),
+            ...modification(spans, 6, 9, ""), ...modification(spans, 9, 9, "jeco")
+        ]);
+    });
+
+    it("checks partial alignment consistently and preserves all unselected provenance", () => {
         checkProperty("alignment-availability", fc.property(editingArbitrary, fc.nat(), fc.nat(), ({ spans, edits }, start, end) => {
             const index = createTextIndex(spans);
             let value = projectText(index, []);
@@ -458,7 +498,13 @@ describe("text projection and editing", () => {
                 value = editText(index, value, from, to, edit.text, false);
             }
             const range = [start % (value.length + 1), end % (value.length + 1)].sort((a, b) => a - b);
-            expect(canAlignText(index, value, range[0], range[1])).toBe(alignText(index, value, range[0], range[1]) !== value);
+            const aligned = alignText(index, value, range[0], range[1]);
+            const sources = (projection: typeof value): (number | null)[] => textPieces(index, projection).flatMap(piece => Array.from(piece.text, (_, i) => piece.source.kind === "segment" ? piece.sourceFrom + i : null));
+            expect(canAlignText(index, value, range[0], range[1])).toBe(aligned !== value);
+            expect(aligned.text).toBe(value.text);
+            expect(sources(aligned).slice(0, range[0])).toEqual(sources(value).slice(0, range[0]));
+            expect(sources(aligned).slice(range[1])).toEqual(sources(value).slice(range[1]));
+            expect(canAlignText(index, aligned, range[0], range[1])).toBe(false);
         }));
     });
 
