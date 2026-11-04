@@ -270,6 +270,10 @@
         }
     },
     "transcript": {
+        "reference": {
+            "replace": "Replace with",
+            "insert": "Insert"
+        },
         "information": {
             "tokenProbability": "Prob:",
             "blankProbability": "No-speech:",

@@ -270,6 +270,10 @@
         }
     },
     "transcript": {
+        "reference": {
+            "replace": "替换为",
+            "insert": "插入"
+        },
         "information": {
             "tokenProbability": "置信度",
             "blankProbability": "无语音",

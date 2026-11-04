@@ -12,17 +12,31 @@
                     <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
                 </DropdownMenu.Item>
             {/if}
-            {#each references as reference (reference.text)}
-                {@const lines = timing(reference.range, reference.target)}
-                <DropdownMenu.Item class="reference-item activable focusable" disabled={disabled("paste")} onSelect={() => applyReference(reference.text)}>
-                    <svg class="reference-timing" viewBox="0 0 52 16">
-                        <line class="candidate-time" x1={lines[0]} x2={lines[1]} y1="4" y2="4" />
-                        <line class="target-time" x1={lines[2]} x2={lines[3]} y1="12" y2="12" />
-                    </svg>
-                    <div class="reference-text" use:fitPreview={{ units: previewUnits(reference.text.replace(/\r\n?|\n/g, " "), "original"), compact: true }}></div>
-                    <span class="reference-runs">{reference.runs.map(number => `#${number}`).join(" ")}</span>
-                </DropdownMenu.Item>
-            {/each}
+            {#if references.length}
+                <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger class="reference-trigger activable focusable">
+                        <div>{i18n.t(request?.target.kind === "gap" ? "transcript.reference.insert" : "transcript.reference.replace")}</div>
+                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                        {@html chevronRight}
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.Portal>
+                        <DropdownMenu.SubContent class="transcript-menu transcript-references" data-keyboard={keyboard.current}
+                            align="start" sideOffset={8} collisionPadding={8} style={`z-index: ${layerIndex + 1};`} onkeydown={keydown}>
+                            {#each references as reference (reference.text)}
+                                {@const lines = timing(reference.range, reference.target)}
+                                <DropdownMenu.Item class="reference-item activable focusable" disabled={disabled("paste")} onSelect={() => applyReference(reference.text)}>
+                                    <svg class="reference-timing" viewBox="0 0 40 20">
+                                        <line class="candidate-time" x1={lines[0]} x2={lines[1]} y1="4" y2="4" />
+                                        <line class="target-time" x1={lines[2]} x2={lines[3]} y1="16" y2="16" />
+                                    </svg>
+                                    <div class="reference-text" use:fitPreview={{ units: previewUnits(reference.text.replace(/\r\n?|\n/g, " "), "original"), compact: true }}></div>
+                                    <span class="reference-runs">{reference.runs.map(number => `#${number}`).join(" ")}</span>
+                                </DropdownMenu.Item>
+                            {/each}
+                        </DropdownMenu.SubContent>
+                    </DropdownMenu.Portal>
+                </DropdownMenu.Sub>
+            {/if}
             {#if references.length && (canAlign || actions.length)}<DropdownMenu.Separator class="menu-separator" />{/if}
             {#if canAlign}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled("cut")} onSelect={align}>
@@ -88,10 +102,21 @@
         margin: 4px;
         background: var(--c-border);
     }
-    .reference-timing {
-        flex: 0 0 52px;
-        width: 52px;
+    :global(.transcript-references) {
+        max-height: var(--bits-menu-content-available-height, calc(100vh - 16px));
+    }
+    :global(.transcript-menu .reference-item) {
+        gap: 12px;
+    }
+    :global(.reference-trigger svg) {
+        flex-shrink: 0;
+        width: 16px;
         height: 16px;
+    }
+    .reference-timing {
+        flex: 0 0 40px;
+        width: 40px;
+        height: 20px;
         overflow: visible;
         stroke-width: 2px;
         stroke-linecap: round;
@@ -115,6 +140,7 @@
 <script lang="ts">
     import { onDestroy, tick, untrack } from "svelte";
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
+    import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
     import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection, transcriptReferenceTarget, applyTranscriptReference } from "../../editor/transcript";
@@ -185,7 +211,7 @@
 
     function timing(candidate: Range, target: Range): number[] {
         const start = Math.min(candidate.start, target.start), end = Math.max(candidate.end, target.end);
-        return [candidate.start, candidate.end, target.start, target.end].map(time => end === start ? 26 : 1 + (time - start) / (end - start) * 50);
+        return [candidate.start, candidate.end, target.start, target.end].map(time => end === start ? 20 : 1 + (time - start) / (end - start) * 38);
     }
 
     function applyReference(text: string): void {
