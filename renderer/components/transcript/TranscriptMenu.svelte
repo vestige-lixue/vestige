@@ -23,6 +23,7 @@
                     <DropdownMenu.Portal>
                         <DropdownMenu.SubContent class={["transcript-menu transcript-references", { "reference-preview": referencePreview }]} data-keyboard={keyboard.current}
                             align="start" sideOffset={8} collisionPadding={8} style={`z-index: ${layerIndex + 1};`} onkeydown={keydown}
+                            onOpenAutoFocus={focusReferences}
                             onpointerenter={() => referenceHover = "content"} onpointerleave={() => referenceHover = null}>
                             {#each references as reference (reference.text)}
                                 {@const lines = timing(reference.range, reference.target)}
@@ -169,6 +170,8 @@
     type ReferenceItem = { text: string; range: Range; target: Range; runs: number[] };
     let request = $state.raw<TranscriptMenuRequest | null>(null);
     let open = $state(false);
+    let focusPending = false;
+    let referenceFocusPending = false;
     let referenceHover = $state<"trigger" | "content" | null>(null);
     const referencePreview = $derived(open && request?.target.kind === "selection" && referenceHover !== null);
     let content = $state<HTMLDivElement | null>(null);
@@ -191,6 +194,7 @@
         if (value.target.kind !== "deletion" && !transcriptMenuClipboardActions(value.target).length && !referenceItems(value).length) return false;
         request = value;
         keyboard.current = value.keyboard;
+        focusPending = true;
         open = true;
         return true;
     }
@@ -202,6 +206,7 @@
     }
 
     function referenceOpenChange(value: boolean): void {
+        referenceFocusPending = value;
         if (!value && referenceHover === "content") referenceHover = null;
     }
 
@@ -284,8 +289,17 @@
 
     function focusMenu(event: Event): void {
         event.preventDefault();
+        // Style updates can remount the focus scope; only focus when opening the menu.
+        if (!focusPending) return;
         const target = keyboard.current ? content?.querySelector<HTMLElement>("[role=\"menuitem\"]:not([data-disabled])") ?? content : content;
-        target?.focus({ preventScroll: true });
+        if (!target) return;
+        focusPending = false;
+        target.focus({ preventScroll: true });
+    }
+
+    function focusReferences(event: Event): void {
+        if (!referenceFocusPending) event.preventDefault();
+        referenceFocusPending = false;
     }
 
     function returnFocus(event: Event): void {
