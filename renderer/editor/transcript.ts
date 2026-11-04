@@ -529,11 +529,11 @@ export function transcriptReferenceTarget(request: TranscriptMenuRequest): { ran
     if (!information?.range) return null;
     const position = projectionOffset(projection, target.position - 1, false);
     if (target.kind === "gap") return { range: information.range, position, replacement: null };
-    const tokens = target.kind === "token" ? [Number(information.key.slice("segment-".length))]
-        : target.kind === "selection" && target.selectionKind !== "added" && information.kind === "selection" ? information.tokens : [];
+    if (target.kind !== "selection" || selection.empty || target.selectionKind === "added" || information.kind !== "selection") return null;
+    const tokens = information.tokens;
     if (!tokens.length) return null;
-    const from = target.kind === "selection" ? projectionOffset(projection, selection.from - 1, false) : position;
-    const to = target.kind === "selection" ? projectionOffset(projection, selection.to - 1, false) : position;
+    const from = projectionOffset(projection, selection.from - 1, false);
+    const to = projectionOffset(projection, selection.to - 1, false);
     const replacement = textReplacement(index, projection, tokens, from, to, position);
     if (!replacement) return null;
     const range = target.selectionKind === "mixed" ? {
