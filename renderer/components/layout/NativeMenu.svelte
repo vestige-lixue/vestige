@@ -4,7 +4,7 @@
     import { type NativeMenu, type NativeMenuItem, type NativeMenuState } from "../../../shared/menu/NativeMenu";
     import { applicationActions, editActions, helpActions, menuGroups, menuItems, quitAction, type MenuAction } from "../../menuModel";
     import { commandShortcuts, editBinding } from "../../keybindings";
-    import { editAvailable, onEditStateChanged, runEdit } from "../../edit";
+    import { editAvailable, onEditStateChanged, runEdit, selectionAvailable } from "../../edit";
     import { commandDisabled, commandLabel, interfaceBlocked, runCommand } from "../../states/commands";
     import * as i18n from "../../i18n.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
@@ -25,12 +25,9 @@
 
     function canEdit(target: HTMLElement | null, action: EditAction): boolean {
         if (interfaceBlocked()) {
+            // Copy only needs selected text; it never falls back to the transcript editor behind the dialog.
+            if (action === "copy") return selectionAvailable(target);
             const input = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-            if (action === "copy") {
-                if (input) return !target.disabled && target.selectionStart !== null && target.selectionEnd !== null && target.selectionStart !== target.selectionEnd;
-                const selection = document.getSelection();
-                return !!selection && !selection.isCollapsed && !!selection.toString();
-            }
             if (!target || !(input ? !target.disabled && !target.readOnly : target.isContentEditable)) return false;
         }
         return editAvailable(target, action);

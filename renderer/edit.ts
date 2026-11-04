@@ -19,6 +19,17 @@ function editTarget(target: HTMLElement | null): HTMLElement | null {
     return transcriptEditorTarget();
 }
 
+/** Whether cut or copy has selected text in the target. `queryCommandEnabled` reports false for both even with a selection. */
+export function selectionAvailable(target: HTMLElement | null): boolean {
+    const input = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+    if (input && target.disabled) return false;
+    // type="number" and similar inputs have no selection API, but the document selection reports their selected text while focused.
+    if (input && target.selectionStart !== null && target.selectionEnd !== null) return target.selectionStart !== target.selectionEnd;
+    if (input && document.activeElement !== target) return false;
+    const selection = document.getSelection();
+    return !!selection && (input || !selection.isCollapsed) && !!selection.toString();
+}
+
 export function editAvailable(element: HTMLElement | null, action: EditAction): boolean {
     const target = editTarget(element);
     const transcript = transcriptEditAvailable(target, action);
@@ -28,12 +39,7 @@ export function editAvailable(element: HTMLElement | null, action: EditAction): 
     const input = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
     const editable = target && (target.isContentEditable
         || input && !target.readOnly && !target.disabled);
-    if (action === "cut" || action === "copy") {
-        if (action === "cut" && !editable) return false;
-        if (input) return !target.disabled && target.selectionStart !== null && target.selectionEnd !== null && target.selectionStart !== target.selectionEnd;
-        const selection = document.getSelection();
-        return !!selection && !selection.isCollapsed && !!selection.toString();
-    }
+    if (action === "cut" || action === "copy") return (action === "copy" || !!editable) && selectionAvailable(target);
     return !!editable && document.queryCommandEnabled(action);
 }
 
