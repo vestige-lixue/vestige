@@ -262,7 +262,7 @@
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
-    import { refreshTranscriptInformation, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
+    import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
     import { textRectangles } from "../../editor/geometry";
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
@@ -314,7 +314,7 @@
     }
 
     function inspectionKeydown(event: KeyboardEvent): void {
-        if (event.key === "Control" && !event.repeat) {
+        if (event.key === inspectionKey() && !event.repeat) {
             const dismissed = controlDismissed;
             controlDismissed = false;
             if (dismissed && inspection?.control) inspect(inspection, true);

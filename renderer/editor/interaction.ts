@@ -3,6 +3,24 @@ import { type EditorView } from "@tiptap/pm/view";
 import { type InspectionGeometry, type InspectionPointer, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 
+// Chords such as Ctrl+C or ⌘C press their key within this delay, so they never flash control inspection.
+const controlDelay = 250;
+// Modifiers and caret movement keep a held inspection modifier inspecting; any other key turns the hold into a chord.
+const holdKeys = new Set(["Control", "Shift", "Alt", "AltGraph", "Meta", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
+// Inspection uses the primary modifier: Command on macOS, where Control-click is a secondary click, and Ctrl elsewhere.
+const mac = (): boolean => window.api.platform === "darwin";
+export function inspectionKey(): "Meta" | "Control" {
+    return mac() ? "Meta" : "Control";
+}
+function primary(event: KeyboardEvent | MouseEvent): boolean {
+    return mac() ? event.metaKey : event.ctrlKey;
+}
+/** The inspection modifier without Alt or the other platform's primary modifier. */
+function inspectionModifier(event: KeyboardEvent | MouseEvent): boolean {
+    return primary(event) && (mac() ? !event.ctrlKey : !event.metaKey) && !event.altKey;
+}
+
 export type TranscriptInspection = InspectionTarget & { control: boolean; menu?: boolean };
 export type InspectionCallbacks = {
     onChange: (inspection: TranscriptInspection | null) => void;
@@ -24,6 +42,11 @@ export function sameInspection(left: TranscriptInspection | null, right: Transcr
 
 type InspectionState = {
     inspection: TranscriptInspection | null;
+    /** The inspection modifier is down: modifier-click and modifier+Enter seek at once. */
+    held: boolean;
+    /** A key other than a modifier or caret movement was pressed during this hold. */
+    chorded: boolean;
+    /** Control inspection, shown once the modifier has been held alone for the delay. */
     control: boolean;
     pointer: InspectionPointer | null;
     hovered: InspectionTarget | null;
@@ -47,9 +70,10 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     pinMenu: (target: (() => InspectionTarget | null) | null, pending?: boolean) => void;
 } {
     const state: InspectionState = {
-        inspection: null, control: false, pointer: null, hovered: null, keyboard: null,
+        inspection: null, held: false, chorded: false, control: false, pointer: null, hovered: null, keyboard: null,
         priority: "pointer", activation: null
     };
+    let controlTimer: ReturnType<typeof setTimeout> | undefined;
     let displayed: TranscriptInspection | null = null;
     let menuTarget: (() => InspectionTarget | null) | null = null;
     let menuPending = false;
@@ -72,7 +96,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     }
     function inspect(preferred = state.priority): void {
         state.priority = preferred;
-        view.dom.classList.toggle("transcript-seek", state.control && !!state.hovered?.information.range);
+        view.dom.classList.toggle("transcript-seek", state.held && !!state.hovered?.information.range);
         // Ending the latest input reveals the other target rather than discarding it.
         const target = menuTarget ? menuTarget() : state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
         const menu = menuPending || !!menuTarget;
@@ -84,11 +108,31 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         options.onChange(next);
     }
     function setControl(value: boolean): boolean {
+        clearTimeout(controlTimer);
+        controlTimer = undefined;
         if (state.control === value) return false;
         state.control = value;
-        state.activation = null;
         state.keyboard = geometry.keyboard(state.control);
         return true;
+    }
+    function retarget(): void {
+        state.hovered = geometry.hover(state.pointer, state.hovered);
+        inspect(state.control ? "keyboard" : state.priority);
+    }
+    /** Returns whether the hold or control inspection changed synchronously. */
+    function hold(value: boolean): boolean {
+        const changed = state.held !== value;
+        if (changed) {
+            state.held = value;
+            // Modifier-click needs the modifier held from press to release.
+            state.activation = null;
+        }
+        if (!value || state.chorded) return setControl(false) || changed;
+        if (!state.control && controlTimer === undefined) controlTimer = setTimeout(() => {
+            controlTimer = undefined;
+            if (!view.isDestroyed && setControl(true)) retarget();
+        }, controlDelay);
+        return changed;
     }
     function leave(event?: PointerEvent): void {
         if (event?.type === "pointerleave") options.onHover?.(false);
@@ -100,31 +144,39 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     }
     function move(event: PointerEvent): void {
         if (event.pointerType === "touch" || view.composing || compositionPending(view.state)) return leave();
-        const changed = setControl(event.ctrlKey && !event.altKey && !event.metaKey);
+        if (!primary(event)) state.chorded = false;
+        hold(inspectionModifier(event));
         state.pointer = { x: event.clientX, y: event.clientY, pressed: event.buttons !== 0 };
         state.hovered = geometry.hover(state.pointer, state.hovered);
         options.onHover?.(event.type !== "pointerleave" && (!!state.hovered || geometry.containsAddedText(state.pointer)));
-        inspect(state.hovered ? "pointer" : changed && state.control ? "keyboard" : state.priority);
+        inspect(state.hovered ? "pointer" : state.priority);
     }
     function modifiers(event: KeyboardEvent): void {
-        const next = event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && !view.composing && !compositionPending(view.state);
-        if (setControl(next)) {
-            state.hovered = geometry.hover(state.pointer, state.hovered);
-            inspect(state.control ? "keyboard" : state.priority);
+        // Releasing the modifier ends the hold, together with any chord made during it.
+        if (!primary(event)) state.chorded = false;
+        const held = inspectionModifier(event) && !event.isComposing && !view.composing && !compositionPending(view.state);
+        const seek = !menuPending && !menuTarget && event.type === "keydown" && event.key === "Enter" && held && !event.shiftKey
+            && (view.dom.contains(document.activeElement) || !!state.hovered);
+        if (!seek) {
+            if (event.type === "keydown" && primary(event) && !holdKeys.has(event.key)) state.chorded = true;
+            if (hold(held)) retarget();
+            return;
         }
-        if (!menuPending && !menuTarget && event.type === "keydown" && event.key === "Enter" && state.control && !event.shiftKey && (view.dom.contains(document.activeElement) || state.hovered)) {
-            event.preventDefault();
-            event.stopPropagation();
-            if (!event.repeat && state.inspection?.information.range) options.onSeek(state.inspection.information.range.start);
-        }
+        event.preventDefault();
+        event.stopPropagation();
+        // Seeking acts on the inspected target, so it shows inspection at once instead of ending it as a chord.
+        state.chorded = false;
+        const changed = hold(true);
+        if (setControl(true) || changed) retarget();
+        if (!event.repeat && state.inspection?.information.range) options.onSeek(state.inspection.information.range.start);
     }
     function down(event: PointerEvent): void {
         state.activation = null;
         move(event);
-        if (event.button !== 0 || !state.control) return;
+        if (event.button !== 0 || !state.held) return;
         const target = geometry.hover(state.pointer, null, { selection: false });
         if (!target?.information.range) return;
-        // Ctrl-click is an audio link, so suppress native caret/word selection in capture phase.
+        // Modifier-click is an audio link, so suppress native caret/word selection in capture phase.
         event.preventDefault();
         event.stopPropagation();
         state.activation = target.information.key;
@@ -135,7 +187,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     function click(event: MouseEvent): void {
         const key = state.activation;
         state.activation = null;
-        if (event.button !== 0 || !event.ctrlKey || event.altKey || event.metaKey || !key) return;
+        if (event.button !== 0 || !inspectionModifier(event) || !key) return;
         const item = geometry.hover(state.pointer, null, { selection: false })?.information;
         if (!item?.range || item.key !== key) return;
         event.preventDefault();
@@ -144,6 +196,10 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     }
     function reset(): void {
         settleFocus(null);
+        clearTimeout(controlTimer);
+        controlTimer = undefined;
+        state.held = false;
+        state.chorded = false;
         state.control = false;
         if (state.pointer) state.pointer.pressed = false;
         state.hovered = null;

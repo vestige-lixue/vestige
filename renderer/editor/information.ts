@@ -11,7 +11,7 @@ import { transcriptMarker, transcriptMarkerAnchor } from "./markers";
 import { transcriptMenuController, type TranscriptMenuCallbacks } from "./menuTarget";
 
 export { type InspectionInformation } from "./informationModel";
-export { type TranscriptInspection } from "./interaction";
+export { type TranscriptInspection, inspectionKey } from "./interaction";
 export type InspectionLabels = { expand: string; collapse: string };
 export type InspectionOptions = InspectionCallbacks & { duration: number; labels?: InspectionLabels; menu?: TranscriptMenuCallbacks };
 type SourceRange = { from: number; to: number };
