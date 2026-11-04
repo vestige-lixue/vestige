@@ -38,7 +38,7 @@ export type ProjectOperation = (
 );
 
 export type ProjectError = ({
-    kind: "pending-imports" | "active-transcriptions";
+    kind: "pending-imports" | "active-transcriptions" | "active-downloads";
 } | {
     kind: "operation-failed";
     failure: FailureInfo;

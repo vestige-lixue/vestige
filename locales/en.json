@@ -156,6 +156,7 @@
             "title": "Operation failed",
             "pendingImports": "Some media are still being imported. Cancel their imports using the remove buttons in the sidebar, or wait for them to finish before saving or closing the project.",
             "activeTranscriptions": "Transcription tasks are still running. Stop them or wait for them to finish before closing or switching projects.",
+            "activeDownloads": "Downloads are still running. Cancel them in Manage backends or Manage models, or wait for them to finish before quitting.",
             "readFailed": "Could not read project “{{path}}”. Error:\n{{error}}"
         },
         "quitWithImports": {

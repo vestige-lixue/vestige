@@ -94,6 +94,7 @@ const api: AppAPI = {
         }
     },
     downloads: {
+        active: () => ipcRenderer.invoke(downloadChannels.active),
         list: () => ipcRenderer.invoke(downloadChannels.list),
         start: (kind, id) => ipcRenderer.invoke(downloadChannels.start, kind, id),
         cancel: id => ipcRenderer.invoke(downloadChannels.cancel, id),

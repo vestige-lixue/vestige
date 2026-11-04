@@ -46,6 +46,7 @@
         switch (error.kind) {
             case "pending-imports": return i18n.t(onQuit ? "project.quitWithImports.description" : "project.operationFailure.pendingImports");
             case "active-transcriptions": return i18n.t("project.operationFailure.activeTranscriptions");
+            case "active-downloads": return i18n.t("project.operationFailure.activeDownloads");
             case "operation-failed": return describeFailure(error.failure);
             case "read-failed": return i18n.t("project.operationFailure.readFailed", { path: error.path, error: describeFailure(error.failure) });
         }

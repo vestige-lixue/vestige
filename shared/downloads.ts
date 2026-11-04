@@ -63,6 +63,7 @@ export type DownloadStartResult = { success: true; taskId: string } | { success:
 
 export const downloadChannels = {
     list: "downloads:list",
+    active: "downloads:active",
     start: "downloads:start",
     cancel: "downloads:cancel",
     openDirectory: "downloads:open-directory"

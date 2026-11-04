@@ -57,6 +57,7 @@ export function registerDownloadIPCs(contents: WebContents, paths: Pick<AppPaths
         task.controller.abort();
         return task.completion;
     };
+    handle(contents, downloadChannels.active, () => active.size > 0);
     handle(contents, downloadChannels.list, async (): Promise<DownloadListResult> => {
         try {
             const downloads = await Promise.all(sources.map(async ({ kind, id, name, estimatedBytes, requiredFiles }) => {

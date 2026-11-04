@@ -156,6 +156,7 @@
             "title": "操作失败",
             "pendingImports": "仍有未完成导入的媒体。请在侧栏点击删除按钮取消导入，或等待导入完成后再保存或关闭项目。",
             "activeTranscriptions": "仍有正在运行的转写任务。请停止任务或等待完成后，再关闭或切换项目。",
+            "activeDownloads": "仍有正在进行的下载。请在“转写后端管理”或“转写模型管理”中取消下载，或等待完成后再退出。",
             "readFailed": "无法读取项目“{{path}}”。错误信息：\n{{error}}"
         },
         "quitWithImports": {

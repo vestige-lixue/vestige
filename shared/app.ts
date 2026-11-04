@@ -52,6 +52,7 @@ export type AppAPI = {
         subscribe(id: string, listener: (snapshot: TaskSnapshot) => void): () => void;
     };
     downloads: {
+        active(): Promise<boolean>;
         list(): Promise<DownloadListResult>;
         start(kind: DownloadKind, id: string): Promise<DownloadStartResult>;
         cancel(taskId: string): Promise<OperationResult>;

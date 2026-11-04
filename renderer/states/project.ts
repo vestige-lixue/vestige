@@ -556,6 +556,10 @@ export function startLifecycle(prepareSettingsBeforeQuit: () => Promise<boolean>
             while (activeTransition) if (!await activeTransition) return true;
             while (saveTask) if (!await saveTask) return true;
             if (rejectActiveTranscriptions()) return true;
+            if (await window.api.downloads.active()) {
+                reportError({ kind: "active-downloads" });
+                return true;
+            }
             let cancelImports = false;
             if (mediaImport.hasPendingImports()) {
                 // Keep imports and directory collection running until cancellation is accepted.
