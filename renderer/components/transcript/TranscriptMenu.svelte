@@ -76,7 +76,7 @@
             0 12px 28px -4px var(--c-shadow-3);
     }
     :global(.transcript-menu.reference-preview) {
-        opacity: .5;
+        opacity: .75;
     }
     :global(.transcript-menu [role="menuitem"]) {
         display: flex;

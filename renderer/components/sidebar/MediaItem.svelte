@@ -126,6 +126,7 @@
         pointer-events: none;
     }
     :where(.media-secondary-wrapper > *) {
+        cursor: pointer;
         pointer-events: auto;
     }
     .media-info {
