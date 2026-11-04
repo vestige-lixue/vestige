@@ -1,8 +1,9 @@
 import { type EditAction } from "../shared/app";
 import { runEdit } from "./edit";
 import { isTranscriptEditorTarget } from "./editor/transcript";
-import { formatShortcut, type Shortcut } from "./shortcuts";
-import { interfaceBlocked, runCommand, type Command } from "./states/commands";
+import { formatShortcut } from "./shortcuts";
+import { type Shortcut } from "../shared/shortcuts";
+import { commandDisabled, interfaceBlocked, runCommand, type Command } from "./states/commands";
 import * as menu from "./states/menu.svelte";
 import * as modal from "./states/modal.svelte";
 import * as player from "./states/player.svelte";
@@ -78,16 +79,25 @@ function boundCommand(binding: Binding): Command {
     return typeof binding.command === "function" ? binding.command() : binding.command;
 }
 
-export function shortcut(command: Command): string | undefined {
-    if (command.kind === "openDevTools") return formatShortcut({ key: "F12" }, isMac()); // Electron owns this native shortcut.
+export function commandShortcuts(command: Command): Shortcut[] {
+    if (command.kind === "openDevTools") return [{ key: "F12" }]; // Electron owns this native shortcut.
     const identity = commandIdentity(command);
-    const matches = bindings.filter(candidate => commandIdentity(boundCommand(candidate)) === identity);
+    return bindings.filter(candidate => commandIdentity(boundCommand(candidate)) === identity)
+        .map(({ key, mod, alt, shift }) => ({ key, mod, alt, shift }));
+}
+
+export function shortcut(command: Command): string | undefined {
+    const matches = commandShortcuts(command);
     return matches.length ? matches.map(binding => formatShortcut(binding, isMac())).join(" / ") : undefined;
 }
 
+export function editBinding(action: EditAction): Shortcut {
+    if (action === "redo" && isMac()) return { key: "z", mod: true, shift: true };
+    return { key: Object.keys(editKeys).find(key => editKeys[key] === action)!, mod: true };
+}
+
 export function editShortcut(action: EditAction): string {
-    if (action === "redo" && isMac()) return formatShortcut({ key: "z", mod: true, shift: true }, true);
-    return formatShortcut({ key: Object.keys(editKeys).find(key => editKeys[key] === action)!, mod: true }, isMac());
+    return formatShortcut(editBinding(action), isMac());
 }
 
 export function cancelProgressNavigation(): void {
@@ -110,7 +120,7 @@ function deletionControl(target: EventTarget | null): boolean {
 }
 
 function run(command: Command): void {
-    if (menuBindings) menuBindings.run(command);
+    if (menuBindings && !interfaceBlocked()) menuBindings.run(command);
     else runCommand(command);
 }
 
@@ -183,7 +193,7 @@ function keydown(event: KeyboardEvent): void {
         return;
     }
     alt = "idle";
-    if (interfaceBlocked() || event.defaultPrevented || event.isComposing || event.getModifierState("AltGraph")
+    if (event.defaultPrevented || event.isComposing || event.getModifierState("AltGraph")
         || event.altKey && event.target instanceof HTMLElement && event.target.closest("select")) {
         wordNavigation = null;
         rewindNavigation = null;
@@ -191,6 +201,19 @@ function keydown(event: KeyboardEvent): void {
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.key.toLowerCase();
+    const binding = bindings.find(candidate => candidate.key === key && !!candidate.mod === mod && !!candidate.shift === event.shiftKey && !!candidate.alt === event.altKey
+        && (candidate.mod || !event.ctrlKey && !event.metaKey));
+    if (interfaceBlocked()) {
+        wordNavigation = null;
+        rewindNavigation = null;
+        const command = binding ? boundCommand(binding) : null;
+        if (command && !commandDisabled(command)) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!event.repeat) run(command);
+        }
+        return;
+    }
     if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (key === " " || key === "enter") && deletionControl(event.target)) return;
     const editing = editingTarget(event.target);
     const editTarget = event.target instanceof HTMLElement && (editing || isTranscriptEditorTarget(event.target)) ? event.target : null;
@@ -202,8 +225,6 @@ function keydown(event: KeyboardEvent): void {
         if (menu.get()) menuBindings?.edit(edit);
         return;
     }
-    const binding = bindings.find(candidate => candidate.key === key && !!candidate.mod === mod && !!candidate.shift === event.shiftKey && !!candidate.alt === event.altKey
-        && (candidate.mod || !event.ctrlKey && !event.metaKey));
     const action = binding && !(editing && key === " ") ? boundCommand(binding) : undefined;
     if (action?.kind !== "seekAdjacentWord") wordNavigation = null;
     if (action?.kind !== "rewindSelectedMedia") rewindNavigation = null;

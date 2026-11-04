@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import { type AppAPI } from "../shared/app";
-import { appChannels, settingsChannels, fileChannels, projectChannels } from "../shared/ipc";
+import { appChannels, settingsChannels, fileChannels, projectChannels, menuChannels } from "../shared/ipc";
 import { type SettingsSnapshot } from "../shared/settings/Settings";
 import { transcriptionChannels } from "../shared/transcription/ipc";
 import { taskOutputChannels, type TaskSnapshot } from "../shared/task";
@@ -22,6 +22,21 @@ ipcRenderer.on(taskOutputChannels.changed, (_event: IpcRendererEvent, snapshot: 
 const api: AppAPI = {
     platform: process.platform,
     ready: () => ipcRenderer.send(appChannels.ready),
+    revealWindow: () => ipcRenderer.send(appChannels.revealWindow),
+    onHiddenByClose(callback) {
+        const listener = (): void => callback();
+        ipcRenderer.on(menuChannels.hiddenByClose, listener);
+        return () => ipcRenderer.removeListener(menuChannels.hiddenByClose, listener);
+    },
+    menu: {
+        update: state => ipcRenderer.send(menuChannels.update, state),
+        onCommand(callback) {
+            const listener = (_event: IpcRendererEvent, id: string): void => callback(id);
+            ipcRenderer.on(menuChannels.command, listener);
+            return () => ipcRenderer.removeListener(menuChannels.command, listener);
+        },
+        setDocumentEdited: edited => ipcRenderer.send(menuChannels.documentEdited, edited)
+    },
     openDevTools: () => ipcRenderer.send(appChannels.openDevTools),
     supportsMica: () => ipcRenderer.invoke(appChannels.supportsMica),
     quit: () => ipcRenderer.send(appChannels.quit),

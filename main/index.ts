@@ -22,6 +22,8 @@ import { captureConsole, LogDirectory } from "./logging";
 import { createAppPaths } from "./paths";
 import { registerAppIPCs } from "./app";
 import { getWindowIcon, registerWindowBehavior } from "./ui/window";
+import { initializeApplicationMenu, registerMenuIPCs } from "./ui/menu";
+import { revealWindow } from "./ui/visibility";
 import { listen } from "./util/ipc";
 import { type FailureInfo } from "../shared/failure";
 
@@ -114,7 +116,8 @@ function startApplication(): void {
             modelDirectory: paths.modelDirectory,
             backendDirectory: paths.backendDirectory
         });
-        registerAppIPCs(mainWindow.webContents, logs);
+        registerAppIPCs(mainWindow, logs);
+        if (process.platform === "darwin") registerMenuIPCs(mainWindow);
         registerProjectIPCs(mainWindow);
         const rememberWindow = registerSettingsIPCs(mainWindow);
         registerWindowTheme(mainWindow);
@@ -169,6 +172,7 @@ function startApplication(): void {
     app.on("second-instance", () => {
         const window = BrowserWindow.getAllWindows()[0];
         if (window) {
+            if (process.platform === "darwin") revealWindow(window);
             if (window.isMinimized()) window.restore();
             window.focus();
         }
@@ -179,6 +183,7 @@ function startApplication(): void {
         registerMediaProtocol();
         app.setAppUserModelId("vestige.lixue");
         if (process.platform === "darwin") {
+            initializeApplicationMenu();
             const updateDockIcon = (): void => app.dock?.setIcon(getWindowIcon());
             updateDockIcon();
             nativeTheme.on("updated", updateDockIcon);
@@ -188,9 +193,14 @@ function startApplication(): void {
         createWindow();
     });
 
-    // If there are no open windows, create a new one on activation.
     app.on("activate", () => {
-        if (startupReady && BrowserWindow.getAllWindows().length === 0) createWindow();
+        if (!startupReady) return;
+        const window = BrowserWindow.getAllWindows()[0];
+        if (window) {
+            revealWindow(window);
+            window.focus();
+        }
+        else createWindow();
     });
 
     app.on("window-all-closed", () => {

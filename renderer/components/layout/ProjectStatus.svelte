@@ -1,5 +1,5 @@
 {#if project.projectState.project}
-    <div class="project-status">
+    <div class="project-status" class:centered>
         <div class="measurement">
             <div class="reserved-width" bind:borderBoxSize={null, sizes => reservedWidth = sizes?.[0]?.inlineSize ?? 0}>
                 <span>{title}</span>
@@ -52,6 +52,11 @@
         font-size: 15px;
         text-align: left;
     }
+    .project-status.centered {
+        margin-left: 0;
+        max-width: min(80%, 32em);
+        text-align: center;
+    }
     .project-status :global(*) {
         -webkit-app-region: no-drag;
     }
@@ -93,9 +98,10 @@
 
     type Props = {
         reservedWidth?: number;
+        centered?: boolean;
     };
 
-    let { reservedWidth = $bindable(0) }: Props = $props();
+    let { reservedWidth = $bindable(0), centered = false }: Props = $props();
 
     const title = $derived(projectTitle(project.getFileName()));
 

@@ -43,7 +43,7 @@
                 </Menubar.SubTrigger>
                 <Menubar.Portal>
                     <Menubar.SubContent data-keyboard={keyboard.current} align="start" sideOffset={8} style={`z-index: ${layerIndex + 1};`}>
-                        {@render menu.items()}
+                        {@render groupItems(menu.value)}
                     </Menubar.SubContent>
                 </Menubar.Portal>
             </Menubar.Sub>
@@ -53,7 +53,7 @@
                 <Menubar.Portal>
                     <Menubar.Content data-keyboard={keyboard.current} bind:ref={menuContents[menu.value]} onOpenAutoFocus={handleMenuOpenAutoFocus} align="start" sideOffset={8} onCloseAutoFocus={event => handleCloseAutoFocus(event, menu.value)}
                         style={`z-index: ${layerIndex + 1};`} interactOutsideBehavior="ignore">
-                        {@render menu.items()}
+                        {@render groupItems(menu.value)}
                     </Menubar.Content>
                 </Menubar.Portal>
             </Menubar.Menu>
@@ -61,9 +61,18 @@
     {/each}
 {/snippet}
 
-{#snippet commandItems(actions: readonly (Command | null)[])}
-    {#each actions as action, index (index)}
+{#snippet groupItems(group: MenuGroup)}
+    {#each menuItems(group) as action, index (index)}
         {#if action === null}<Menubar.Separator />
+        {:else if action.kind === "removeSelectedMedia"}
+            <Menubar.Item class="activable focusable" disabled={selectedMediaId === null} closeOnSelect={false} onSelect={handleRemoveMedia}>
+                <div>{removalConfirmation !== null && removalConfirmation === selectedMediaId ? i18n.t("common.confirmAgain") : i18n.t("media.actions.remove")}</div>
+            </Menubar.Item>
+        {:else if action.kind === "edit"}
+            <Menubar.Item class="activable focusable" disabled={!availableEdits[action.action]} onSelect={() => runEdit(action.action)}>
+                <div>{i18n.t(`menu.edit.${action.action}`)}</div>
+                <kbd>{editShortcut(action.action)}</kbd>
+            </Menubar.Item>
         {:else}
             <Menubar.Item class="activable focusable" disabled={commandDisabled(action)} onSelect={() => runMenuCommand(action)}>
                 <div class:external-link={action.kind === "openProjectRepository"}>
@@ -78,33 +87,6 @@
         {/if}
     {/each}
 {/snippet}
-
-{#snippet projectItems()}{@render commandItems(projectActions)}{/snippet}
-
-{#snippet mediaItems()}
-    {@render commandItems([{ kind: "importMedia" }, null, transcriptionCommand])}
-    <Menubar.Item class="activable focusable" disabled={selectedMediaId === null} closeOnSelect={false} onSelect={handleRemoveMedia}>
-        <div>{removalConfirmation !== null && removalConfirmation === selectedMediaId ? i18n.t("common.confirmAgain") : i18n.t("media.actions.remove")}</div>
-    </Menubar.Item>
-    {@render commandItems([null, { kind: "moveSelectedMedia", direction: -1 }, { kind: "moveSelectedMedia", direction: 1 }])}
-{/snippet}
-
-{#snippet transcriptionItems()}{@render commandItems([transcriptionCommand, null, ...transcriptionActions])}{/snippet}
-
-{#snippet editItems()}
-    {#each editActions as action, index (index)}
-        {#if action === null}<Menubar.Separator />
-        {:else}
-            <Menubar.Item class="activable focusable" disabled={!availableEdits[action]} onSelect={() => runEdit(action)}>
-                <div>{i18n.t(`menu.edit.${action}`)}</div>
-                <kbd>{editShortcut(action)}</kbd>
-            </Menubar.Item>
-        {/if}
-    {/each}
-{/snippet}
-
-{#snippet playItems()}{@render commandItems(playActions)}{/snippet}
-{#snippet miscItems()}{@render commandItems(miscActions)}{/snippet}
 
 
 <style>
@@ -241,45 +223,12 @@
     import { editAvailable, runEdit as performEdit } from "../../edit";
     import { isTranscriptEditorTarget } from "../../editor/transcript";
     import { shortcut, editShortcut, registerMenu } from "../../keybindings";
-    import * as transcription from "../../states/transcription.svelte";
+    import { editActions, menuGroups as menus, menuItems, type MenuGroup } from "../../menuModel";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as menu from "../../states/menu.svelte";
     import * as modal from "../../states/modal.svelte";
 
     const selectedMediaId = $derived(mediaSelection.get());
-    const selectedTask = $derived(selectedMediaId ? transcription.getTask(selectedMediaId) : null);
-    const transcriptionCommand = $derived<Command>({
-        kind: selectedTask?.status === "failed" ? "reviewTranscriptionError" : transcription.isPending(selectedTask) ? "stopTranscription" : "openTranscriptionConfig",
-        mediaId: selectedMediaId
-    });
-    const projectActions: readonly (Command | null)[] = [
-        { kind: "newProject" }, { kind: "openProject" }, { kind: "saveProject" }, { kind: "saveProjectAs" }, { kind: "closeProject" }
-    ];
-    const transcriptionActions: readonly (Command | null)[] = [
-        { kind: "openPanel", panel: "vocabulary" }, { kind: "openPanel", panel: "tasks" }, null,
-        { kind: "openPanel", panel: "transcription-backends" }, { kind: "openPanel", panel: "transcription-models" }, { kind: "openPanel", panel: "transcription-presets" }
-    ];
-    const editActions: readonly (EditAction | null)[] = ["undo", "redo", null, "cut", "copy", "paste", null, "selectAll"];
-    const playActions: readonly (Command | null)[] = [
-        { kind: "playSelectedMedia" }, { kind: "cyclePlaybackMode" }, null,
-        { kind: "selectAdjacentMedia", direction: -1 }, { kind: "selectAdjacentMedia", direction: 1 }, null,
-        { kind: "rewindSelectedMedia" }, { kind: "seekAdjacentWord", direction: -1 }, { kind: "seekAdjacentWord", direction: 1 }, null,
-        { kind: "toggleVolumeStabilization" }, { kind: "restorePlaybackSpeed" }
-    ];
-    const miscActions: readonly (Command | null)[] = [
-        { kind: "openPanel", panel: "settings" }, { kind: "openDevTools" }, null,
-        { kind: "openPanel", panel: "guide" }, { kind: "openProjectRepository" }, { kind: "openPanel", panel: "licenses" }, { kind: "openPanel", panel: "about" },
-        null, { kind: "quitApp" }
-    ];
-
-    const menus = [
-        { value: "project", label: "menu.project.title", items: projectItems },
-        { value: "media", label: "menu.media.title", items: mediaItems },
-        { value: "transcription", label: "menu.transcription.title", items: transcriptionItems },
-        { value: "edit", label: "menu.edit.title", items: editItems },
-        { value: "play", label: "menu.playback.title", items: playItems },
-        { value: "misc", label: "menu.other.title", items: miscItems }
-    ] as const;
 
     const keyboard = new IsUsingKeyboard();
     let menuRoot = $state<HTMLDivElement | null>(null);

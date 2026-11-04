@@ -44,6 +44,21 @@
         },
         "playback": {
             "title": "播放"
+        },
+        "window": {
+            "title": "窗口"
+        },
+        "help": {
+            "title": "帮助"
+        },
+        "system": {
+            "services": "服务",
+            "hide": "隐藏 Vestige",
+            "hideOthers": "隐藏其他",
+            "unhide": "全部显示",
+            "minimize": "最小化",
+            "zoom": "缩放",
+            "front": "前置全部窗口"
         }
     },
     "player": {
@@ -127,6 +142,10 @@
         "empty": {
             "description": "拖入媒体文件、<action/>或按下 <shortcut/> 导入媒体。",
             "importAction": "点击此处"
+        },
+        "removeConfirmation": {
+            "title": "从项目中移除“{{name}}”？",
+            "description": "它的转写结果和校对修改将从项目中移除，媒体文件本身不会被删除。"
         }
     },
     "project": {

@@ -1,4 +1,4 @@
-import { app, type WebContents } from "electron";
+import { app, type BrowserWindow } from "electron";
 import { appChannels } from "../shared/ipc";
 import { type EditAction } from "../shared/app";
 import { type LogDirectory } from "./logging";
@@ -6,8 +6,11 @@ import { handle, listen } from "./util/ipc";
 import { type OperationResult } from "../shared/failure";
 import { isSystemError } from "./util/file";
 import { fileOperationFailure } from "./util/fs";
+import { revealWindow } from "./ui/visibility";
 
-export function registerAppIPCs(contents: WebContents, logs: LogDirectory): void {
+export function registerAppIPCs(window: BrowserWindow, logs: LogDirectory): void {
+    const contents = window.webContents;
+    listen(contents, appChannels.revealWindow, () => revealWindow(window));
     listen(contents, appChannels.edit, (action: unknown) => {
         if (typeof action !== "string" || !["selectAll", "undo", "redo", "cut", "copy", "paste"].includes(action)) return;
         contents[action as EditAction]();

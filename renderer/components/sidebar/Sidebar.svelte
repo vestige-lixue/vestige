@@ -3,7 +3,7 @@
     style:min-width={`${minWidth}px`}
     style:max-width={maxWidth}
 >
-    <div class="logo">
+    <div class="logo" class:hide-logo={hideLogo} bind:contentRect={logoBounds}>
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html logo}
     </div>
@@ -67,6 +67,9 @@
         padding: 0 12px 0 calc(env(titlebar-area-x) + 16px);
         margin-bottom: var(--drag-region-margin);
     }
+    .logo.hide-logo :global(svg) {
+        visibility: hidden;
+    }
     .logo :global(svg) {
         display: block;
         width: auto;
@@ -79,6 +82,9 @@
 
 
 <script lang="ts">
+    let logoBounds = $state<DOMRectReadOnly>();
+    const hideLogo = $derived(!!logoBounds && logoBounds.width < logoBounds.height * 1092 / 417 * 0.6);
+
     import logo from "../../../resources/logos/logo-black.svg?raw";
     import MediaList from "./MediaList.svelte";
     import SideNav from "./SideNav.svelte";

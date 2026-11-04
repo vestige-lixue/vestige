@@ -1,6 +1,19 @@
 import { type EditAction } from "../shared/app";
 import { handleTranscriptEdit, handleTranscriptMenuEdit, isTranscriptEditorTarget, transcriptEditAvailable, transcriptEditorTarget } from "./editor/transcript";
 
+const editStateListeners = new Set<() => void>();
+
+export function onEditStateChanged(listener: () => void): () => void {
+    editStateListeners.add(listener);
+    return () => {
+        editStateListeners.delete(listener);
+    };
+}
+
+export function notifyEditStateChanged(): void {
+    for (const listener of editStateListeners) listener();
+}
+
 function editTarget(target: HTMLElement | null): HTMLElement | null {
     if (target && (target.matches("input, textarea") || target.isContentEditable || isTranscriptEditorTarget(target))) return target;
     return transcriptEditorTarget();

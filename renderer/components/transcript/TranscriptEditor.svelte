@@ -270,6 +270,7 @@
     import * as transcript from "../../states/transcript.svelte";
     import * as projectAPI from "../../states/project";
     import { runCommand } from "../../states/commands";
+    import { notifyEditStateChanged } from "../../edit";
     import * as i18n from "../../i18n.svelte";
 
     let { vestige, run, onInspect }: { vestige: Vestige; run: Run; onInspect?: (information: InspectionInformation | null) => void } = $props();
@@ -380,15 +381,21 @@
             }
         }));
         editor = instance;
+        instance.on("transaction", ({ transaction }) => {
+            if (transaction.docChanged || transaction.selectionSet) notifyEditStateChanged();
+        });
+        notifyEditStateChanged();
         return () => {
             window.removeEventListener("keydown", inspectionKeydown, true);
             instance.destroy();
+            notifyEditStateChanged();
             inspect(null);
         };
     });
 
     $effect(() => {
         editor?.setEditable(!project.projectState.locked, false);
+        untrack(notifyEditStateChanged);
         const labels = {
             expand: i18n.t("transcript.information.expand"), collapse: i18n.t("transcript.information.collapse")
         };

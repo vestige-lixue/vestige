@@ -1,6 +1,6 @@
 import { app, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
-import { appChannels } from "../shared/ipc";
+import { appChannels, menuChannels } from "../shared/ipc";
 import { listen } from "./util/ipc";
 
 let checkBeforeQuit: (() => Promise<boolean>) | null = null;
@@ -94,6 +94,11 @@ export function registerWindowLifecycle(window: BrowserWindow, prepareClose: () 
     window.on("close", event => {
         if (allowClose || allowQuit) return;
         event.preventDefault();
+        if (process.platform === "darwin") {
+            window.hide();
+            if (!contents.isDestroyed()) contents.send(menuChannels.hiddenByClose);
+            return;
+        }
         if (closing) return;
         closing = true;
         checkClose().then(block => {

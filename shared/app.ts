@@ -10,12 +10,20 @@ import { type TaskSnapshot } from "./task";
 import { type DocumentationResult, type DocumentationKind } from "./documentation";
 import { type DownloadListResult, type DownloadStartResult, type DownloadKind } from "./downloads";
 import { type OperationResult } from "./failure";
+import { type NativeMenuState } from "./menu/NativeMenu";
 
 export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
 
 export type AppAPI = {
     platform: NodeJS.Platform;
     ready(): void;
+    revealWindow(): void;
+    onHiddenByClose(listener: () => void): () => void;
+    menu: {
+        update(state: NativeMenuState): void;
+        onCommand(listener: (id: string) => void): () => void;
+        setDocumentEdited(edited: boolean): void;
+    };
     openDevTools(): void;
     supportsMica(): Promise<boolean>;
     quit(): void;

@@ -7,7 +7,12 @@
     <ApplicationDialogs />
     <Sidebar />
     <div>
-        <Menu />
+        {#if window.api.platform === "darwin"}
+            <NativeMenu />
+            <TitleBar />
+        {:else}
+            <Menu />
+        {/if}
         <main bind:contentBoxSize={null, sizes => availableHeight = sizes?.[0]?.blockSize ?? 0}>
             <Player {availableHeight} />
             <Transcript />
@@ -40,6 +45,8 @@
     import * as mediaSession from "../../states/mediaSession.svelte";
     import { Tooltip } from "bits-ui";
     import Menu from "./Menu.svelte";
+    import NativeMenu from "./NativeMenu.svelte";
+    import TitleBar from "./TitleBar.svelte";
     import Player from "../player/Player.svelte";
     import Sidebar from "../sidebar/Sidebar.svelte";
     import FileDropOverlay from "./FileDropOverlay.svelte";

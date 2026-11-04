@@ -4,6 +4,7 @@ import iconWhite from "../../resources/logos/logo-square-white.png?asset";
 import windowsIconBlack from "../../resources/logos/logo-square-black.ico?asset";
 import windowsIconWhite from "../../resources/logos/logo-square-white.ico?asset";
 import { type LogFile } from "../logging";
+import { ignoreMenuShortcut } from "./menu";
 
 function openExternal(url: string): void {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(console.error);
@@ -39,10 +40,9 @@ export function registerWindowBehavior(window: BrowserWindow, packaged: boolean,
     });
     contents.on("before-input-event", (event, input) => {
         const command = input.control || input.meta;
-        // Disable native reload/close/quit shortcuts while keeping page key events.
-        contents.setIgnoreMenuShortcuts(
-            command && (input.code === "KeyR" || input.code === "KeyW" || input.key.toLowerCase() === "q")
-        );
+        // Custom macOS commands display accelerators but retain the renderer's input semantics.
+        contents.setIgnoreMenuShortcuts(process.platform === "darwin" ? ignoreMenuShortcut(contents, input)
+            : command && (input.code === "KeyR" || input.code === "KeyW" || input.key.toLowerCase() === "q"));
         if (input.type !== "keyDown") return;
         if (input.code === "F12" && !input.control && !input.meta && !input.alt && !input.shift) {
             event.preventDefault();

@@ -183,6 +183,7 @@ type CommandOf<Kind extends Command["kind"]> = Command & { kind: Kind };
 type CommandDefinition<Kind extends Command["kind"]> = {
     run: (command: CommandOf<Kind>) => void;
     enabled: (command: CommandOf<Kind>) => boolean;
+    allowedWhileBlocked?: boolean;
     label: (command: CommandOf<Kind>) => string;
 };
 
@@ -221,7 +222,7 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
     closeProject: { run: () => void projectAPI.close(), enabled: hasProject, label: label("common.close") },
     quitApp: {
         run: () => window.api.quit(),
-        enabled: always, label: label("menu.other.quit")
+        enabled: always, allowedWhileBlocked: true, label: label("menu.other.quit")
     },
     importMedia: { run: () => void projectAPI.selectMediaForImport(), enabled: always, label: label("menu.media.import") },
     openPanel: { run: command => openPanel(command.panel), enabled: always, label: command => i18n.t(panelLabels[command.panel]) },
@@ -338,7 +339,8 @@ function definition<Kind extends Command["kind"]>(kind: Kind): CommandDefinition
 }
 
 export function commandDisabled(command: Command): boolean {
-    return !definition(command.kind).enabled(command);
+    const current = definition(command.kind);
+    return !current.allowedWhileBlocked && interfaceBlocked() || !current.enabled(command);
 }
 
 export function commandLabel(command: Command): string {
@@ -346,5 +348,5 @@ export function commandLabel(command: Command): string {
 }
 
 export function runCommand(command: Command): void {
-    if (!interfaceBlocked() && !commandDisabled(command)) definition(command.kind).run(command);
+    if (!commandDisabled(command)) definition(command.kind).run(command);
 }

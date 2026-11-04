@@ -44,6 +44,21 @@
         },
         "playback": {
             "title": "Playback"
+        },
+        "window": {
+            "title": "Window"
+        },
+        "help": {
+            "title": "Help"
+        },
+        "system": {
+            "services": "Services",
+            "hide": "Hide Vestige",
+            "hideOthers": "Hide others",
+            "unhide": "Show all",
+            "minimize": "Minimize",
+            "zoom": "Zoom",
+            "front": "Bring all to front"
         }
     },
     "player": {
@@ -127,6 +142,10 @@
         "empty": {
             "description": "Drag in media files, <action/>, or press <shortcut/> to import.",
             "importAction": "click here"
+        },
+        "removeConfirmation": {
+            "title": "Remove “{{name}}” from the project?",
+            "description": "Its transcripts and edits will be removed from this project. The media file itself is not deleted."
         }
     },
     "project": {

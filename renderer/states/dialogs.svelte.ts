@@ -41,6 +41,12 @@ type SwitchDisplayedRunDialog = {
     onConfirm: () => void;
 };
 
+type RemoveMediaDialog = {
+    kind: "remove-media";
+    mediaId: string;
+    onConfirm: () => void;
+};
+
 type TranscriptionPresetsDialog = {
     kind: "transcription-presets";
     selectedName?: string;
@@ -96,6 +102,7 @@ export type DialogDescriptor = (
     TranscriptionTasksDialog |
     TranscriptionConfigDialog |
     SwitchDisplayedRunDialog |
+    RemoveMediaDialog |
     TranscriptionPresetsDialog |
     SaveConfirmationDialog |
     SaveFailureDialog |

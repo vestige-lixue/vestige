@@ -6,5 +6,6 @@ export const appChannels = {
     beforeQuit: "app:before-quit",
     beforeQuitResult: "app:before-quit-result",
     openDevTools: "window:open-devtools",
-    supportsMica: "window:supports-mica"
+    supportsMica: "window:supports-mica",
+    revealWindow: "window:reveal"
 } as const;

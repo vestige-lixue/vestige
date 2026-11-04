@@ -1,4 +1,4 @@
-export type Shortcut = { key: string; mod?: boolean; alt?: boolean; shift?: boolean };
+import { type Shortcut } from "../shared/shortcuts";
 
 export function formatShortcut(shortcut: Shortcut, mac: boolean): string {
     const key = shortcut.key.toLowerCase();

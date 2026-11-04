@@ -11,6 +11,7 @@ import UserGuide from "../dialogs/UserGuide.svelte";
 import ParameterGuide from "../dialogs/ParameterGuide.svelte";
 import TranscriptionConfig from "../dialogs/TranscriptionConfig.svelte";
 import SwitchDisplayedRun from "../dialogs/SwitchDisplayedRun.svelte";
+import RemoveMedia from "../dialogs/RemoveMedia.svelte";
 import TranscriptionPresets from "../dialogs/TranscriptionPresets.svelte";
 import SaveConfirmation from "../dialogs/SaveConfirmation.svelte";
 import SaveFailure from "../dialogs/SaveFailure.svelte";
@@ -49,6 +50,7 @@ const registry: { [Kind in DialogKind]: Presenter<Kind> } = {
         tasks: dialog.getTasks(), focusTaskId: dialog.focusTaskId, onStop: dialog.onStop, onRetry: dialog.onRetry, onRemove: dialog.onRemove
     })),
     transcription: define("transcription", TranscriptionConfig, dialog => ({ dialogId: dialog.id, mediaId: dialog.mediaId })),
+    "remove-media": define("remove-media", RemoveMedia, dialog => ({ mediaId: dialog.mediaId, onConfirm: dialog.onConfirm })),
     "switch-displayed-run": define("switch-displayed-run", SwitchDisplayedRun, dialog => ({ onConfirm: dialog.onConfirm })),
     "transcription-presets": define("transcription-presets", TranscriptionPresets, dialog => ({
         dialogId: dialog.id, selectedName: dialog.selectedName, onApply: dialog.onApply
