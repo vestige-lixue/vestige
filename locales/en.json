@@ -6,7 +6,8 @@
         "browse": "Browse",
         "save": "Save",
         "retry": "Retry",
-        "confirmAgain": "Click again to confirm"
+        "confirmAgain": "Click again to confirm",
+        "clear": "Clear"
     },
     "colorPicker": {
         "hex": "Hex",
@@ -66,18 +67,18 @@
             "play": "Play",
             "pause": "Pause",
             "rewind": "Rewind",
-            "cycleMode": "Switch",
+            "cycleMode": "Change mode",
             "enableStabilization": "Enable volume stabilization",
             "disableStabilization": "Disable volume stabilization",
             "restoreSpeed": "Restore playback speed",
             "focusSlider": "Focus slider",
-            "previousMedia": "Previous media",
-            "nextMedia": "Next media",
+            "previousMedia": "Previous file",
+            "nextMedia": "Next file",
             "previousWord": "Previous word",
             "nextWord": "Next word"
         },
         "modes": {
-            "single": "Play one",
+            "single": "Stop after current",
             "sequential": "Play in order",
             "repeat-all": "Repeat all",
             "repeat-one": "Repeat one"
@@ -105,10 +106,10 @@
                 },
                 "guidance": {
                     "sameContent": "Choose a file with the same content as the original media. Import different content as new media.",
-                    "restoreFile": "Restore the file and retry, or locate it at its new location."
+                    "restoreFile": "Restore the file and retry, or point to its new location."
                 },
                 "originalPath": "\nOriginal project path: {{path}}",
-                "description": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\nIgnoring keeps this media and its transcripts. You can also remove it from the sidebar."
+                "description": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\nChoose Ignore to keep this media file and its transcripts, or remove it from the sidebar."
             }
         },
         "renameHint": "Double-click to rename",
@@ -117,7 +118,7 @@
             "video": "Video"
         },
         "actions": {
-            "skip": "Skip media",
+            "skip": "Skip media list",
             "remove": "Remove from project",
             "moveEarlier": "Move earlier",
             "moveLater": "Move later"
@@ -150,7 +151,7 @@
     },
     "project": {
         "unsaved": {
-            "name": "<Unsaved>",
+            "name": "Untitled",
             "hint": "Not saved yet. Click to save."
         },
         "saveConfirmation": {
@@ -173,20 +174,20 @@
         },
         "operationFailure": {
             "title": "Operation failed",
-            "pendingImports": "Some media are still being imported. Cancel their imports using the remove buttons in the sidebar, or wait for them to finish before saving or closing the project.",
+            "pendingImports": "Some media are still importing. Cancel them in the sidebar, or wait for them to finish before saving or closing the project.",
             "activeTranscriptions": "Transcription tasks are still running. Stop them or wait for them to finish before closing or switching projects.",
             "activeDownloads": "Downloads are still running. Cancel them in Manage backends or Manage models, or wait for them to finish before quitting.",
             "readFailed": "Could not read project “{{path}}”. Error:\n{{error}}"
         },
         "quitWithImports": {
             "title": "Cancel imports and quit?",
-            "description": "Some media are still being imported. Choosing “Quit anyway” continues to the project save step. Unfinished imports will be cancelled when quitting is confirmed; cancelling quitting resumes them.",
+            "description": "Some media are still importing. “Quit anyway” moves on to saving the project. Imports are cancelled only once quitting is confirmed; if you cancel quitting, they keep going.",
             "quit": "Quit anyway"
         },
         "saveFailure": {
             "title": "Save failed",
             "actions": {
-                "editInMemory": "Keep editing in memory",
+                "editInMemory": "Keep editing without saving",
                 "saveAs": "Save as…"
             },
             "description": "Could not save to “{{name}}”.\n{{error}}\nSave to a different file?"
@@ -227,18 +228,18 @@
             "saveError": "Could not save presets: {{error}}"
         },
         "config": {
-            "submit": "New transcription",
+            "submit": "Start transcription",
             "title": "Transcription configuration",
             "executor": {
                 "label": "Executor"
             },
             "modelDirectory": {
-                "label": "Model directory",
-                "required": "Choose a model directory."
+                "label": "Model folder",
+                "required": "Choose a model folder."
             },
             "backendDirectory": {
-                "required": "Choose a backend directory.",
-                "label": "Backend directory"
+                "required": "Choose a backend folder.",
+                "label": "Backend folder"
             },
             "preset": {
                 "label": "Preset",
@@ -247,8 +248,8 @@
         },
         "actions": {
             "new": "New transcription",
-            "reviewFailure": "Transcription error details",
-            "cancelQueued": "Cancel",
+            "reviewFailure": "View error details",
+            "cancelQueued": "Cancel transcription",
             "stop": "Stop transcription"
         },
         "tasks": {
@@ -282,7 +283,7 @@
                 "remove": "Remove parameter"
             },
             "guide": {
-                "title": "Quick reference"
+                "title": "Parameter reference"
             }
         },
         "vocabulary": {
@@ -295,29 +296,27 @@
             "insert": "Insert"
         },
         "information": {
-            "tokenProbability": "Prob:",
-            "blankProbability": "No-speech:",
-            "deletion": "Deleted",
-            "gap": "No speech",
+            "tokenProbability": "Confidence",
+            "blankProbability": "No speech",
+            "gap": "No-speech gaps",
             "gaps": "{{count}} ({{duration}}s)",
             "restore": "Restore deleted text",
             "align": "Align with original",
-            "expand": "Expand deletion",
-            "collapse": "Collapse deletion",
-            "toggleSelectionDeletions": "Expand/collapse deletions in selection",
-            "estimated": "Estimated: "
+            "expand": "Expand deleted text",
+            "collapse": "Collapse deleted text",
+            "toggleSelectionDeletions": "Expand/collapse deleted text in selection"
         },
         "runs": {
             "title": "Transcriptions",
             "empty": "No transcriptions",
             "actions": {
                 "remove": "Delete this transcription",
-                "removeWithEdits": "Delete this transcription and edits on it"
+                "removeWithEdits": "Delete this transcription and its edits"
             }
         },
         "switchRun": {
             "title": "Switch displayed result",
-            "description": "Switching the displayed result will remove all text edits.",
+            "description": "Switching will discard all your edits.",
             "confirm": "Discard edits and switch"
         },
         "emptyMedia": "This media has no transcript yet.",
@@ -352,21 +351,21 @@
             },
             "mediaPathMode": {
                 "label": "Media path storage mode",
-                "description": "Relative paths start from the project file. Applies to all future saves.",
+                "description": "Relative paths start from the project file’s folder. Takes effect from the next save.",
                 "options": {
                     "absolute": "Absolute",
-                    "project": "Relative when in project folder",
+                    "project": "Relative inside project folder",
                     "relative": "Relative whenever possible"
                 },
                 "descriptions": {
-                    "absolute": "Save every media with its absolute path.",
+                    "absolute": "Use absolute paths for all media files.",
                     "project": "Use relative paths for media beside the project file or in its subfolders, and absolute paths for other media.",
-                    "relative": "Save every media with its relative path when possible. Use absolute paths otherwise."
+                    "relative": "Use relative paths for all media files when possible, and absolute paths otherwise."
                 }
             },
             "compressProjectFiles": {
                 "label": "Compress project files",
-                "description": "Remove whitespaces in JSON to reduce file size, but decreases readability."
+                "description": "Remove whitespace from the JSON to reduce file size, at the cost of readability."
             },
             "clearLogs": {
                 "label": "Clear logs",
@@ -384,17 +383,17 @@
         "editing": {
             "referenceOverlap": {
                 "label": "Reference overlap threshold",
-                "description": "Show text from other Runs when its overlap reaches this percentage of the shorter time range.",
+                "description": "Offer text from other transcriptions under “Replace with” and “Insert” when its time overlap with the target reaches this percentage of the shorter duration.",
                 "invalid": "The overlap threshold must be an integer from 0 to 100."
             },
-            "title": "Edit",
+            "title": "Editing",
             "followPlayback": {
                 "label": "Follow playback",
                 "description": "Scroll the transcript to keep the playing text in view, the same way it follows the caret."
             },
             "informationDisplay": {
                 "label": "Information display",
-                "description": "Choose where token probabilities, original text and audio ranges appear.",
+                "description": "Choose where confidence, original text and time ranges appear.",
                 "options": {
                     "tooltip": "Tooltip",
                     "bar": "Information bar"
@@ -406,7 +405,7 @@
             },
             "hideTrivialInformation": {
                 "label": "Hide unremarkable probabilities",
-                "description": "Leave probabilities out of tooltips for tokens at 100% with 0% no-speech, and for no-speech gaps."
+                "description": "Leave probabilities out of tooltips for tokens at 100% confidence and 0% no-speech, and for no-speech gaps."
             }
         },
         "playback": {
@@ -423,7 +422,7 @@
             },
             "volumeSliderMapping": {
                 "label": "Volume slider mapping",
-                "description": "Equal dB steps help distinguish quiet sounds, but damage the relationship between volume adjustment and perceived loudness.",
+                "description": "Equal dB steps help distinguish quiet sounds, but the slider then no longer tracks perceived loudness.",
                 "options": {
                     "amplitude": "Equal amplitude steps",
                     "decibel": "Equal dB steps"
@@ -435,24 +434,24 @@
                 "invalid": "Enter a number no greater than {{max}}."
             },
             "mediaSwitchPlayback": {
-                "label": "Play state after switching media"
+                "label": "Playback after switching media"
             },
             "wordSwitchPlayback": {
-                "label": "Play state after switching word"
+                "label": "Playback after jumping to a word"
             },
             "rememberPlaybackPosition": {
                 "label": "Remember playback progress",
-                "description": "Save playback progress in the project. Resume from the saved position when switching media."
+                "description": "Save each media file’s playback position in the project, and resume from it when you switch back."
             },
             "pauseOnOutputDeviceChange": {
-                "label": "Pause on audio output device changes",
+                "label": "Pause when the audio output device changes",
                 "description": "Pause playback when the system default audio output device changes or disconnects.\nPlayback will be paused regardless, if audio output device is taken by another device."
             },
             "switchPlayback": {
                 "options": {
                     "pause": "Pause",
                     "play": "Play",
-                    "keep": "Keep unchanged",
+                    "keep": "Keep current",
                     "invert": "Toggle"
                 }
             },
@@ -463,19 +462,19 @@
                 "start": "Start test",
                 "end": "End test",
                 "instruction": "Press the button on the third beat.\nOnce calibrated, the moving line should cross the thick line exactly when you hear the third beat.",
-                "tap": "TAP",
+                "tap": "Tap",
                 "failed": "Could not play the test audio. Check your audio output device and try again."
             },
             "showLevelMeter": {
-                "label": "Show audio levels"
+                "label": "Show level meter"
             },
             "levelMeterReadout": {
-                "label": "Audio level readout",
-                "description": "The selected level is also used for the full-scale indicator.",
+                "label": "Level meter source",
+                "description": "The clipping indicator also follows this point.",
                 "options": {
                     "source": "Source",
-                    "project": "Project",
-                    "monitor": "Monitor"
+                    "project": "After stabilization",
+                    "monitor": "Output"
                 }
             }
         },
@@ -498,11 +497,11 @@
                 "description": "Higher values make the sidebar background more transparent."
             },
             "schemes": {
-                "light": "Light Theme",
-                "dark": "Dark Theme"
+                "light": "Light colors",
+                "dark": "Dark colors"
             },
             "actions": {
-                "reset": "Reset to default"
+                "reset": "Reset colors"
             },
             "colors": {
                 "--c-accent": "Accent color",
@@ -510,13 +509,13 @@
                 "--c-surface": "Secondary background",
                 "--c-text": "Primary text",
                 "--c-text-80p": "Secondary text",
-                "--c-audio-level": "Audio level"
+                "--c-audio-level": "Level meter"
             }
         },
         "advanced": {
-            "title": "Advanced settings",
+            "title": "Advanced",
             "volumeStabilization": {
-                "title": "Volume Stabilization",
+                "title": "Volume stabilization",
                 "maxGainDb": {
                     "label": "Maximum boost",
                     "description": "Limit how much quiet audio is amplified. Higher values may make background noise louder."
@@ -535,45 +534,45 @@
                 },
                 "targetLevelDb": {
                     "label": "Target level",
-                    "description": "The average level automatic gain aims for (subjects to the maximum boost and peak limit)."
+                    "description": "The average level automatic gain aims for (subject to the maximum boost and peak limit)."
                 }
             }
         }
     },
     "fileDrop": {
         "release": "Drop to import files",
-        "formats": "Media files, folders of media files, or one .vestige project"
+        "formats": "Media files, folders of media files, or a single .vestige project"
     },
     "downloads": {
         "models": {
             "actions": {
                 "openDirectory": "Open model folder"
             },
-            "description": "Download a built-in model below, or download one yourself and arrange its files as described in the <guide/>.",
-            "title": "Built-in models",
+            "description": "Download a model below, or download one yourself and arrange its files as described in the <guide/>.",
+            "title": "Available models",
             "details": {
-                "whisperTiny": "For whisper.cpp. Fast multilingual transcription with the lowest resource use, suited to modest hardware with limited accuracy. CPU supported; GPU weights use about 0.07 GiB.",
-                "whisperBase": "For whisper.cpp. Lightweight multilingual transcription, more accurate than Tiny and suited to clear speech. CPU supported; GPU weights use about 0.14 GiB.",
-                "whisperSmall": "For whisper.cpp. Multilingual transcription balancing accuracy and speed with moderate resource use. CPU supported; GPU weights use about 0.45 GiB.",
-                "whisperLargeV3": "For whisper.cpp. Multilingual transcription focused on accuracy, with slower processing and high resource use. CPU supported; GPU weights use about 2.88 GiB.",
-                "whisperLargeV3Turbo": "For whisper.cpp. Faster than Large v3 with a small accuracy tradeoff; repetition and hallucinations remain possible. CPU supported; GPU weights use about 1.51 GiB.",
-                "paraformerZh": "For sherpa-onnx. Fast, non-autoregressive recognition focused on Chinese, including mixed Chinese and English speech. Moderate resource use; runs on CPU; GPU weights use about 0.77 GiB.",
-                "senseVoiceSmall": "For sherpa-onnx. Fast recognition of Mandarin, Cantonese, English, Japanese and Korean, with text timestamps. Low resource use with INT8; CPU preferred; GPU weights use about 0.22 GiB.",
-                "fireRedAsr2Ctc": "For sherpa-onnx. CTC recognition for Chinese, English, mixed speech and Chinese dialects, with text timestamps. Moderate resource use with INT8; CPU preferred; GPU weights use about 0.72 GiB.",
-                "qwen3Asr06b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on efficiency, with moderate INT8 memory use and CPU support; GPU weights use about 0.92 GiB; text timestamps are currently unavailable.",
-                "qwen3Asr17b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on accuracy, with higher INT8 memory use, slower processing and CPU support; GPU weights use about 2.23 GiB; text timestamps are currently unavailable."
+                "whisperTiny": "For whisper.cpp. Fast multilingual transcription with the lowest resource use, suited to modest hardware with limited accuracy. Runs on CPU; on GPU, weights take about 0.07 GiB of memory.",
+                "whisperBase": "For whisper.cpp. Lightweight multilingual transcription, more accurate than Tiny and suited to clear speech. Runs on CPU; on GPU, weights take about 0.14 GiB of memory.",
+                "whisperSmall": "For whisper.cpp. Multilingual transcription balancing accuracy and speed with moderate resource use. Runs on CPU; on GPU, weights take about 0.45 GiB of memory.",
+                "whisperLargeV3": "For whisper.cpp. Multilingual transcription focused on accuracy, with slower processing and high resource use. Runs on CPU; on GPU, weights take about 2.88 GiB of memory.",
+                "whisperLargeV3Turbo": "For whisper.cpp. Faster than Large v3 with a small accuracy tradeoff; repetition and hallucinations remain possible. Runs on CPU; on GPU, weights take about 1.51 GiB of memory.",
+                "paraformerZh": "For sherpa-onnx. Fast, non-autoregressive recognition focused on Chinese, including mixed Chinese and English speech. Moderate resource use; runs on CPU; on GPU, weights take about 0.77 GiB of memory.",
+                "senseVoiceSmall": "For sherpa-onnx. Fast recognition of Mandarin, Cantonese, English, Japanese and Korean, with text timestamps. Low resource use with INT8; CPU recommended; on GPU, weights take about 0.22 GiB of memory.",
+                "fireRedAsr2Ctc": "For sherpa-onnx. CTC recognition for Chinese, English, mixed speech and Chinese dialects, with text timestamps. Moderate resource use with INT8; CPU recommended; on GPU, weights take about 0.72 GiB of memory.",
+                "qwen3Asr06b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on efficiency, with moderate INT8 memory use and CPU support; on GPU, weights take about 0.92 GiB of memory; text timestamps are currently unavailable.",
+                "qwen3Asr17b": "For sherpa-onnx. Supports 30 languages and Chinese dialects, including singing and songs with accompaniment. Focuses on accuracy, with higher INT8 memory use, slower processing and CPU support; on GPU, weights take about 2.23 GiB of memory; text timestamps are currently unavailable."
             }
         },
         "loading": "Loading downloads…",
         "backends": {
-            "title": "Built-in backends",
+            "title": "Available backends",
             "actions": {
                 "openDirectory": "Open backend folder"
             },
-            "description": "Download a built-in backend below, or download one yourself and arrange its files as described in the <guide/>."
+            "description": "Download a backend below, or download one yourself and arrange its files as described in the <guide/>."
         },
-        "estimatedSize": " ({{size}} MiB)",
-        "empty": "No built-in downloads are available for this platform.",
+        "estimatedSize": " (~{{size}} MiB)",
+        "empty": "No downloads are available for this platform.",
         "status": {
             "installed": "Installed",
             "loading": "Loading download status…",
@@ -643,12 +642,12 @@
         },
         "directories": {
             "model": {
-                "title": "Choose model directory",
-                "confirm": "Choose model directory"
+                "title": "Choose model folder",
+                "confirm": "Choose model folder"
             },
             "backend": {
-                "title": "Choose backend directory",
-                "confirm": "Choose backend directory"
+                "title": "Choose backend folder",
+                "confirm": "Choose backend folder"
             }
         }
     },
@@ -666,7 +665,7 @@
             "noDuration": "The media duration could not be determined.",
             "timeout": "Reading media information timed out. Please retry.",
             "format": "Unsupported media format.",
-            "invalidReference": "A media file size and modification time are required.",
+            "invalidReference": "A valid media file size and hash are required.",
             "invalidCheckId": "A unique media check ID is required.",
             "invalidConcurrency": "Media import concurrency must be a positive integer.",
             "invalidImport": "A pending, unique media import is required.",
@@ -675,11 +674,11 @@
         "transcription": {
             "mediaUnavailable": "The media file is unavailable or has moved. Please configure transcription again.",
             "cancelled": "Transcription cancelled.",
-            "invalidRequest": "A transcription request is required.",
+            "invalidRequest": "A valid transcription request is required.",
             "invalidId": "A unique transcription task ID is required.",
             "paramsObject": "Parameters must be a JSON object.",
             "paramValue": "Parameter values must be strings.",
-            "paramNull": "Parameter values must not contain null characters.",
+            "paramNull": "Parameter values must not contain NUL characters.",
             "unknownExecutor": "Unknown executor: {{executor}}",
             "emptyPath": "{{field}} must be a non-empty path.",
             "invalidResult": "Could not parse the executor's JSON result.",
@@ -689,7 +688,7 @@
             "truncatedOutput": "The model truncated the audio or generated text. No transcript was saved. Check custom hotwords and model parameters.",
             "unstableOutput": "The model still repeated or truncated its output for {{start}}–{{end}} s after retrying shorter parts. No transcript was saved. Try another model or adjust its parameters.",
             "invalidOption": "Invalid option name: {{option}}",
-            "managedOption": "Option {{option}} is managed by Vestige.",
+            "managedOption": "Option {{option}} is set by Vestige and cannot be set manually.",
             "output": {
                 "array": "{{executor}} returned no transcription array.",
                 "text": "{{executor}} returned no transcript text.",
@@ -812,7 +811,7 @@
         }
     },
     "documentation": {
-        "path": "For agents: This document is located at {{path}}. Please do not write to it, the application will overwrite it on every startup.",
+        "path": "For agents: this document is at {{path}}. Do not edit it; the app overwrites it on every startup.",
         "loading": "Loading documentation…",
         "contents": "Contents",
         "back": "Back",

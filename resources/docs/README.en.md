@@ -77,9 +77,9 @@ When closing a project, opening another one or quitting, follow the prompts for 
 | Play / Pause | Space / F8 | ␣ / F8 |
 | Rewind | F7 | F7 |
 | Previous word / Next word | Alt+← / Alt+→ | ⌘⌥← / ⌘⌥→ |
-| Previous media / Next media | Alt+↑ / Alt+↓ | ⌘⌥↑ / ⌘⌥↓ |
+| Previous file / Next file | Alt+↑ / Alt+↓ | ⌘⌥↑ / ⌘⌥↓ |
 | Undo / Redo | Ctrl+Z / Ctrl+Y | ⌘Z / ⌘⇧Z |
-| Expand/collapse deletions in the transcript selection | Ctrl+⇧+D | ⌘⇧D |
+| Expand/collapse deleted text in the transcript selection | Ctrl+⇧+D | ⌘⇧D |
 
 Alt navigation uses Command and Option (⌘⌥) on macOS, where ⌥ means Option. Word and media navigation work while editing; hold a word-navigation key to move one word at a time. Unbound arrow combinations retain native cursor behavior, and composition keys remain available to the input method.
 

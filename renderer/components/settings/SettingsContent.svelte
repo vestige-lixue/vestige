@@ -8,7 +8,7 @@
         <div class="label">{i18n.t("settings.general.clearLogs.label")}</div>
     </div>
     <TextButton id="clear-logs" aria-labelledby="clear-logs-label" disabled={pending || clearingLogs} onclick={() => void clearLogs()}>
-        {i18n.t("settings.general.clearLogs.label")}
+        {i18n.t("common.clear")}
     </TextButton>
 </div>
 {#if logsFailure}<div class="error-message">{i18n.t("settings.general.clearLogs.error", { error: logsFailure })}</div>{/if}

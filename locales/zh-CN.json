@@ -6,7 +6,8 @@
         "browse": "浏览",
         "save": "保存",
         "retry": "重试",
-        "confirmAgain": "再次点击确认"
+        "confirmAgain": "再次点击确认",
+        "clear": "清除"
     },
     "colorPicker": {
         "hex": "颜色代码",
@@ -37,9 +38,9 @@
         },
         "other": {
             "title": "应用",
-            "quit": "退出应用",
+            "quit": "退出",
             "developerTools": "开发者工具",
-            "repository": "项目 GitHub 仓库",
+            "repository": "GitHub 仓库",
             "about": "关于"
         },
         "playback": {
@@ -65,28 +66,28 @@
         "actions": {
             "play": "播放",
             "pause": "暂停",
-            "rewind": "回退",
-            "cycleMode": "切换",
-            "enableStabilization": "开启稳定音量",
-            "disableStabilization": "关闭稳定音量",
+            "rewind": "后退",
+            "cycleMode": "切换播放模式",
+            "enableStabilization": "开启音量稳定",
+            "disableStabilization": "关闭音量稳定",
             "restoreSpeed": "还原播放速度",
-            "focusSlider": "聚焦滑动条",
-            "previousMedia": "上一媒体",
-            "nextMedia": "下一媒体",
-            "previousWord": "上一词",
-            "nextWord": "下一词"
+            "focusSlider": "聚焦滑块",
+            "previousMedia": "上一个媒体",
+            "nextMedia": "下一个媒体",
+            "previousWord": "上一个词",
+            "nextWord": "下一个词"
         },
         "modes": {
-            "single": "单项播放",
+            "single": "播完停止",
             "sequential": "顺序播放",
             "repeat-all": "列表循环",
-            "repeat-one": "单项循环"
+            "repeat-one": "单个循环"
         },
         "noMedia": "未选择媒体"
     },
     "media": {
         "reference": {
-            "checking": "正在校验",
+            "checking": "正在检查媒体",
             "actions": {
                 "ignore": "忽略",
                 "relocate": "重新定位"
@@ -96,28 +97,28 @@
                 "changed": "媒体已更改",
                 "unreadable": "无法读取媒体"
             },
-            "ignored": "{{status}} (已忽略)",
+            "ignored": "{{status}}（已忽略）",
             "failure": {
                 "title": {
                     "missing": "找不到媒体文件",
-                    "changed": "媒体文件已变化",
+                    "changed": "媒体文件已更改",
                     "unreadable": "无法读取媒体文件"
                 },
                 "guidance": {
                     "sameContent": "请选择与原媒体内容相同的文件。要使用新内容，请另行导入。",
-                    "restoreFile": "可在外部恢复文件后重试，或重定位到文件的新位置。"
+                    "restoreFile": "可在外部恢复文件后重试，或重新定位到文件的新位置。"
                 },
                 "originalPath": "\n项目原路径：{{path}}",
-                "description": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\n忽略后保留此媒体及已有转写，也可在侧栏删除此媒体。"
+                "description": "{{path}}{{original}}\n\n{{error}}\n{{guidance}}\n选择“忽略”会保留此媒体及其转写；也可以在侧栏中将它移除。"
             }
         },
-        "renameHint": "双击编辑名称",
+        "renameHint": "双击重命名",
         "types": {
             "audio": "音频",
             "video": "视频"
         },
         "actions": {
-            "skip": "跳过媒体",
+            "skip": "跳过媒体列表",
             "remove": "从项目中移除",
             "moveEarlier": "向前移动一位",
             "moveLater": "向后移动一位"
@@ -134,7 +135,7 @@
             },
             "failure": {
                 "title": "媒体导入失败",
-                "droppedFile": "拖入文件",
+                "droppedFile": "拖入的文件",
                 "description": "{{path}}\n\n{{error}}\n请确认文件可读取且为支持的音视频格式。"
             }
         },
@@ -150,7 +151,7 @@
     },
     "project": {
         "unsaved": {
-            "name": "<未保存>",
+            "name": "未命名",
             "hint": "尚未保存，点击保存"
         },
         "saveConfirmation": {
@@ -173,20 +174,20 @@
         },
         "operationFailure": {
             "title": "操作失败",
-            "pendingImports": "仍有未完成导入的媒体。请在侧栏点击删除按钮取消导入，或等待导入完成后再保存或关闭项目。",
+            "pendingImports": "仍有媒体正在导入。请在侧栏中取消这些导入，或等待导入完成后再保存或关闭项目。",
             "activeTranscriptions": "仍有正在运行的转写任务。请停止任务或等待完成后，再关闭或切换项目。",
-            "activeDownloads": "仍有正在进行的下载。请在“转写后端管理”或“转写模型管理”中取消下载，或等待完成后再退出。",
+            "activeDownloads": "仍有正在进行的下载。请在“管理转写后端”或“管理转写模型”中取消下载，或等待完成后再退出。",
             "readFailed": "无法读取项目“{{path}}”。错误信息：\n{{error}}"
         },
         "quitWithImports": {
             "title": "取消导入并退出？",
-            "description": "仍有未完成导入的媒体。选择“仍要退出”将继续处理项目保存，确认退出后才会取消所有未完成的导入；取消退出则继续导入。",
+            "description": "仍有媒体正在导入。选择“仍要退出”后会继续处理项目保存；只有确定退出时才会取消未完成的导入，中途取消退出则导入照常进行。",
             "quit": "仍要退出"
         },
         "saveFailure": {
             "title": "保存失败",
             "actions": {
-                "editInMemory": "在内存中编辑",
+                "editInMemory": "暂不保存，继续编辑",
                 "saveAs": "另存为…"
             },
             "description": "无法保存到“{{name}}”。\n{{error}}\n是否另存为其他文件？"
@@ -195,19 +196,19 @@
     "transcription": {
         "backends": {
             "actions": {
-                "manage": "转写后端管理"
+                "manage": "管理转写后端"
             },
             "title": "转写后端管理"
         },
         "models": {
             "actions": {
-                "manage": "转写模型管理"
+                "manage": "管理转写模型"
             },
             "title": "转写模型管理"
         },
         "presets": {
             "actions": {
-                "manage": "转写预设管理",
+                "manage": "管理转写预设",
                 "new": "新建预设",
                 "copy": "复制预设",
                 "remove": "删除预设",
@@ -219,26 +220,26 @@
                 "required": "请输入预设名称。",
                 "duplicate": "预设名称不能重复。"
             },
-            "builtinCannotRemove": "该预设为内置预设，不可删除",
+            "builtinCannotRemove": "内置预设不可删除。",
             "newName": "新预设",
             "copyName": "{{name}} 副本",
             "empty": "暂无转写预设",
-            "loading": "正在读取预设……",
+            "loading": "正在读取预设…",
             "saveError": "保存预设时出现错误：{{error}}"
         },
         "config": {
-            "submit": "新建转写",
+            "submit": "开始转写",
             "title": "转写配置",
             "executor": {
                 "label": "执行器"
             },
             "modelDirectory": {
-                "label": "模型目录",
-                "required": "请选择模型目录。"
+                "label": "模型文件夹",
+                "required": "请选择模型文件夹。"
             },
             "backendDirectory": {
-                "required": "请选择后端目录。",
-                "label": "后端目录"
+                "required": "请选择后端文件夹。",
+                "label": "后端文件夹"
             },
             "preset": {
                 "label": "预设",
@@ -247,8 +248,8 @@
         },
         "actions": {
             "new": "新建转写",
-            "reviewFailure": "转写失败详情",
-            "cancelQueued": "取消",
+            "reviewFailure": "查看失败原因",
+            "cancelQueued": "取消转写",
             "stop": "停止转写"
         },
         "tasks": {
@@ -282,7 +283,7 @@
                 "remove": "删除参数"
             },
             "guide": {
-                "title": "参数指南"
+                "title": "参数说明"
             }
         },
         "vocabulary": {
@@ -297,15 +298,13 @@
         "information": {
             "tokenProbability": "置信度",
             "blankProbability": "无语音",
-            "deletion": "删除",
-            "gap": "无语音",
+            "gap": "无语音段",
             "gaps": "{{count}} ({{duration}}s)",
-            "restore": "放回",
+            "restore": "恢复已删除的文字",
             "align": "与原文对齐",
-            "expand": "展开删除",
-            "collapse": "收起删除",
-            "toggleSelectionDeletions": "展开/收起选区内的删除",
-            "estimated": "预计的："
+            "expand": "展开已删除的文字",
+            "collapse": "收起已删除的文字",
+            "toggleSelectionDeletions": "展开/收起选区内已删除的文字"
         },
         "runs": {
             "title": "转写列表",
@@ -316,8 +315,8 @@
             }
         },
         "switchRun": {
-            "title": "切换显示的转录结果",
-            "description": "切换显示的转录结果将清空您的所有修改。",
+            "title": "切换显示的转写",
+            "description": "切换后将清空当前的所有修改。",
             "confirm": "清空修改并切换"
         },
         "emptyMedia": "此媒体暂无转写结果。",
@@ -336,7 +335,7 @@
             "cancel": "取消退出"
         },
         "title": "设置",
-        "loading": "正在读取设置……",
+        "loading": "正在读取设置…",
         "saveError": "保存设置时出现错误：{{error}}",
         "validation": {
             "number": "请输入 {{min}} 到 {{max}} 之间的数值。"
@@ -352,7 +351,7 @@
             },
             "mediaPathMode": {
                 "label": "媒体路径保存方式",
-                "description": "相对路径以项目文件为起点。此设置应用于以后的全部保存。",
+                "description": "相对路径以项目文件所在的文件夹为起点。从下次保存起生效。",
                 "options": {
                     "absolute": "绝对路径",
                     "project": "项目文件夹内使用相对路径",
@@ -366,7 +365,7 @@
             },
             "compressProjectFiles": {
                 "label": "压缩项目文件",
-                "description": "去除 JSON 空白符，可减少文件体积，但会降低可读性。"
+                "description": "去除 JSON 中的空白字符以减小文件体积，但会降低可读性。"
             },
             "clearLogs": {
                 "label": "清除日志",
@@ -376,15 +375,15 @@
         "transcription": {
             "title": "转写",
             "concurrency": {
-                "label": "转写并行任务数",
+                "label": "同时转写的任务数",
                 "description": "降低数量后，正在执行的任务会继续，等待中的任务按新的上限开始。",
-                "invalid": "转写并行任务数必须是 1 到 {{maximum}} 之间的整数。"
+                "invalid": "同时转写的任务数必须是 1 到 {{maximum}} 之间的整数。"
             }
         },
         "editing": {
             "referenceOverlap": {
                 "label": "参考文字重叠阈值",
-                "description": "与目标的重叠时长达到两者较短时长的这一比例时，显示其他 Run 的文字。",
+                "description": "其他转写中的文字与目标在时间上的重叠，达到两者较短时长的这一比例时，才会作为候选出现在右键菜单的“替换为”和“插入”里。",
                 "invalid": "重叠阈值必须是 0 到 100 之间的整数。"
             },
             "title": "编辑",
@@ -394,7 +393,7 @@
             },
             "informationDisplay": {
                 "label": "信息显示位置",
-                "description": "选择 token 概率、原文和音频范围的显示位置。",
+                "description": "选择置信度、原文和时间范围的显示位置。",
                 "options": {
                     "tooltip": "浮动提示",
                     "bar": "信息栏"
@@ -406,19 +405,19 @@
             },
             "hideTrivialInformation": {
                 "label": "隐藏无需关注的概率",
-                "description": "浮动提示中，置信度 100% 且无语音 0% 的 token，以及无语音标记，都不显示概率。"
+                "description": "置信度为 100% 且无语音概率为 0% 的字词，以及无语音标记，在浮动提示中不显示概率。"
             }
         },
         "playback": {
             "title": "播放",
             "rewindStep": {
-                "label": "F7 回退量",
-                "description": "每按一次 F7 回退的时长，不会暂停或继续播放。",
+                "label": "F7 后退时长",
+                "description": "每按一次 F7 后退的时长，不会暂停或继续播放。",
                 "invalid": "请输入 {{min}} 到 {{max}} 之间的整数（毫秒）。"
             },
             "startRewind": {
-                "label": "开始播放时回退",
-                "description": "每次开始播放时，先从起点往前回退这段时长。设为 0 即关闭。",
+                "label": "开始播放时后退",
+                "description": "每次开始播放时，先从起点后退这段时长。设为 0 即关闭。",
                 "invalid": "请输入 {{min}} 到 {{max}} 之间的整数（毫秒）。"
             },
             "volumeSliderMapping": {
@@ -435,14 +434,14 @@
                 "invalid": "请输入不大于 {{max}} 的数值。"
             },
             "mediaSwitchPlayback": {
-                "label": "切换媒体后播放状态"
+                "label": "切换媒体后的播放状态"
             },
             "wordSwitchPlayback": {
-                "label": "词跳转后播放状态"
+                "label": "跳转到字词后的播放状态"
             },
             "rememberPlaybackPosition": {
-                "label": "保留播放进度",
-                "description": "在项目中保存播放进度。在切换媒体时从保存进度开始播放。"
+                "label": "记住播放进度",
+                "description": "在项目中保存各媒体的播放进度，切换回该媒体时从上次的位置继续。"
             },
             "pauseOnOutputDeviceChange": {
                 "label": "切换音频输出设备时暂停播放",
@@ -452,7 +451,7 @@
                 "options": {
                     "pause": "暂停",
                     "play": "播放",
-                    "keep": "不变",
+                    "keep": "保持不变",
                     "invert": "反转"
                 }
             },
@@ -462,27 +461,27 @@
                 "invalid": "请输入 {{min}} 到 {{max}} 之间的整数。",
                 "start": "开始测试",
                 "end": "结束测试",
-                "instruction": "在第三拍按下按钮。\n如果已校准，您应在听到第三拍时看到移动竖线恰好经过粗竖线。",
+                "instruction": "听到第三拍时按下按钮。\n校准正确时，听到第三拍的同时，移动的竖线会恰好经过粗竖线。",
                 "tap": "按下",
                 "failed": "无法播放测试音频，请检查音频输出设备后重试。"
             },
             "showLevelMeter": {
-                "label": "显示电平"
+                "label": "显示电平表"
             },
             "levelMeterReadout": {
-                "label": "电平读出来源",
-                "description": "选择的电平也作为满幅提示的基准。",
+                "label": "电平表测量点",
+                "description": "满幅（削波）提示也以所选测量点为准。",
                 "options": {
-                    "source": "媒体",
-                    "project": "项目",
-                    "monitor": "监听"
+                    "source": "原始音频",
+                    "project": "音量稳定后",
+                    "monitor": "最终输出"
                 }
             }
         },
         "theme": {
             "title": "主题",
             "mode": {
-                "label": "显示模式",
+                "label": "外观",
                 "options": {
                     "light": "浅色",
                     "system": "跟随系统",
@@ -494,7 +493,7 @@
                 "description": "让侧栏背景呈现桌面壁纸的色调。"
             },
             "sidebarTransparency": {
-                "label": "透明程度",
+                "label": "透明度",
                 "description": "数值越大，侧栏背景越通透。"
             },
             "schemes": {
@@ -502,19 +501,19 @@
                 "dark": "深色配色"
             },
             "actions": {
-                "reset": "还原默认设置"
+                "reset": "恢复默认配色"
             },
             "colors": {
                 "--c-accent": "强调色",
-                "--c-background": "主要背景色",
-                "--c-surface": "次要背景色",
-                "--c-text": "主要文字",
-                "--c-text-80p": "次要文字",
-                "--c-audio-level": "电平颜色"
+                "--c-background": "主背景色",
+                "--c-surface": "次背景色",
+                "--c-text": "主文字色",
+                "--c-text-80p": "次文字色",
+                "--c-audio-level": "电平表颜色"
             }
         },
         "advanced": {
-            "title": "高级设置",
+            "title": "高级",
             "volumeStabilization": {
                 "title": "音量稳定",
                 "maxGainDb": {
@@ -549,31 +548,31 @@
             "actions": {
                 "openDirectory": "打开模型文件夹"
             },
-            "description": "选择下方的内置模型进行下载，或自行下载并按<guide/>整理。",
-            "title": "内置模型",
+            "description": "下载下方的模型，或自行下载后按<guide/>中的说明整理文件。",
+            "title": "可下载的模型",
             "details": {
-                "whisperTiny": "适用 whisper.cpp。多语言转录，速度快、资源占用最低，适合低配置设备，准确率有限。可用 CPU；GPU 权重约 0.07 GiB。",
-                "whisperBase": "适用 whisper.cpp。多语言转录，轻量快速，比 Tiny 更准确，适合清晰语音。可用 CPU；GPU 权重约 0.14 GiB。",
-                "whisperSmall": "适用 whisper.cpp。多语言转录，兼顾准确率与速度，资源占用中等。可用 CPU；GPU 权重约 0.45 GiB。",
-                "whisperLargeV3": "适用 whisper.cpp。多语言转录，侧重准确率，速度较慢、资源占用高。可用 CPU；GPU 权重约 2.88 GiB。",
-                "whisperLargeV3Turbo": "适用 whisper.cpp。多语言转录，比 Large v3 更快，准确率略有取舍，仍可能重复或幻觉。可用 CPU；GPU 权重约 1.51 GiB。",
-                "paraformerZh": "适用 sherpa-onnx。侧重中文，支持中英混合语音，非自回归识别，转录速度快。资源占用中等，CPU 可运行；GPU 权重约 0.77 GiB。",
-                "senseVoiceSmall": "适用 sherpa-onnx。支持普通话、粤语、英语、日语和韩语，识别快速并提供文字时间戳。INT8 资源占用低，优先使用 CPU；GPU 权重约 0.22 GiB。",
-                "fireRedAsr2Ctc": "适用 sherpa-onnx。支持中英混合及多种中文方言，采用 CTC 识别并提供文字时间戳。INT8 资源占用中等，优先使用 CPU；GPU 权重约 0.72 GiB。",
-                "qwen3Asr06b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重效率。INT8 内存占用中等，CPU 可运行，GPU 权重约 0.92 GiB；当前不提供文字时间戳。",
-                "qwen3Asr17b": "适用 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重准确率。INT8 内存占用较高、速度较慢，CPU 可运行，GPU 权重约 2.23 GiB；当前不提供文字时间戳。"
+                "whisperTiny": "适用于 whisper.cpp。多语言转写，速度快、资源占用最低，适合低配置设备，但准确率有限。可用 CPU 运行；使用 GPU 时权重约占 0.07 GiB 显存。",
+                "whisperBase": "适用于 whisper.cpp。多语言转写，轻量快速，比 Tiny 更准确，适合清晰语音。可用 CPU 运行；使用 GPU 时权重约占 0.14 GiB 显存。",
+                "whisperSmall": "适用于 whisper.cpp。多语言转写，兼顾准确率与速度，资源占用中等。可用 CPU 运行；使用 GPU 时权重约占 0.45 GiB 显存。",
+                "whisperLargeV3": "适用于 whisper.cpp。多语言转写，侧重准确率，速度较慢、资源占用高。可用 CPU 运行；使用 GPU 时权重约占 2.88 GiB 显存。",
+                "whisperLargeV3Turbo": "适用于 whisper.cpp。多语言转写，比 Large v3 更快，准确率略有取舍，仍可能出现重复或幻觉。可用 CPU 运行；使用 GPU 时权重约占 1.51 GiB 显存。",
+                "paraformerZh": "适用于 sherpa-onnx。侧重中文，支持中英混合语音，非自回归识别，转写速度快。资源占用中等，可用 CPU 运行；使用 GPU 时权重约占 0.77 GiB 显存。",
+                "senseVoiceSmall": "适用于 sherpa-onnx。支持普通话、粤语、英语、日语和韩语，识别快速并提供文字时间戳。INT8 资源占用低，推荐用 CPU 运行；使用 GPU 时权重约占 0.22 GiB 显存。",
+                "fireRedAsr2Ctc": "适用于 sherpa-onnx。支持中英混合及多种中文方言，采用 CTC 识别并提供文字时间戳。INT8 资源占用中等，推荐用 CPU 运行；使用 GPU 时权重约占 0.72 GiB 显存。",
+                "qwen3Asr06b": "适用于 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重效率。INT8 内存占用中等，可用 CPU 运行；使用 GPU 时权重约占 0.92 GiB 显存；当前不提供文字时间戳。",
+                "qwen3Asr17b": "适用于 sherpa-onnx。支持 30 种语言及多种中文方言，可识别歌声和带伴奏歌曲，侧重准确率。INT8 内存占用较高、速度较慢，可用 CPU 运行；使用 GPU 时权重约占 2.23 GiB 显存；当前不提供文字时间戳。"
             }
         },
         "loading": "正在读取下载列表…",
         "backends": {
-            "title": "内置后端",
+            "title": "可下载的后端",
             "actions": {
                 "openDirectory": "打开后端文件夹"
             },
-            "description": "选择下方的内置后端进行下载，或自行下载并按<guide/>整理。"
+            "description": "下载下方的后端，或自行下载后按<guide/>中的说明整理文件。"
         },
-        "estimatedSize": "（{{size}} MiB）",
-        "empty": "此平台暂无内置下载。",
+        "estimatedSize": "（约 {{size}} MiB）",
+        "empty": "当前平台暂无可用下载。",
         "status": {
             "installed": "已下载",
             "loading": "正在读取下载状态…",
@@ -594,7 +593,7 @@
         "columns": {
             "project": "名称",
             "license": "许可证",
-            "url": "地址"
+            "url": "网址"
         },
         "ffmpegNote": "FFmpeg 的许可证随构建配置变化，以所附发行包的许可证为准。",
         "actions": {
@@ -643,12 +642,12 @@
         },
         "directories": {
             "model": {
-                "title": "选择模型目录",
-                "confirm": "选择模型目录"
+                "title": "选择模型文件夹",
+                "confirm": "选择模型文件夹"
             },
             "backend": {
-                "title": "选择后端目录",
-                "confirm": "选择后端目录"
+                "title": "选择后端文件夹",
+                "confirm": "选择后端文件夹"
             }
         }
     },
@@ -660,13 +659,13 @@
             "changedDuringRead": "检查期间文件发生了变化，请重试。",
             "missing": "找不到此路径下的媒体文件，文件可能已移动或重命名。",
             "cancelled": "媒体读取已取消。",
-            "sourceInvalidated": "前端已重新加载或退出，媒体源请求已取消。",
+            "sourceInvalidated": "界面已重新加载或关闭，媒体请求已取消。",
             "invalidInfo": "ffprobe 返回了无效的媒体信息。",
             "noAudio": "文件中没有音轨。",
             "noDuration": "无法确定媒体时长。",
             "timeout": "读取媒体信息超时，请重试。",
-            "format": "媒体格式不符合。",
-            "invalidReference": "需要有效的媒体文件大小和修改时间。",
+            "format": "不支持的媒体格式。",
+            "invalidReference": "需要有效的媒体文件大小和哈希值。",
             "invalidCheckId": "需要唯一的媒体检查 ID。",
             "invalidConcurrency": "媒体导入并发数必须是正整数。",
             "invalidImport": "需要尚未完成且唯一的媒体导入任务。",
@@ -679,7 +678,7 @@
             "invalidId": "需要唯一的转写任务 ID。",
             "paramsObject": "参数必须是 JSON 对象。",
             "paramValue": "参数值必须是字符串。",
-            "paramNull": "参数值不能包含空字符。",
+            "paramNull": "参数值不能包含 NUL 字符。",
             "unknownExecutor": "未知执行器：{{executor}}",
             "emptyPath": "{{field}} 必须是非空路径。",
             "invalidResult": "无法解析执行器返回的 JSON 结果。",
@@ -689,7 +688,7 @@
             "truncatedOutput": "模型截断了音频或生成的文本，本次转写未保存。请检查自定义热词和模型参数。",
             "unstableOutput": "已缩短片段重试，但模型在 {{start}}–{{end}} 秒仍重复生成或截断输出，本次转写未保存。请尝试其他模型或调整参数。",
             "invalidOption": "无效的选项名称：{{option}}",
-            "managedOption": "选项 {{option}} 由 Vestige 管理。",
+            "managedOption": "选项 {{option}} 由 Vestige 自动设置，不能手动指定。",
             "output": {
                 "array": "{{executor}} 未返回转写数组。",
                 "text": "{{executor}} 未返回转写文本。",
@@ -772,7 +771,7 @@
                 "http": "下载服务器返回 HTTP {{status}}：{{resource}}",
                 "request": "无法请求下载元数据或连接传输服务：{{resource}}",
                 "metadata": "发布版本的元数据无效：{{resource}}",
-                "asset": "此发布版本没有与软件包匹配的已验证归档：{{resource}}"
+                "asset": "此发布版本没有与软件包匹配的已验证压缩包：{{resource}}"
             },
             "transfer": {
                 "rpc": "下载服务返回了无效响应或拒绝了请求。",
@@ -787,19 +786,19 @@
                 "resolution": "无法解析系统代理。"
             },
             "integrity": {
-                "checksum": "文件校验和不符：{{file}}",
+                "checksum": "文件校验值不匹配：{{file}}",
                 "size": "文件大小不符（预期 {{expected}}，实际 {{actual}} 字节）：{{file}}",
                 "empty": "下载的文件缺失、为空或不是普通文件：{{file}}",
                 "html": "服务器返回了 HTML 页面，而非请求的文件：{{file}}",
                 "runtime-manifest": "运行库缓存清单无效或不完整：{{file}}",
                 "runtime-file": "缓存的运行库文件未通过校验：{{file}}",
-                "runtime-license": "运行库归档缺少许可证：{{file}}"
+                "runtime-license": "运行库压缩包缺少许可证：{{file}}"
             },
             "archive": {
-                "unsafe-entry": "归档中包含不安全的路径：{{path}}",
-                "unsupported-entry": "归档中包含不支持的条目或链接：{{path}}",
-                "missing-file": "归档缺少必需文件：{{path}}",
-                "unpack": "无法读取或解压归档：{{path}}"
+                "unsafe-entry": "压缩包中包含不安全的路径：{{path}}",
+                "unsupported-entry": "压缩包中包含不支持的条目或链接：{{path}}",
+                "missing-file": "压缩包缺少必需文件：{{path}}",
+                "unpack": "无法读取或解压压缩包：{{path}}"
             },
             "conflict": {
                 "exists": "下载文件夹已存在，请先移走再重新下载：{{path}}",
@@ -812,7 +811,7 @@
         }
     },
     "documentation": {
-        "path": "Agent 友好：该文档位于 {{path}}。请勿写入，应用每次启动会覆盖。",
+        "path": "给 Agent 的提示：本文档位于 {{path}}。请勿修改，应用每次启动时都会覆盖它。",
         "loading": "正在读取文档…",
         "contents": "目录",
         "back": "返回",

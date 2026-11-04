@@ -17,7 +17,7 @@
             {:else}—{/if}
         </div>
         {#if information?.gaps?.length}
-            <div class="gaps">{@render statistic(i18n.t("transcript.information.blankProbability"), i18n.t("transcript.information.gaps", {
+            <div class="gaps">{@render statistic(i18n.t("transcript.information.gap"), i18n.t("transcript.information.gaps", {
                 count: information.gaps.length,
                 duration: information.gaps.reduce((sum, gap) => sum + (gap.range ? gap.range.end - gap.range.start : 0), 0).toFixed(2)
             }), true)}</div>
