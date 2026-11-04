@@ -35,6 +35,10 @@ export function closeLayer(layer: symbol): void {
     layers.delete(layer);
 }
 
+export function hasOpenLayer(): boolean {
+    return layers.size > 0;
+}
+
 export function getLayerIndex(layer: symbol): number {
     return layerBase + Math.max(0, [...layers].indexOf(layer)) * layerStep;
 }

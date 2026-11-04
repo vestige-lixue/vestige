@@ -128,7 +128,7 @@
         height: 20px;
         overflow: visible;
         stroke-width: 2px;
-        stroke-linecap: round;
+        stroke-linecap: square;
     }
     .candidate-time { stroke: var(--c-accent); }
     .target-time { stroke: var(--c-text-80p); }
@@ -228,7 +228,7 @@
 
     function timing(candidate: Range, target: Range): number[] {
         const start = Math.min(candidate.start, target.start), end = Math.max(candidate.end, target.end);
-        return [candidate.start, candidate.end, target.start, target.end].map(time => end === start ? 20 : 1 + (time - start) / (end - start) * 38);
+        return [candidate.start, candidate.end, target.start, target.end].map(time => Math.round(end === start ? 20 : 1 + (time - start) / (end - start) * 38));
     }
 
     function applyReference(text: string): void {

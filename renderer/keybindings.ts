@@ -4,6 +4,7 @@ import { isTranscriptEditorTarget } from "./editor/transcript";
 import { formatShortcut, type Shortcut } from "./shortcuts";
 import { interfaceBlocked, runCommand, type Command } from "./states/commands";
 import * as menu from "./states/menu.svelte";
+import * as modal from "./states/modal.svelte";
 import * as player from "./states/player.svelte";
 import * as mediaSelection from "./states/mediaSelection.svelte";
 import * as transcript from "./states/transcript.svelte";
@@ -114,7 +115,7 @@ function run(command: Command): void {
 }
 
 function runWord(direction: -1 | 1, repeat: boolean): void {
-    if (interfaceBlocked() || !player.getURL()) {
+    if (menu.get() || modal.hasOpenLayer() || interfaceBlocked() || !player.getURL()) {
         wordNavigation = null;
         return;
     }
@@ -148,7 +149,7 @@ function runRewind(repeat: boolean): void {
 }
 
 export function seekProgress(event: KeyboardEvent): void {
-    if (interfaceBlocked() || !player.getURL() || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
+    if (menu.get() || modal.hasOpenLayer() || interfaceBlocked() || !player.getURL() || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
         || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) {
         cancelProgressNavigation();
         return;
