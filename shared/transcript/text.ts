@@ -76,37 +76,7 @@ function insertionOf(index: TextIndex, position: number, text: string): Modifica
     return { type: "insert", pos: textPosition(index, position), text };
 }
 
-// Greedy codepoint alignment with one-character lookahead; never search for distant matches.
-function restoreReplacement(index: TextIndex, from: number, to: number, text: string, modifications: Modification[]): void {
-    const characters = Array.from(text);
-    let source = from;
-    let inserted = 0;
-    let deletedFrom = from;
-    let insertedFrom = 0;
-    function append(end: number, insertedEnd: number): void {
-        if (deletedFrom < end) modifications.push(deletionOf(index, deletedFrom, end));
-        if (insertedFrom < insertedEnd) modifications.push(insertionOf(index, end, characters.slice(insertedFrom, insertedEnd).join("")));
-    }
-    while (source < to && inserted < characters.length) {
-        if (index.characters[source] === characters[inserted]) {
-            append(source, inserted);
-            deletedFrom = ++source;
-            insertedFrom = ++inserted;
-        }
-        else if (source + 1 < to && inserted + 1 < characters.length && index.characters[source + 1] === characters[inserted + 1]) {
-            // Prefer a substitution when the next pair already lines up.
-            source++; inserted++;
-        }
-        else if (inserted + 1 < characters.length && index.characters[source] === characters[inserted + 1]) inserted++;
-        else if (source + 1 < to && index.characters[source + 1] === characters[inserted]) source++;
-        else {
-            source++; inserted++;
-        }
-    }
-    append(to, characters.length);
-}
-
-export function normalizeModifications(index: TextIndex, modifications: readonly Modification[], restore = true): Modification[] {
+export function normalizeModifications(index: TextIndex, modifications: readonly Modification[]): Modification[] {
     const deletions: { from: number; to: number }[] = [];
     const insertions: { position: number; text: string }[] = [];
     for (const modification of modifications) {
@@ -149,11 +119,8 @@ export function normalizeModifications(index: TextIndex, modifications: readonly
             normalized.push(insertionOf(index, insertion.position, insertion.text));
         }
         const insertion = anchored[insertionIndex]?.position === deletion.to ? anchored[insertionIndex++] : null;
-        if (insertion && restore) restoreReplacement(index, deletion.from, deletion.to, insertion.text, normalized);
-        else {
-            normalized.push(deletionOf(index, deletion.from, deletion.to));
-            if (insertion) normalized.push(insertionOf(index, insertion.position, insertion.text));
-        }
+        normalized.push(deletionOf(index, deletion.from, deletion.to));
+        if (insertion) normalized.push(insertionOf(index, insertion.position, insertion.text));
     }
     for (; insertionIndex < anchored.length; insertionIndex++) {
         const insertion = anchored[insertionIndex];
@@ -286,7 +253,7 @@ function updateTree(index: TextIndex, projection: TextProjection, modifications:
 }
 
 // Displayed codepoint range of `after` outside which both projections have identical text and provenance.
-// D18 can restore characters typed by earlier edits, so this may extend beyond the edited range.
+// This conservative window also covers explicit provenance-only alignment.
 export function provenanceChange(index: TextIndex, before: TextProjection, after: TextProjection): { from: number; to: number } | null {
     const window = changedWindow(index, before.modifications, after.modifications);
     if (!window) return null;
@@ -295,18 +262,71 @@ export function provenanceChange(index: TextIndex, before: TextProjection, after
     return { from: left?.length ?? 0, to: after.length - (right?.length ?? 0) };
 }
 
+function modifiedProjection(index: TextIndex, projection: TextProjection, modifications: Modification[], text = projection.text): TextProjection {
+    const normalized = normalizeModifications(index, modifications);
+    const tree = updateTree(index, projection, normalized);
+    return tree === projection.tree && text === projection.text ? projection : { text, length: tree?.length ?? 0, tree, modifications: normalized };
+}
+
+function characterSources(index: TextIndex, projection: TextProjection, from: number, to: number): (number | null)[] {
+    return textPieces(index, projection, from, to).flatMap(piece => Array.from({ length: Math.max(0, Math.min(to, piece.to) - Math.max(from, piece.from)) }, (_, i) =>
+        piece.source.kind === "segment" ? piece.sourceFrom + Math.max(from, piece.from) - piece.from + i : null));
+}
+
+// Deletions and insertions are independent operations; use their current positions to find adjacent text.
+export function alignText(index: TextIndex, projection: TextProjection, from: number, to: number): TextProjection {
+    if (from >= to) return projection;
+    const modifications: Modification[] = [];
+    for (let i = 0; i < projection.modifications.length; i++) {
+        const deletion = projection.modifications[i];
+        const insertion = projection.modifications[i + 1];
+        if (deletion.type !== "delete" || insertion?.type !== "insert") {
+            modifications.push(deletion);
+            continue;
+        }
+        const start = textOffset(index, deletion.range.start), end = textOffset(index, deletion.range.end);
+        const position = projectionOffset(projection, projectedOffset(projection, start), false);
+        if (position < from || position > to || textOffset(index, insertion.pos) !== end) {
+            modifications.push(deletion);
+            continue;
+        }
+        const characters = Array.from(insertion.text);
+        let prefix = 0, suffix = 0;
+        while (start + prefix < end && prefix < characters.length && index.characters[start + prefix] === characters[prefix]) prefix++;
+        while (end - suffix > start + prefix && characters.length - suffix > prefix
+            && index.characters[end - suffix - 1] === characters[characters.length - suffix - 1]) suffix++;
+        if (start + prefix < end - suffix) modifications.push(deletionOf(index, start + prefix, end - suffix));
+        if (prefix < characters.length - suffix) modifications.push(insertionOf(index, end - suffix, characters.slice(prefix, characters.length - suffix).join("")));
+        i++;
+    }
+    return modifiedProjection(index, projection, modifications);
+}
+
+export function restoreTextDeletion(index: TextIndex, projection: TextProjection, from: number, to: number): TextProjection {
+    const modifications = projection.modifications.filter(item => item.type !== "delete" || textOffset(index, item.range.start) !== from || textOffset(index, item.range.end) !== to);
+    if (modifications.length === projection.modifications.length) return projection;
+    const position = projectedOffset(projection, from);
+    return modifiedProjection(index, projection, modifications, projection.text.slice(0, position) + index.characters.slice(from, to).join("") + projection.text.slice(position));
+}
+
 // Reapply only the final IME replacement to its saved source identities, ignoring provisional candidates.
-export function commitText(index: TextIndex, saved: TextProjection, pending: TextProjection): TextProjection {
-    if (pending.text === saved.text) return saved;
-    const before = provenanceChange(index, pending, saved)!;
+export function commitText(index: TextIndex, saved: TextProjection, pending: TextProjection, range?: { from: number; to: number; end: number }): TextProjection {
+    if (range) return editText(index, saved, range.from, range.to, pending.text.slice(projectionOffset(pending, range.from, true), projectionOffset(pending, range.end, true)));
+    if (pending === saved) return saved;
+    const before = provenanceChange(index, pending, saved);
+    if (!before) return saved;
     const after = provenanceChange(index, saved, pending)!;
     const original = Array.from(saved.text.slice(projectionOffset(saved, before.from, true), projectionOffset(saved, before.to, true)));
     const inserted = Array.from(pending.text.slice(projectionOffset(pending, after.from, true), projectionOffset(pending, after.to, true)));
     let first = 0;
     let oldEnd = original.length;
     let newEnd = inserted.length;
-    while (first < oldEnd && first < newEnd && original[first] === inserted[first]) first++;
-    while (oldEnd > first && newEnd > first && original[oldEnd - 1] === inserted[newEnd - 1]) {
+    const oldSources = characterSources(index, saved, before.from, before.to);
+    const newSources = characterSources(index, pending, after.from, after.to);
+    const same = (old: number, next: number): boolean => original[old] === inserted[next]
+        && oldSources[old] !== null && oldSources[old] === newSources[next];
+    while (first < oldEnd && first < newEnd && same(first, first)) first++;
+    while (oldEnd > first && newEnd > first && same(oldEnd - 1, newEnd - 1)) {
         oldEnd--; newEnd--;
     }
     return editText(index, saved, before.from + first, before.from + oldEnd, inserted.slice(first, newEnd).join(""));
@@ -319,7 +339,7 @@ export function editText(index: TextIndex, projection: TextProjection, from: num
     }
     const utf16From = projectionOffset(projection, from, true);
     const utf16To = projectionOffset(projection, to, true);
-    if (projection.text.slice(utf16From, utf16To) === text) return projection;
+    if (from === to && !text) return projection;
     const pieces = textPieces(index, projection, from, to);
     const touched = new Set(pieces.flatMap(piece => piece.source.kind === "modification" ? [piece.source.index] : []));
     const remaining = projection.modifications.filter((_, position) => !touched.has(position));
@@ -361,9 +381,32 @@ export function editText(index: TextIndex, projection: TextProjection, from: num
     for (const modification of remaining) {
         if (modificationStart(index, modification) >= start) modifications.push(modification);
     }
-    const normalized = normalizeModifications(index, modifications, restore);
-    const tree = updateTree(index, projection, normalized);
-    return { text: projection.text.slice(0, utf16From) + text + projection.text.slice(utf16To), length: tree?.length ?? 0, tree, modifications: normalized };
+    const next = modifiedProjection(index, projection, modifications, projection.text.slice(0, utf16From) + text + projection.text.slice(utf16To));
+    if (!restore || !text) return next;
+    const first = pieces.find(piece => piece.source.kind === "segment" && Math.max(from, piece.from) < Math.min(to, piece.to));
+    const source = first ? first.sourceFrom + Math.max(from, first.from) - first.from : null;
+    const candidates = source === null ? textPieces(index, next, from, from) : sourceTextPieces(index, next, source, source + 1);
+    const deletion = candidates.find(piece => piece.source.kind === "modification" && next.modifications[piece.source.index].type === "delete"
+        && (source === null ? piece.from === from : piece.sourceFrom <= source && source < piece.sourceTo));
+    if (!deletion) return next;
+    const added = next.modifications[deletion.source.index + 1];
+    if (added?.type !== "insert" || textOffset(index, added.pos) !== deletion.sourceTo) return next;
+    const characters = Array.from(added.text);
+    const input = Array.from(text);
+    // Without selected source text, the marker must have no surviving added characters beside it.
+    if (source === null && characters.length !== input.length) return next;
+    const matchStart = source ?? deletion.sourceFrom;
+    let matched = 0;
+    while (matched < input.length && matchStart + matched < deletion.sourceTo && input[matched] === index.characters[matchStart + matched]) matched++;
+    if (!matched) return next;
+    const before = characters.slice(0, from - deletion.from).join("");
+    const after = characters.slice(from - deletion.from + matched).join("");
+    const changes = next.modifications.filter((_, i) => i !== deletion.source.index && i !== deletion.source.index + 1);
+    if (deletion.sourceFrom < matchStart) changes.push(deletionOf(index, deletion.sourceFrom, matchStart));
+    if (matchStart + matched < deletion.sourceTo) changes.push(deletionOf(index, matchStart + matched, deletion.sourceTo));
+    if (before) changes.push(insertionOf(index, matchStart, before));
+    if (after) changes.push(insertionOf(index, deletion.sourceTo, after));
+    return modifiedProjection(index, projection, changes, next.text);
 }
 
 export function codepointToUtf16(text: string, offset: number): number {

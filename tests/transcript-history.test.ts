@@ -3,7 +3,8 @@ import { getSchema } from "@tiptap/core";
 import { AllSelection, EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { closeHistory, undo, redo, undoDepth, redoDepth } from "@tiptap/pm/history";
 import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText } from "../renderer/editor/transcript";
-import { createTextIndex } from "../shared/transcript/text";
+import { projectionTransaction } from "../renderer/editor/projectionStep";
+import { createTextIndex, editText, alignText, restoreTextDeletion } from "../shared/transcript/text";
 import { transcript } from "./support/fixtures";
 
 function editor(text: string): {
@@ -132,5 +133,57 @@ describe("transcript history selection", () => {
         value.apply(value.state().tr.insertText("X"));
         expect(documentText(value.state().doc)).toBe("aXdef");
         expect(value.state().selection).toMatchObject({ anchor: 3, head: 3 });
+    });
+
+    it.each(["align", "restore", "replace", "insert"])("keeps %s as one undoable explicit projection write", action => {
+        const value = editor("LwhatR"), index = createTextIndex(transcript(["LwhatR"]));
+        const initial = transcriptProjection(value.state());
+        const before = editText(index, initial, 1, 5, "want", false);
+        value.apply(closeHistory(projectionTransaction(value.state(), initial, before)));
+        value.select(6, 2);
+        const after = action === "align" ? alignText(index, before, 1, 5)
+            : action === "restore" ? restoreTextDeletion(index, before, 1, 5)
+                : action === "replace" ? editText(index, before, 1, 5, "what", false) : editText(index, before, 1, 1, "what", false);
+        value.apply(closeHistory(projectionTransaction(value.state(), before, after)));
+        expect(transcriptModifications(value.state())).toEqual(after.modifications);
+        expect(documentText(value.state().doc)).toBe(after.text);
+        expect(undoDepth(value.state())).toBe(2);
+        const selection = value.state().selection;
+        expect(value.history("undo")).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        expect(documentText(value.state().doc)).toBe(before.text);
+        expect(value.history("redo")).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(after.modifications);
+        expect(documentText(value.state().doc)).toBe(after.text);
+        expect(value.state().selection.anchor).toBeGreaterThanOrEqual(value.state().selection.head);
+        if (action !== "restore" && action !== "insert") expect(value.state().selection.eq(selection)).toBe(true);
+    });
+
+    it("maps restoration at the marker even when adjacent added text is identical", () => {
+        const value = editor("Outro"), index = createTextIndex(transcript(["Outro"]));
+        const initial = transcriptProjection(value.state()), before = editText(index, initial, 1, 2, "u", false);
+        value.apply(closeHistory(projectionTransaction(value.state(), initial, before)));
+        value.select(2);
+        const restored = restoreTextDeletion(index, before, 1, 2);
+        value.apply(closeHistory(projectionTransaction(value.state(), before, restored, { from: 1, to: 1, text: "u" })));
+        expect(documentText(value.state().doc)).toBe("Ouutro");
+        expect(value.state().selection.head).toBe(3);
+        expect(transcriptModifications(value.state())).toEqual(restored.modifications);
+        expect(value.history("undo")).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        expect(value.history("redo")).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(restored.modifications);
+    });
+
+    it.each(["t", "that"])("does not preserve an inherited source mark when replacing what with %s", text => {
+        const value = editor("what"), index = createTextIndex(transcript(["what"]));
+        value.select(1, 5);
+        value.apply(value.state().tr.insertText(text));
+        expect(transcriptModifications(value.state())).toEqual(editText(index, transcriptProjection(editor("what").state()), 0, 4, text).modifications);
+        expect(value.state().doc.firstChild?.firstChild?.marks[0].attrs.kind).toBe("modification");
+        value.history("undo");
+        expect(transcriptModifications(value.state())).toEqual([]);
+        value.history("redo");
+        expect(documentText(value.state().doc)).toBe(text);
     });
 });

@@ -277,6 +277,7 @@
             "gap": "无语音",
             "gaps": "{{count}} ({{duration}}s)",
             "restore": "放回",
+            "align": "与原文对齐",
             "expand": "展开删除",
             "collapse": "收起删除",
             "toggleSelectionDeletions": "展开/收起选区内的删除",

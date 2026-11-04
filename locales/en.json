@@ -277,6 +277,7 @@
             "gap": "No speech",
             "gaps": "{{count}} ({{duration}}s)",
             "restore": "Restore deleted text",
+            "align": "Align with original",
             "expand": "Expand deletion",
             "collapse": "Collapse deletion",
             "toggleSelectionDeletions": "Expand/collapse deletions in selection",

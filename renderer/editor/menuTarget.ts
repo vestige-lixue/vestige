@@ -1,12 +1,13 @@
 import { TextSelection, type EditorState, type Selection } from "@tiptap/pm/state";
-import { Fragment, type Node as PMNode } from "@tiptap/pm/model";
+import { type Node as PMNode } from "@tiptap/pm/model";
 import { type EditorView } from "@tiptap/pm/view";
 import { closeHistory } from "@tiptap/pm/history";
 import { type EditAction } from "../../shared/app";
-import { textPieces, type TextIndex, type TextProjection } from "../../shared/transcript/text";
+import { textPieces, restoreTextDeletion, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { transcriptSelection, transcriptTokenGroup, type InspectionInformation, type TranscriptInformation } from "./informationModel";
 import { keyboardRectangle, pointerRectangle, type InspectionGeometry, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
+import { projectionTransaction } from "./projectionStep";
 
 export type TranscriptMenuTarget = {
     kind: "deletion" | "gap" | "token" | "selection" | "text";
@@ -64,15 +65,13 @@ export function canRestoreDeletion(view: EditorView, information: TranscriptInfo
         && information?.kind === "deletion" && !!information.original;
 }
 
-export function restoreDeletion(view: EditorView, information: TranscriptInformation | null): boolean {
+export function restoreDeletion(view: EditorView, information: TranscriptInformation | null, index: TextIndex, projection: TextProjection): boolean {
     if (!canRestoreDeletion(view, information)) return false;
-    const nodes = information.original.split("\n").flatMap((line, index) => [
-        ...index ? [view.state.schema.nodes.hardBreak.create()] : [],
-        ...line ? [view.state.schema.text(line)] : []
-    ]);
-    const position = information.from + 1;
-    // The transaction maps the existing selection; restoring elsewhere must not move it to this deletion.
-    view.dispatch(closeHistory(view.state.tr).replaceWith(position, position, Fragment.fromArray(nodes)).scrollIntoView());
+    const restored = restoreTextDeletion(index, projection, information.sourceFrom, information.sourceTo);
+    if (restored === projection) return false;
+    // Explicit projection writes preserve added text and map the current selection through the insertion.
+    view.dispatch(closeHistory(projectionTransaction(view.state, projection, restored,
+        { from: information.from, to: information.from, text: information.original })).scrollIntoView());
     view.focus();
     return true;
 }

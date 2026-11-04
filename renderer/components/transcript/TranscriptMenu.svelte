@@ -12,6 +12,12 @@
                     <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
                 </DropdownMenu.Item>
             {/if}
+            {#if alignment}
+                <DropdownMenu.Item class="activable focusable" disabled={disabled("cut")} onSelect={align}>
+                    <div>{i18n.t("transcript.information.align")}</div>
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator class="menu-separator" />
+            {/if}
             {#each actions as action (action)}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled(action)} onSelect={() => edit(action)}>
                     <div>{i18n.t(`menu.edit.${action}`)}</div>
@@ -65,6 +71,11 @@
     :global(.transcript-menu[data-keyboard="false"] .focusable:focus-visible) {
         outline: none;
     }
+    :global(.transcript-menu .menu-separator) {
+        height: 1px;
+        margin: 4px;
+        background: var(--c-border);
+    }
 </style>
 
 <script lang="ts">
@@ -72,7 +83,7 @@
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
-    import { dismissTranscriptMenu, toggleTranscriptDeletion } from "../../editor/transcript";
+    import { dismissTranscriptMenu, toggleTranscriptDeletion, transcriptAlignment, alignTranscriptSelection } from "../../editor/transcript";
     import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { editAvailable, runEdit } from "../../edit";
     import { editShortcut } from "../../keybindings";
@@ -85,6 +96,7 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
+    const alignment = $derived(request?.target.kind === "selection" ? transcriptAlignment(request.view, request.selection) : null);
     const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
@@ -135,6 +147,16 @@
             if (open || request !== current || !restoreTranscriptMenuSelection(current)) return;
             if (restore) runCommand(command);
             else toggleTranscriptDeletion(current.view.dom, command.key);
+        });
+    }
+
+    function align(): void {
+        if (!request || !alignment || disabled("cut")) return;
+        const current = request;
+        changeOpen(false);
+        void tick().then(() => {
+            if (open || request !== current || disabled("cut") || !restoreTranscriptMenuSelection(current)) return;
+            alignTranscriptSelection(current.view);
         });
     }
 

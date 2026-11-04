@@ -59,9 +59,18 @@ describe("project validation contract through the real typia transform", () => {
             const original = structuredClone(projection.modifications);
             const restored: unknown = JSON.parse(JSON.stringify(project(spans, projection.modifications)));
             const parsed = parseProject(restored);
+            expect(parsed.vestiges[0].modifications).toEqual(original);
             expect(projectText(index, parsed.vestiges[0].modifications).text).toBe(projection.text);
             expect(projection.modifications).toEqual(original);
         }));
+    });
+
+    it("does not restore matching text during project validation or JSON reload", () => {
+        const spans = transcript(["what"]), index = createTextIndex(spans);
+        const written = editText(index, projectText(index, []), 0, 4, "what", false);
+        const reopened = parseProject(JSON.parse(JSON.stringify(project(spans, written.modifications))));
+        expect(reopened.vestiges[0].modifications).toEqual(written.modifications);
+        expect(projectText(index, reopened.vestiges[0].modifications).modifications).toEqual(written.modifications);
     });
 
     it("rejects impossible original coordinates and invalid numeric/domain relations", () => {

@@ -249,15 +249,23 @@ describe("selection comparison", () => {
             { kind: "deleted", text: "store" }, { kind: "inserted", text: "shop" }, { kind: "original", text: " now" }
         ]).flat().map(part => part.text).join("")).toBe("to the storeshop now");
     });
-    it("preserves matching prefix and middle source in the comparison", () => {
+    it("preserves recorded prefix and middle source in the comparison", () => {
         const spans = transcript(["store"]);
         const index = createTextIndex(spans);
-        const projection = projectText(index, modification(spans, 0, 5, "shop"));
+        const projection = projectText(index, [...modification(spans, 1, 2, "h"), ...modification(spans, 3, 5, "p")]);
         expect(transcriptSelection(index, projection, 1, 0, 4)?.comparison).toEqual([
             { kind: "original", text: "s" }, { kind: "deleted", text: "t" }, { kind: "inserted", text: "h" },
             { kind: "original", text: "o" }, { kind: "deleted", text: "re" }, { kind: "inserted", text: "p" }
         ]);
         expect(transcriptSelection(index, projectText(index, []), 1, 0, 5)?.comparison).toEqual([]);
+    });
+
+    it("does not infer matching source when loading an unaligned replacement", () => {
+        const spans = transcript(["store"]), index = createTextIndex(spans);
+        const projection = projectText(index, modification(spans, 0, 5, "shop"));
+        expect(transcriptSelection(index, projection, 1, 0, 4)?.comparison).toEqual([
+            { kind: "deleted", text: "store" }, { kind: "inserted", text: "shop" }
+        ]);
     });
 
     it("keeps independent modifications at their actual character boundaries", () => {

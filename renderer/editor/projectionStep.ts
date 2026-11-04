@@ -1,7 +1,29 @@
-import { type Node, type Schema } from "@tiptap/pm/model";
+import { Fragment, type Node, type Schema } from "@tiptap/pm/model";
+import { type EditorState, type Transaction } from "@tiptap/pm/state";
 import { Step, StepResult } from "@tiptap/pm/transform";
 import { type Modification } from "../../shared/Vestige";
 import { type TextProjection } from "../../shared/transcript/text";
+
+// The projection owns provenance; trimming equal displayed characters here only limits DOM changes.
+export function projectionTransaction(state: EditorState, before: TextProjection, after: TextProjection, replacement?: { from: number; to: number; text: string }): Transaction {
+    const original = Array.from(before.text), inserted = Array.from(after.text);
+    let start = 0, oldEnd = original.length, newEnd = inserted.length;
+    while (start < oldEnd && start < newEnd && original[start] === inserted[start]) start++;
+    while (oldEnd > start && newEnd > start && original[oldEnd - 1] === inserted[newEnd - 1]) {
+        oldEnd--; newEnd--;
+    }
+    const transaction = state.tr;
+    if (replacement || oldEnd > start || newEnd > start) {
+        const text = replacement?.text ?? inserted.slice(start, newEnd).join("");
+        const nodes = text.split("\n").flatMap((line, i) => [
+            ...i ? [state.schema.nodes.hardBreak.create()] : [], ...line ? [state.schema.text(line)] : []
+        ]);
+        const from = (replacement?.from ?? original.slice(0, start).join("").length) + 1;
+        const to = replacement ? replacement.to + 1 : from + original.slice(start, oldEnd).join("").length;
+        transaction.replaceWith(from, to, Fragment.fromArray(nodes));
+    }
+    return transaction.step(new ProjectionStep(before.modifications, after.modifications, before, after));
+}
 
 // History owns source snapshots without changing document markup (which would rebuild its DOM).
 // Positions are immutable Run coordinates, so mapping document edits does not move these anchors.

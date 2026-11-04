@@ -1,15 +1,15 @@
 import { Editor, Extension, Mark, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type Mark as PMMark, type Schema } from "@tiptap/pm/model";
-import { Plugin, PluginKey, type Transaction, type EditorState } from "@tiptap/pm/state";
+import { Plugin, PluginKey, type Transaction, type EditorState, type Selection } from "@tiptap/pm/state";
 import { dropPoint } from "@tiptap/pm/transform";
 import { dropCursorPlugin } from "./dropCursor";
-import { compositionPlugin, compositionActive, compositionCommit } from "./composition";
+import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
 import { transcriptScrollPlugin, scrollTranscriptPlayback } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
-import { ProjectionStep } from "./projectionStep";
-import { history, undo, redo } from "@tiptap/pm/history";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { ProjectionStep, projectionTransaction } from "./projectionStep";
+import { history, undo, redo, closeHistory } from "@tiptap/pm/history";
+import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
@@ -17,11 +17,12 @@ import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDel
 import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
-    type TextIndex, type TextProjection
+    alignText, type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
 type DirtyRange = { from: number; to: number };
-type BridgeState = { projection: TextProjection; saved: TextProjection; dirty: DirtyRange[] };
+type PendingEdit = { from: number; to: number; end: number };
+type BridgeState = { index: TextIndex; projection: TextProjection; saved: TextProjection; dirty: DirtyRange[]; pendingEdit: PendingEdit | null };
 const bridgeKey = new PluginKey<BridgeState>("vestigeTranscript");
 type PlaybackState = { time: number; follow: boolean; projection: TextProjection; ranges: number[]; decorations: DecorationSet };
 const playbackKey = new PluginKey<PlaybackState>("vestigePlayback");
@@ -115,11 +116,10 @@ function splitsCodepoint(text: string, offset: number): boolean {
     return offset > 0 && offset < text.length && /[\uD800-\uDBFF]/.test(text[offset - 1]) && /[\uDC00-\uDFFF]/.test(text[offset]);
 }
 
-function applyTextSteps(index: TextIndex, projection: TextProjection, transaction: Transaction, restore: boolean): TextProjection {
+function applyTextSteps(index: TextIndex, projection: TextProjection, transaction: Transaction, restore: boolean, edited: (from: number, to: number, length: number) => void): TextProjection {
     for (let i = 0; i < transaction.steps.length; i++) {
         const before = projection.text;
         const after = documentText(transaction.docs[i + 1] ?? transaction.doc);
-        if (before === after) continue;
         const changes: { from: number; to: number; start: number; end: number }[] = [];
         transaction.steps[i].getMap().forEach((from, to, start, end) => {
             changes.push({
@@ -129,17 +129,9 @@ function applyTextSteps(index: TextIndex, projection: TextProjection, transactio
                 end: Math.max(0, Math.min(after.length, end - 1))
             });
         });
-        // DOM reparsing can include unchanged neighbors when their source marks change.
+        // Only expand split codepoints. Native input ranges identify unchanged DOM neighbors;
+        // equal text or token marks alone cannot prove that a replaced character kept its source.
         for (const change of changes) {
-            while (change.from < change.to && change.start < change.end && before[change.from] === after[change.start]) {
-                change.from++;
-                change.start++;
-            }
-            while (change.from < change.to && change.start < change.end && before[change.to - 1] === after[change.end - 1]) {
-                change.to--;
-                change.end--;
-            }
-            // Keep codepoints intact after trimming the unchanged prefix and suffix.
             while (splitsCodepoint(before, change.from) || splitsCodepoint(after, change.start)) {
                 change.from--;
                 change.start--;
@@ -160,7 +152,10 @@ function applyTextSteps(index: TextIndex, projection: TextProjection, transactio
             else merged.push(change);
         }
         for (const change of merged.reverse()) {
-            projection = editText(index, projection, projectionOffset(projection, change.from, false), projectionOffset(projection, change.to, false), after.slice(change.start, change.end), restore);
+            const from = projectionOffset(projection, change.from, false), to = projectionOffset(projection, change.to, false);
+            const text = after.slice(change.start, change.end);
+            projection = editText(index, projection, from, to, text, restore);
+            edited(from, to, Array.from(text).length);
         }
         if (projection.text !== after) throw new Error("Transcript transaction did not preserve rendered text.");
     }
@@ -206,7 +201,7 @@ function dirtyRanges(index: TextIndex, previous: BridgeState, projection: TextPr
         const after = transaction.mapping.slice(step + 1);
         map.forEach((_from, _to, from, to) => ranges.push({ from: after.map(from, -1), to: after.map(to, 1) }));
     });
-    // Normalization can change the provenance of untouched neighbors, e.g. D18 restoring earlier typed text.
+    // Explicit alignment changes provenance without changing text or contributing a document map.
     const change = projection === previous.projection ? null : provenanceChange(index, previous.projection, projection);
     if (change) ranges.push({ from: projectionOffset(projection, change.from, true) + 1, to: projectionOffset(projection, change.to, true) + 1 });
     const merged: DirtyRange[] = [];
@@ -230,17 +225,44 @@ export function transcriptModifications(state: EditorState): Modification[] {
 }
 
 export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Plugin[] {
+    let nativeInput: { doc: PMNode; from: number; to: number; text: string } | null = null;
     const bridge = new Plugin<BridgeState>({
         key: bridgeKey,
         state: {
-            init: () => ({ projection: initial, saved: initial, dirty: [] }),
+            init: () => ({ index, projection: initial, saved: initial, dirty: [], pendingEdit: null }),
             apply(transaction, previous, _oldState, newState) {
                 const snapshot = transaction.steps.findLast(step => step instanceof ProjectionStep);
-                let projection = snapshot instanceof ProjectionStep ? snapshot.afterProjection ?? projectText(index, snapshot.after)
-                    : transaction.getMeta(bridgeKey) ? previous.projection : applyTextSteps(index, previous.projection, transaction, !compositionActive(newState));
-                if (compositionCommit(transaction)) projection = commitText(index, previous.saved, projection);
+                const restore = !compositionActive(newState) && !compositionCommit(transaction);
+                let pendingEdit = previous.pendingEdit;
+                const edited = (from: number, to: number, length: number): void => {
+                    if (!compositionActive(newState) && !compositionCommit(transaction)) return;
+                    pendingEdit = pendingEdit ? {
+                        from: Math.min(pendingEdit.from, from),
+                        to: pendingEdit.to + Math.max(0, to - pendingEdit.end),
+                        end: Math.max(pendingEdit.end, to) + length - (to - from)
+                    } : { from, to, end: from + length };
+                };
+                let projection = previous.projection;
+                if (snapshot instanceof ProjectionStep) projection = snapshot.afterProjection ?? projectText(index, snapshot.after);
+                else if (!transaction.getMeta(bridgeKey)) {
+                    const input = nativeInput;
+                    if (input && input.doc === transaction.before
+                        && documentText(transaction.doc) === projection.text.slice(0, input.from) + input.text + projection.text.slice(input.to)) {
+                        nativeInput = null;
+                        const from = projectionOffset(projection, input.from, false), to = projectionOffset(projection, input.to, false);
+                        projection = editText(index, projection, from, to, input.text, restore);
+                        edited(from, to, Array.from(input.text).length);
+                    }
+                    else projection = applyTextSteps(index, projection, transaction, restore, edited);
+                }
+                if (compositionCommit(transaction)) {
+                    projection = commitText(index, previous.saved, projection, pendingEdit ?? undefined);
+                    pendingEdit = null;
+                    nativeInput = null;
+                }
+                if (snapshot) pendingEdit = null;
                 return {
-                    projection,
+                    index, projection, pendingEdit,
                     saved: snapshot ? projection : previous.saved,
                     dirty: transaction.getMeta(bridgeKey) === true ? [] : dirtyRanges(index, previous, projection, transaction)
                 };
@@ -282,7 +304,22 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             },
             handleDOMEvents: {
                 beforeinput(view, event) {
+                    if (view.editable && ["insertText", "insertCompositionText", "insertReplacementText"].includes(event.inputType) && event.data !== null) {
+                        const range = event.getTargetRanges()[0];
+                        if (range && view.dom.contains(range.startContainer) && view.dom.contains(range.endContainer)) {
+                            const from = view.posAtDOM(range.startContainer, range.startOffset) - 1, to = view.posAtDOM(range.endContainer, range.endOffset) - 1;
+                            const text = documentText(view.state.doc);
+                            if (from >= 0 && from <= to && to <= text.length && !splitsCodepoint(text, from) && !splitsCodepoint(text, to)) {
+                                nativeInput = { doc: view.state.doc, from, to, text: event.data };
+                            }
+                        }
+                    }
                     if (!view.editable || event.defaultPrevented || event.isComposing || view.composing) return false;
+                    if (event.cancelable && event.inputType === "insertText" && event.data !== null) {
+                        event.preventDefault();
+                        view.dispatch(view.state.tr.replaceSelection(plainSlice(view.state.schema, event.data)).scrollIntoView());
+                        return true;
+                    }
                     if (event.cancelable && /^delete(?:Content|Word|SoftLine|HardLine)(?:Backward|Forward)$/.test(event.inputType)) {
                         const ranges = event.getTargetRanges();
                         if (ranges.length !== 1) return false;
@@ -456,7 +493,25 @@ export function transcriptDeletionRestorable(element: HTMLElement | null, key: s
 
 export function restoreTranscriptDeletion(element: HTMLElement | null, key: string): boolean {
     const editor = transcriptEditorAt(element);
-    return editor ? restoreDeletion(editor.view, transcriptDeletion(editor.view, key)) : false;
+    if (!editor) return false;
+    const { index, projection } = bridgeKey.getState(editor.state)!;
+    return restoreDeletion(editor.view, transcriptDeletion(editor.view, key), index, projection);
+}
+
+export function transcriptAlignment(view: EditorView, selection: Selection = view.state.selection): TextProjection | null {
+    if (view.isDestroyed || view.composing || compositionPending(view.state) || selection.empty) return null;
+    const { index, projection } = bridgeKey.getState(view.state)!;
+    const aligned = alignText(index, projection, projectionOffset(projection, selection.from - 1, false), projectionOffset(projection, selection.to - 1, false));
+    return aligned === projection ? null : aligned;
+}
+
+export function alignTranscriptSelection(view: EditorView): boolean {
+    if (!view.editable) return false;
+    const aligned = transcriptAlignment(view);
+    if (!aligned) return false;
+    view.dispatch(closeHistory(projectionTransaction(view.state, transcriptProjection(view.state), aligned)));
+    view.focus();
+    return true;
 }
 
 export function dismissTranscriptMenu(element: HTMLElement | null): void {
