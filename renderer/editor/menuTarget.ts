@@ -4,8 +4,8 @@ import { type EditorView } from "@tiptap/pm/view";
 import { closeHistory } from "@tiptap/pm/history";
 import { type EditAction } from "../../shared/app";
 import { textPieces, type TextIndex, type TextProjection } from "../../shared/transcript/text";
-import { transcriptSelection, transcriptTokenGroup, type AddedInformation, type InspectionInformation, type TranscriptInformation } from "./informationModel";
-import { keyboardRectangle, pointerRectangle, transcriptRectangles, type InspectionGeometry, type InspectionTarget } from "./geometry";
+import { transcriptSelection, transcriptTokenGroup, type InspectionInformation, type TranscriptInformation } from "./informationModel";
+import { keyboardRectangle, pointerRectangle, type InspectionGeometry, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 
 export type TranscriptMenuTarget = {
@@ -84,11 +84,6 @@ function eventMarker(view: EditorView, target: EventTarget | null): HTMLElement 
     return expanded ? expanded.querySelector<HTMLElement>(".transcript-event.deletion") : target.closest<HTMLElement>(".transcript-event");
 }
 
-function addedInformation(from: number, to: number): AddedInformation {
-    return { key: `added/${from}/${to}`, kind: "added", from, to, sourceFrom: 0, sourceTo: 0,
-        range: null, original: null, probability: null, blankProbability: null };
-}
-
 export function transcriptMenuController(
     view: EditorView, index: TextIndex, projectionOf: (state: EditorState) => TextProjection, duration: number,
     events: () => Map<string, TranscriptInformation>, geometry: InspectionGeometry,
@@ -109,9 +104,7 @@ export function transcriptMenuController(
             const marker = view.dom.querySelector<HTMLElement>(`.transcript-event[data-inspection="${CSS.escape(information.key)}"]`);
             return marker ? { information, rectangles: [], anchor: marker.getBoundingClientRect(), keyboard, pressed: false } : null;
         }
-        const rectangles = information.kind === "token"
-            ? transcriptTokenGroup(index, projectionOf(view.state), information).map(item => transcriptRectangles(view, item))
-            : [transcriptRectangles(view, { from: target.from - 1, to: target.to - 1 }, true)];
+        const rectangles = geometry.rectangles(information);
         const rects = rectangles.flat();
         const caret = view.coordsAtPos(target.position);
         const anchor = point && pointerRectangle(rects, point, { top: 0, right: 0, bottom: 0, left: 0 })
@@ -137,8 +130,8 @@ export function transcriptMenuController(
             const pieces = textPieces(index, projection, from, to, true).filter(piece => Math.max(from, piece.utf16From) < Math.min(to, piece.utf16To));
             const original = pieces.some(piece => piece.source.kind === "segment");
             const added = pieces.some(piece => piece.source.kind !== "segment");
-            const information = transcriptSelection(index, projection, duration, from, to) ?? addedInformation(from, to);
-            return { kind: "selection", from: information.from + 1, to: information.to + 1, position, information,
+            const information = transcriptSelection(index, projection, duration, from, to);
+            return { kind: "selection", from: (information?.from ?? from) + 1, to: (information?.to ?? to) + 1, position, information,
                 selectionKind: original ? added ? "mixed" : "original" : "added" };
         }
         const point = { x: event.clientX, y: event.clientY, pressed: false };

@@ -210,5 +210,4 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
     };
 }
 
-export type AddedInformation = Omit<TranscriptInformation, "kind"> & { kind: "added" };
-export type InspectionInformation = TranscriptInformation | SelectionInformation | AddedInformation;
+export type InspectionInformation = TranscriptInformation | SelectionInformation;

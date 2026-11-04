@@ -1,7 +1,7 @@
 import { type EditorState } from "@tiptap/pm/state";
 import { type EditorView } from "@tiptap/pm/view";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
-import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type TranscriptInformation, type SelectionInformation } from "./informationModel";
+import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type SelectionInformation } from "./informationModel";
 import { compositionPending } from "./composition";
 
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
@@ -94,6 +94,7 @@ export function keyboardRectangle<T extends Rectangle>(rectangles: readonly T[],
 }
 
 export type InspectionGeometry = {
+    rectangles: (information: InspectionInformation) => DOMRect[][];
     hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, options?: { measure?: boolean; selection?: boolean }) => InspectionTarget | null;
     containsAddedText: (pointer: InspectionPointer | null) => boolean;
     keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
@@ -118,8 +119,10 @@ export function inspectionGeometry(
     function rectangles(item: { from: number; to: number }): DOMRect[] {
         return transcriptRectangles(view, item);
     }
-    function tokenRectangles(item: TranscriptInformation): DOMRect[][] {
-        return transcriptTokenGroup(index, projectionOf(view.state), item).map(rectangles);
+    function informationRectangles(information: InspectionInformation): DOMRect[][] {
+        const fragments = information.kind === "selection" ? information.fragments
+            : information.kind === "token" ? transcriptTokenGroup(index, projectionOf(view.state), information) : [];
+        return fragments.map(rectangles);
     }
     function spacingOf(item: { from: number }): Spacing | null {
         const start = view.domAtPos(item.from + 1, 1).node;
@@ -148,13 +151,14 @@ export function inspectionGeometry(
             measure = true;
         }
         if (measure || measureSelection) {
-            selected.rectangles = selected.information?.fragments.map(rectangles) ?? [];
+            selected.rectangles = selected.information ? informationRectangles(selected.information) : [];
             selected.hit = rectangles(selected);
             measureSelection = false;
         }
         return selected;
     }
     return {
+        rectangles: informationRectangles,
         hover(pointer, previous, { measure = false, selection = true } = {}) {
             if (measure) measureSelection = true;
             if (!pointer || blocked()) return null;
@@ -190,7 +194,7 @@ export function inspectionGeometry(
             // At a boundary try the following token first, then the preceding token's spacing.
             for (const item of transcriptTokens(index, projectionOf(view.state), offset).reverse()) {
                 if (offset < item.from || offset > item.to) continue;
-                const boxes = !measure && previous?.information === item ? previous.rectangles : tokenRectangles(item);
+                const boxes = !measure && previous?.information === item ? previous.rectangles : informationRectangles(item);
                 const rects = boxes.flat();
                 let anchor = pointerRectangle(rects, pointer, { top: 0, right: 0, bottom: 0, left: 0 });
                 if (!anchor) {
@@ -227,7 +231,7 @@ export function inspectionGeometry(
             // A caret at a boundary belongs to the following character; the document end has none.
             const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);
             if (!item) return null;
-            const boxes = tokenRectangles(item);
+            const boxes = informationRectangles(item);
             const caret = view.coordsAtPos(view.state.selection.head);
             const anchor = keyboardRectangle(boxes.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
             return { information: item, rectangles: boxes, anchor, keyboard: true, pressed: false };
