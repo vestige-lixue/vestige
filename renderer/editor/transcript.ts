@@ -35,7 +35,8 @@ const sourceDOM = new WeakMap<HTMLElement, { kind: string; index: number }>();
 const Document = Node.create({ name: "doc", topNode: true, content: "paragraph" });
 
 const Paragraph = Node.create({
-    name: "paragraph", group: "block", content: "(text | hardBreak)*", whitespace: "pre",
+    // ProseMirror's modifier-click node selection would select the entire single-paragraph transcript.
+    name: "paragraph", group: "block", content: "(text | hardBreak)*", whitespace: "pre", selectable: false,
     parseHTML() {
         return [{ tag: "div" }, { tag: "p" }];
     },

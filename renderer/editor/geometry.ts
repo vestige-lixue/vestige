@@ -96,7 +96,7 @@ export function keyboardRectangle<T extends Rectangle>(rectangles: readonly T[],
 export type InspectionGeometry = {
     rectangles: (information: InspectionInformation) => DOMRect[][];
     hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, options?: { measure?: boolean; selection?: boolean }) => InspectionTarget | null;
-    containsAddedText: (pointer: InspectionPointer | null) => boolean;
+    overTextOrMarker: (point: Point) => boolean;
     keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
 };
 
@@ -205,12 +205,13 @@ export function inspectionGeometry(
             }
             return null;
         },
-        containsAddedText(pointer) {
-            if (!pointer || blocked()) return false;
-            const added = document.elementFromPoint(pointer.x, pointer.y)?.closest(".transcript-added");
-            if (!added || !view.dom.contains(added)) return false;
-            // Inline fragments include the text's padding without filling the whitespace between wrapped lines.
-            return !!pointerRectangle([...added.getClientRects()], pointer, { top: 0, right: 0, bottom: 0, left: 0 });
+        overTextOrMarker({ x, y }) {
+            // Use native inline hit boxes at fractional boundaries and include text beneath transparent marker anchors.
+            for (const element of document.elementsFromPoint(x, y)) {
+                if (!view.dom.contains(element)) break;
+                if (element.matches(".transcript-text, .transcript-event")) return true;
+            }
+            return false;
         },
         keyboard(control, element = document.activeElement) {
             if (blocked() || !document.hasFocus()) return null;

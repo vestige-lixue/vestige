@@ -52,7 +52,8 @@ type InspectionState = {
     hovered: InspectionTarget | null;
     keyboard: InspectionTarget | null;
     priority: "pointer" | "keyboard";
-    activation: string | null;
+    /** A modifier press owns the click even when it misses or its seek is cancelled. */
+    activation: { key: string | null } | null;
 };
 
 export function inspectionController(view: EditorView, geometry: InspectionGeometry, options: InspectionCallbacks): {
@@ -125,7 +126,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         if (changed) {
             state.held = value;
             // Modifier-click needs the modifier held from press to release.
-            state.activation = null;
+            if (state.activation) state.activation.key = null;
         }
         if (!value || state.chorded) return setControl(false) || changed;
         if (!state.control && controlTimer === undefined) controlTimer = setTimeout(() => {
@@ -148,7 +149,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         hold(inspectionModifier(event));
         state.pointer = { x: event.clientX, y: event.clientY, pressed: event.buttons !== 0 };
         state.hovered = geometry.hover(state.pointer, state.hovered);
-        options.onHover?.(event.type !== "pointerleave" && (!!state.hovered || geometry.containsAddedText(state.pointer)));
+        options.onHover?.(event.type !== "pointerleave" && (!!state.hovered || geometry.overTextOrMarker(state.pointer)));
         inspect(state.hovered ? "pointer" : state.priority);
     }
     function modifiers(event: KeyboardEvent): void {
@@ -173,26 +174,25 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     function down(event: PointerEvent): void {
         state.activation = null;
         move(event);
-        if (event.button !== 0 || !state.held) return;
-        const target = geometry.hover(state.pointer, null, { selection: false });
-        if (!target?.information.range) return;
-        // Modifier-click is an audio link, so suppress native caret/word selection in capture phase.
+        if (event.button !== 0 || !state.held || !state.pointer) return;
+        // A missed audio link must also keep the selection and the viewport where they are.
         event.preventDefault();
         event.stopPropagation();
-        state.activation = target.information.key;
+        const item = geometry.hover(state.pointer, null, { selection: false })?.information;
+        state.activation = { key: item?.range ? item.key : null };
     }
     function up(event: PointerEvent): void {
         if (state.pointer?.pressed) move(event);
     }
     function click(event: MouseEvent): void {
-        const key = state.activation;
+        const activation = state.activation;
         state.activation = null;
-        if (event.button !== 0 || !inspectionModifier(event) || !key) return;
-        const item = geometry.hover(state.pointer, null, { selection: false })?.information;
-        if (!item?.range || item.key !== key) return;
+        if (event.button !== 0 || !activation) return;
         event.preventDefault();
-        event.stopPropagation();
-        options.onSeek(item.range.start);
+        event.stopImmediatePropagation();
+        if (!activation.key || !inspectionModifier(event)) return;
+        const item = geometry.hover(state.pointer, null, { selection: false })?.information;
+        if (item?.range && item.key === activation.key) options.onSeek(item.range.start);
     }
     function reset(): void {
         settleFocus(null);
@@ -235,7 +235,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         if (compositionPending(previous)) return refresh();
         const changed = view.state.doc !== previous.doc;
         if (changed || !view.state.selection.eq(previous.selection)) {
-            state.activation = null;
+            if (state.activation) state.activation.key = null;
             state.hovered = geometry.hover(state.pointer, state.hovered, { measure: true });
             state.keyboard = geometry.keyboard(state.control);
             inspect(state.control ? "keyboard" : state.priority);
