@@ -9,6 +9,14 @@
             class="editor" spellcheck={false} style:--transcript-font-size={`${settings.getEditing().fontSize}px`}
             tabindex={-1} bind:this={element}
         ></div>
+        {#if hoveredLineBreak}
+            <div class="line-breaks" aria-hidden="true">
+                <span
+                    class="line-break" class:added={hoveredLineBreak.added} style:left={`${hoveredLineBreak.left}px`} style:top={`${hoveredLineBreak.top}px`}
+                    style:height={`${hoveredLineBreak.height}px`} style:line-height={`${hoveredLineBreak.height}px`} style:font-size={`${hoveredLineBreak.fontSize}px`}
+                >&emsp;<svg class="line-break-glyph" viewBox="0 0 16 16"><path d="M13 3v7H3M6 7l-3 3 3 3" /></svg></span>
+            </div>
+        {/if}
         {#if inspection?.rectangles.length}
             <svg class="inspection-outline">
                 {#each outlines as path (path)}<path d={path} />{/each}
@@ -73,6 +81,41 @@
         stroke: var(--c-text-80p);
         stroke-width: 1px;
         stroke-dasharray: 3 2;
+    }
+    .line-breaks {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+    }
+    /* The hint is laid out like the break's own text box, so an added break's underline matches added text. */
+    .line-break {
+        position: absolute;
+        white-space: pre;
+        color: var(--c-text-80p);
+    }
+    /* Every glyph is muted; only the underline, colored like added text's, marks an added break. */
+    .line-break.added {
+        text-decoration-color: var(--c-text);
+        text-decoration-line: underline;
+        text-decoration-style: dashed;
+        text-underline-offset: .2em;
+        text-decoration-skip-ink: none;
+        text-decoration-thickness: 1px;
+    }
+    /* Drawn rather than taken from the font, so its size does not depend on the font's arrow glyph. */
+    .line-break-glyph {
+        position: absolute;
+        inset: 0;
+        width: .7em;
+        height: .7em;
+        margin: auto;
+        overflow: visible;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
     }
     :global(.tooltip-content.transcript-tooltip) {
         display: block;
@@ -157,6 +200,7 @@
     .editor :global(.transcript-event-anchor) {
         /* Inline anchors with positioned children corrupt Chromium's IME text offsets. */
         position: absolute;
+        z-index: 1;
         display: inline;
         font-size: 0;
         line-height: 0;
@@ -264,6 +308,7 @@
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
     import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
     import { textRectangles } from "../../editor/geometry";
+    import { measureLineBreaks, sameLineBreaks, lineBreakAt, type LineBreakBox } from "../../editor/lineBreaks";
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
     import * as settings from "../../states/settings.svelte";
@@ -279,6 +324,10 @@
     let contextMenu: { show: TranscriptMenuCallbacks["open"]; edit: TranscriptMenuCallbacks["edit"] };
     let inspection = $state.raw<TranscriptInspection | null>(null);
     let selectionRectangles = $state.raw<DOMRect[]>([]);
+    let lineBreaks = $state.raw<LineBreakBox[]>([]);
+    let hoveredBreak = $state(-1);
+    // Index -1 means no hovered break and reads undefined.
+    const hoveredLineBreak = $derived<LineBreakBox | undefined>(lineBreaks[hoveredBreak]);
     let tooltipOpen = $state(false);
     let openTimer: ReturnType<typeof setTimeout> | undefined;
     let skipDelayUntil = 0;
@@ -445,6 +494,54 @@
             document.removeEventListener("selectionchange", schedule);
             window.removeEventListener("scroll", schedule, true);
             selectionRectangles = [];
+        };
+    });
+
+    $effect(() => {
+        const current = editor;
+        if (!current) return;
+        let frame = 0;
+        let pointer: { x: number; y: number } | null = null;
+        function hover(): void {
+            const origin = element.getBoundingClientRect();
+            hoveredBreak = pointer ? lineBreakAt(lineBreaks, pointer.x - origin.left, pointer.y - origin.top) : -1;
+        }
+        function refresh(): void {
+            frame = 0;
+            if (current!.isDestroyed) return;
+            const next = measureLineBreaks(current!.view.dom, element.getBoundingClientRect());
+            if (!sameLineBreaks(next, lineBreaks)) lineBreaks = next;
+            hover();
+        }
+        // Expanding a deletion or a playback change moves text without a document change.
+        function schedule(): void {
+            if (!frame) frame = requestAnimationFrame(refresh);
+        }
+        function move(event: PointerEvent): void {
+            pointer = event.pointerType === "touch" ? null : { x: event.clientX, y: event.clientY };
+            hover();
+        }
+        function leave(): void {
+            pointer = null;
+            hover();
+        }
+        const observer = new ResizeObserver(schedule);
+        observer.observe(current.view.dom);
+        current.on("transaction", schedule);
+        element.addEventListener("pointermove", move);
+        element.addEventListener("pointerleave", leave);
+        // Scrolling moves text under a resting pointer without a pointer event.
+        window.addEventListener("scroll", hover, true);
+        schedule();
+        return () => {
+            cancelAnimationFrame(frame);
+            observer.disconnect();
+            current.off("transaction", schedule);
+            element.removeEventListener("pointermove", move);
+            element.removeEventListener("pointerleave", leave);
+            window.removeEventListener("scroll", hover, true);
+            lineBreaks = [];
+            hoveredBreak = -1;
         };
     });
 
