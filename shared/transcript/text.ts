@@ -1,4 +1,5 @@
 import { firstTrue } from "../util/search";
+import { commonRuns } from "../util/diff";
 import { type Modification } from "../Vestige";
 import { type TranscriptSpan } from "../transcription/Run";
 import { type TextPosition } from "../util/range";
@@ -291,14 +292,19 @@ export function canAlignText(index: TextIndex, projection: TextProjection, from:
     for (let i = 0; i < projection.modifications.length; i++) {
         const candidate = alignmentCandidate(index, projection, i, from, to);
         if (!candidate) continue;
-        // A shared endpoint guarantees a nonempty prefix or suffix; inspect at most two UTF-16 units.
-        if (candidate.text.codePointAt(0) === index.characters[candidate.start].codePointAt(0)
-            || Array.from(candidate.text.slice(Math.max(0, candidate.selectedTo - 2), candidate.selectedTo)).at(-1) === index.characters[candidate.end - 1]) return true;
+        // Any shared character makes the longest common subsequence nonempty.
+        const original = new Set(index.characters.slice(candidate.start, candidate.end));
+        if (Array.from(candidate.text.slice(0, candidate.selectedTo)).some(character => original.has(character))) return true;
         i++;
     }
     return false;
 }
 
+function codePoints(characters: readonly string[]): Int32Array {
+    return Int32Array.from(characters, character => character.codePointAt(0)!);
+}
+
+// Explicit alignment keeps a longest common subsequence of each deleted original and its selected added text.
 export function alignText(index: TextIndex, projection: TextProjection, from: number, to: number): TextProjection {
     if (from >= to) return projection;
     const modifications: Modification[] = [];
@@ -310,12 +316,15 @@ export function alignText(index: TextIndex, projection: TextProjection, from: nu
         }
         const { start, end, text, selectedTo } = candidate;
         const characters = Array.from(text.slice(0, selectedTo));
-        let prefix = 0, suffix = 0;
-        while (start + prefix < end && prefix < characters.length && index.characters[start + prefix] === characters[prefix]) prefix++;
-        while (end - suffix > start + prefix && characters.length - suffix > prefix
-            && index.characters[end - suffix - 1] === characters[characters.length - suffix - 1]) suffix++;
-        if (start + prefix < end - suffix) modifications.push(deletionOf(index, start + prefix, end - suffix));
-        if (prefix < characters.length - suffix) modifications.push(insertionOf(index, end - suffix, characters.slice(prefix, characters.length - suffix).join("")));
+        const runs = commonRuns(codePoints(index.characters.slice(start, end)), codePoints(characters));
+        let source = start, added = 0;
+        for (const run of [...runs, { a: end - start, b: characters.length, length: 0 }]) {
+            const position = start + run.a;
+            if (source < position) modifications.push(deletionOf(index, source, position));
+            if (added < run.b) modifications.push(insertionOf(index, position, characters.slice(added, run.b).join("")));
+            source = position + run.length;
+            added = run.b + run.length;
+        }
         if (selectedTo < text.length) modifications.push(insertionOf(index, end, text.slice(selectedTo)));
         i++;
     }

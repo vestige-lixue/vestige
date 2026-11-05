@@ -455,15 +455,19 @@ describe("text projection and editing", () => {
     });
 
     it.each([
-        ["what", "want", [[1, 3, ""], [3, 3, "an"]]],
+        ["what", "want", [[1, 2, ""], [3, 3, "n"]]],
         ["what", "that", [[0, 1, ""], [1, 1, "t"]]],
         ["天汽", "天气", [[1, 2, ""], [2, 2, "气"]]],
         ["😀中x", "😀文x", [[1, 2, ""], [2, 2, "文"]]],
         ["abXcd", "abYcd", [[2, 3, ""], [3, 3, "Y"]]],
         ["aaaa", "aa", [[2, 4, ""]]],
         ["what", "what", []],
-        ["abc", "XbY", [[0, 3, ""], [3, 3, "XbY"]]]
-    ] as [string, string, [number, number, string][]][])("aligns only the two ends of %s / %s", (original, added, expected) => {
+        ["abc", "XbY", [[0, 1, ""], [1, 1, "X"], [2, 3, ""], [3, 3, "Y"]]],
+        ["ac", "abc", [[1, 1, "b"]]],
+        ["abc", "XYZ", [[0, 3, ""], [3, 3, "XYZ"]]],
+        ["天汽很好啊", "天气很好呀", [[1, 2, ""], [2, 2, "气"], [4, 5, ""], [5, 5, "呀"]]],
+        ["风吹过的地方", "雨落下的时候", [[0, 3, ""], [3, 3, "雨落下"], [4, 6, ""], [6, 6, "时候"]]]
+    ] as [string, string, [number, number, string][]][])("aligns a longest common subsequence of %s / %s", (original, added, expected) => {
         const spans = transcript([original]), index = createTextIndex(spans);
         const before = editText(index, projectText(index, []), 0, index.characters.length, added, false);
         const aligned = alignText(index, before, 0, before.length);
@@ -480,7 +484,7 @@ describe("text projection and editing", () => {
         [0, 2, [[2, 5, ""], [5, 5, "ant"]]],
         [2, 4, null],
         [1, 1, null],
-        [1, 5, [[2, 4, ""], [4, 4, "an"]]]
+        [1, 5, [[2, 3, ""], [4, 4, "n"]]]
     ])("limits alignment to selected text beside an included marker %i/%i", (from, to, expected) => {
         const spans = transcript(["LwhatR"]), index = createTextIndex(spans);
         const before = editText(index, projectText(index, []), 1, 5, "want", false);
@@ -495,8 +499,8 @@ describe("text projection and editing", () => {
         ["eco", "echo", 1, [[1, 3, ""], [3, 3, "cho"]]],
         ["eco", "jeco", 1, [[0, 3, ""], [3, 3, "jeco"]]],
         ["eco", "jecoTAIL", 4, [[0, 0, "j"], [3, 3, "TAIL"]]],
-        ["what", "wantTAIL", 3, [[1, 4, ""], [4, 4, "antTAIL"]]],
-        ["what", "wantTAIL", 4, [[1, 3, ""], [3, 3, "an"], [4, 4, "TAIL"]]],
+        ["what", "wantTAIL", 3, [[1, 2, ""], [3, 4, ""], [4, 4, "ntTAIL"]]],
+        ["what", "wantTAIL", 4, [[1, 2, ""], [3, 3, "n"], [4, 4, "TAIL"]]],
         ["what", "thatTAIL", 4, [[0, 1, ""], [1, 1, "t"], [4, 4, "TAIL"]]],
         ["abc", "abcX", 2, [[2, 3, ""], [3, 3, "cX"]]],
         ["😀中x", "😀文x尾", 1, [[1, 3, ""], [3, 3, "文x尾"]]],
@@ -519,7 +523,7 @@ describe("text projection and editing", () => {
         const aligned = alignText(index, before, 1, 6);
         expect(aligned.text).toBe(before.text);
         expect(aligned.modifications).toEqual([
-            ...modification(spans, 2, 4, ""), ...modification(spans, 4, 4, "an"),
+            ...modification(spans, 2, 3, ""), ...modification(spans, 4, 4, "n"),
             ...modification(spans, 6, 9, ""), ...modification(spans, 9, 9, "jeco")
         ]);
     });
@@ -544,16 +548,16 @@ describe("text projection and editing", () => {
     });
 
     it.each([
-        ["😀x", "😀y", true], ["x😀", "y😀", true],
+        ["😀x", "😀y", true], ["x😀", "y😀", true], ["a😀b", "x😀y", true],
         ["\uD83D", "😀", false], ["\uDE00", "😀", false], ["x\uDE00", "y😀", false]
-    ] as [string, string, boolean][])("checks complete endpoint codepoints for %s / %s", (original, added, expected) => {
+    ] as [string, string, boolean][])("compares complete codepoints for %s / %s", (original, added, expected) => {
         const index = createTextIndex(transcript([original]));
         const value = editText(index, projectText(index, []), 0, index.characters.length, added, false);
         expect(canAlignText(index, value, 0, value.length)).toBe(expected);
         expect(alignText(index, value, 0, value.length) !== value).toBe(expected);
     });
 
-    it("aligns random edits without changing display and leaves neither matching end", () => {
+    it("aligns random edits without changing display and leaves no shared character beside any marker", () => {
         checkProperty("explicit-alignment", fc.property(editingArbitrary, ({ spans, edits }) => {
             const index = createTextIndex(spans);
             let value = projectText(index, []);
@@ -571,9 +575,29 @@ describe("text projection and editing", () => {
                 if (deletion.type !== "delete" || insertion?.type !== "insert") return;
                 const from = textOffset(index, deletion.range.start), to = textOffset(index, deletion.range.end);
                 if (textOffset(index, insertion.pos) !== to) return;
-                expect([...insertion.text][0]).not.toBe(index.characters[from]);
-                expect([...insertion.text].at(-1)).not.toBe(index.characters[to - 1]);
+                const original = new Set(index.characters.slice(from, to));
+                expect([...insertion.text].filter(character => original.has(character))).toEqual([]);
             });
+        }));
+    });
+
+    it("keeps as many original characters as a longest common subsequence", () => {
+        const characters = fc.constantFrom("a", "b", "c", "😀", "\uD83D");
+        checkProperty("alignment-lcs", fc.property(fc.array(characters, { minLength: 1, maxLength: 16 }), fc.array(characters, { maxLength: 16 }), (original, added) => {
+            const index = createTextIndex(transcript(original));
+            const before = editText(index, projectText(index, []), 0, original.length, added.join(""), false);
+            const aligned = alignText(index, before, 0, before.length);
+            const lengths = Array.from({ length: original.length + 1 }, () => new Array<number>(added.length + 1).fill(0));
+            for (let i = 1; i <= original.length; i++) {
+                for (let j = 1; j <= added.length; j++) {
+                    lengths[i][j] = original[i - 1] === added[j - 1] ? lengths[i - 1][j - 1] + 1 : Math.max(lengths[i - 1][j], lengths[i][j - 1]);
+                }
+            }
+            const kept = textPieces(index, aligned).filter(piece => piece.source.kind === "segment").reduce((sum, piece) => sum + piece.to - piece.from, 0);
+            expect(aligned.text).toBe(before.text);
+            expect(kept).toBe(lengths[original.length][added.length]);
+            expect(canAlignText(index, before, 0, before.length)).toBe(kept > 0);
+            expect(canAlignText(index, aligned, 0, aligned.length)).toBe(false);
         }));
     });
 
