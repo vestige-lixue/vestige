@@ -150,6 +150,12 @@
         }
     },
     "project": {
+        "empty": {
+            "newAction": "新建项目",
+            "newDescription": "<action/> <shortcut/>，或拖入媒体文件。",
+            "openAction": "打开项目",
+            "openDescription": "<action/> <shortcut/>，或拖入 <extension/> 文件。"
+        },
         "unsaved": {
             "name": "未命名",
             "hint": "尚未保存，点击保存"

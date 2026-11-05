@@ -36,7 +36,7 @@ s {
     text-decoration-skip-ink: none;
 }
 
-kbd {
+kbd, code:not(pre code) {
     display: inline-flex;
     align-items: center;
     height: 1.5em;

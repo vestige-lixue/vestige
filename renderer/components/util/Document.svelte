@@ -75,9 +75,13 @@
         border: 1px solid var(--c-border);
         border-radius: 6px;
     }
-    article :global(pre), article :global(code) {
+    article :global(pre), article :global(pre code) {
         font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
         font-size: 13px;
+    }
+    article :global(code:not(pre code)) {
+        display: inline;
+        white-space: normal;
     }
     article :global(table) {
         width: 100%;

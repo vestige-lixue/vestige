@@ -150,6 +150,12 @@
         }
     },
     "project": {
+        "empty": {
+            "newAction": "Create a new project",
+            "newDescription": "<action/> <shortcut/>, or drop media files here.",
+            "openAction": "Open a project",
+            "openDescription": "<action/> <shortcut/>, or drop a <extension/> file here."
+        },
         "unsaved": {
             "name": "Untitled",
             "hint": "Not saved yet. Click to save."
