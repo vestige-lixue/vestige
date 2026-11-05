@@ -156,7 +156,7 @@ function clearPlaybackPositions(value: Project | null): boolean {
 }
 
 function createProject(): Project {
-    return { version: projectVersion, lastOpened: Date.now(), vestiges: [] };
+    return { version: projectVersion, lastOpened: Date.now(), selectedMediaId: null, vestiges: [] };
 }
 
 function hasChanges(includePendingImports = true): boolean {
@@ -273,20 +273,24 @@ async function prepareToLeave(allowPendingImports = false): Promise<boolean> {
     return true;
 }
 
+function restoreMediaSelection(): void {
+    const ids = project.projectState.project?.vestiges.map(vestige => vestige.media.id) ?? [];
+    const selected = mediaSelection.get() ?? ids[0] ?? null;
+    mediaImportAPI.reset(ids, selected);
+    if (mediaSelection.select(selected)) projectRevision++;
+}
+
 async function replaceProject(nextProject: Project | null, path: AbsolutePath | null): Promise<void> {
     // Version zero describes the disk snapshot, before session normalization.
     projectRevision = 0;
     savedRevision = path === null ? -1 : 0;
     if (!settings.getConfirmedPlayback().rememberPlaybackPosition && clearPlaybackPositions(nextProject)) projectRevision++;
-    mediaSelection.select(null);
     transcriptionAPI.stopAll();
     projectGeneration++;
-    mediaImportAPI.reset([]);
-    const released = playerAPI.reset();
     project.projectState.path = path;
     project.setProject(nextProject);
-    await released;
-    mediaImportAPI.reset(nextProject?.vestiges.map(vestige => vestige.media.id) ?? []);
+    restoreMediaSelection();
+    await playerAPI.reset();
 }
 
 export function create(): Promise<boolean> {
@@ -306,13 +310,17 @@ async function openSource(source: InputSource): Promise<boolean> {
     const resolved = typeof source === "string" ? { success: true as const, path: source } : await window.api.file.getPathForFile(source);
     if (!resolved.success) throw new VestigeErrors(resolved.error);
     const path = resolved.path;
+    // Reopening the current file must read the selection and edits flushed on leave.
+    const currentPath = project.projectState.path;
+    const reopening = window.api.platform === "win32" ? path.toLowerCase() === currentPath?.toLowerCase() : path === currentPath;
+    if (reopening && !await prepareToLeave()) return false;
     setOperation({ kind: "read", path });
     const result = await window.api.project.getProject(path);
     if (!result.success) {
         reportError({ kind: "read-failed", path, failure: result.error });
         return false;
     }
-    if (!await prepareToLeave()) return false;
+    if (!reopening && !await prepareToLeave()) return false;
     setOperation({ kind: "open", path });
     const lastOpened = Date.now();
     const openedAtChanged = result.project.lastOpened !== lastOpened;
@@ -433,6 +441,7 @@ export function selectMedia(id: string | null, playFromStart = false): void {
     playerAPI.commitSeekPreview();
     playerAPI.captureProgress();
     if (!mediaSelection.select(id)) return;
+    projectRevision++;
     mediaImportAPI.prioritize(id);
     if (playFromStart) {
         const vestige = project.getVestige(id);
@@ -538,7 +547,7 @@ export function close(): Promise<boolean> {
 
 export function startLifecycle(prepareSettingsBeforeQuit: () => Promise<boolean>): () => void {
     lifecycleStarted = true;
-    mediaImportAPI.reset(project.projectState.project?.vestiges.map(vestige => vestige.media.id) ?? []);
+    restoreMediaSelection();
     let rememberPlaybackPosition: boolean | null = null;
     const unsubscribeSettings = settingsAPI.subscribe(value => {
         if (value === null) return;
@@ -605,7 +614,6 @@ export function startLifecycle(prepareSettingsBeforeQuit: () => Promise<boolean>
         projectGeneration++;
         transcriptionAPI.stopAll();
         mediaImportAPI.reset([]);
-        mediaSelection.select(null);
         void playerAPI.reset().catch(reportUnexpected);
         pauseAutosave();
         unsubscribe();

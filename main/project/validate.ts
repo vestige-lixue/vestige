@@ -10,9 +10,11 @@ import { type AbsolutePath } from "../../shared/util/path";
 import { resolveMediaPath } from "./path";
 
 // JSON stores plain strings; establish the path brand after structural validation.
-type SerializedProject = Omit<Project, "version" | "vestiges"> & {
+type SerializedProject = Omit<Project, "version" | "selectedMediaId" | "vestiges"> & {
     // Keep the version text for the unsupported-version diagnostic.
     version: string;
+    // Older version-one files did not record a selection.
+    selectedMediaId?: Project["selectedMediaId"];
     vestiges: Array<Omit<Project["vestiges"][number], "media"> & {
         media: Omit<Project["vestiges"][number]["media"], "path"> & { path: string };
     }>;
@@ -89,7 +91,7 @@ export function parseProject(value: unknown, directory?: AbsolutePath): Project 
         if (typeof props.value === "number" && props.expected.includes("number")) {
             return new VestigeErrors({ kind: "project-invalid-number", path, integer: /\.(?:lastOpened|size|displayedRunIdx|startedAt|segmentIdx|offset|batchSize)$/.test(path) }, { cause: props });
         }
-        if (typeof props.value === "string" && path.endsWith(".media.id")) {
+        if (typeof props.value === "string" && (path.endsWith(".media.id") || path === "project.selectedMediaId")) {
             return new VestigeErrors({ kind: "project-invalid-uuid", path }, { cause: props });
         }
         return new VestigeErrors({ kind: "project-invalid-structure", path, expected: props.expected }, { cause: props });
@@ -98,9 +100,11 @@ export function parseProject(value: unknown, directory?: AbsolutePath): Project 
     // Own every nested object before resolving paths or normalizing modifications.
     const project = structuredClone(checked);
     const mediaIds = new Set<string>();
+    const selectedId = project.selectedMediaId?.toLowerCase();
     return {
         ...project,
         version: projectVersion,
+        selectedMediaId: selectedId ? project.vestiges.find(({ media }) => media.id.toLowerCase() === selectedId)?.media.id ?? null : null,
         vestiges: project.vestiges.map((vestige, index) => {
             const path = `project.vestiges[${index}]`;
             const { media, runs } = vestige;

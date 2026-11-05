@@ -84,6 +84,7 @@ export function project(spans: TranscriptSpan[] = transcript(["hello"]), modific
     return {
         version: projectVersion,
         lastOpened: 0,
+        selectedMediaId: null,
         vestiges: [{
             media: {
                 id: "00000000-0000-4000-8000-000000000001",

@@ -34,6 +34,20 @@ describe("project validation contract through the real typia transform", () => {
         expect(() => parseProject(project())).not.toThrow();
     });
 
+    it("restores the selected media by UUID and accepts projects without a selection", () => {
+        const input = project();
+        const id = "abcdefab-cdef-4abc-abcd-abcdefabcdef";
+        input.vestiges[0].media.id = id;
+        input.selectedMediaId = id;
+        expect(parseProject(JSON.parse(JSON.stringify(input))).selectedMediaId).toBe(id);
+        expect(parseProject({ ...input, selectedMediaId: id.toUpperCase() }).selectedMediaId).toBe(id);
+        expect(parseProject({ ...input, vestiges: [] }).selectedMediaId).toBeNull();
+        expect(parseProject({ ...input, selectedMediaId: null }).selectedMediaId).toBeNull();
+        const { selectedMediaId, ...legacy } = input;
+        expect(parseProject(legacy).selectedMediaId).toBeNull();
+        expectFailure({ ...input, selectedMediaId: selectedMediaId + "!" }, "project-invalid-uuid");
+    });
+
     it("rejects structurally invalid input through the generated checker (transform canary)", () => {
         const legal = project();
         const invalid = { ...legal, vestiges: [{ ...legal.vestiges[0], media: { ...legal.vestiges[0].media, duration: "one" } }] };

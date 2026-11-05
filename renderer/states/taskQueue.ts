@@ -29,14 +29,14 @@ export class TaskQueue<Value> {
         this.concurrency = options.concurrency;
     }
 
-    enqueue(id: string, value: Value): ScheduledTask<Value> {
+    enqueue(id: string, value: Value, priority = 0): ScheduledTask<Value> {
         const previous = this.entries.get(id);
         if (previous) this.cancelEntry(previous);
         const controller = new AbortController();
         let resolve!: () => void;
         const completed = new Promise<void>(done => resolve = done);
         const task = { id, value, signal: controller.signal, completed };
-        this.entries.set(id, { task, controller, resolve, state: "queued", priority: 0, order: this.order++ });
+        this.entries.set(id, { task, controller, resolve, state: "queued", priority, order: this.order++ });
         this.pump();
         return task;
     }

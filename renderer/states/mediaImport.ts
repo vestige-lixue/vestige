@@ -77,7 +77,6 @@ function resetValidation(): void {
     validation.setPlaying(playing);
     validationReady = false;
     tasks.setConcurrency(0);
-    prioritized = null;
 }
 
 function monitorValidation(): void {
@@ -176,7 +175,7 @@ function showIssue(id: string): void {
     issueDialogs.set(id, dialog);
 }
 
-export function reset(ids: string[]): void {
+export function reset(ids: string[], selectedId: string | null = null): void {
     collection?.abort();
     collection = null;
     mediaImport.state.collecting = false;
@@ -192,6 +191,7 @@ export function reset(ids: string[]): void {
     mediaImport.items.clear();
     for (const id of ids) mediaImport.items.set(id, mediaImport.createItem({ id, stage: "queued" }));
     mediaImport.state.ids = [...ids];
+    prioritized = selectedId;
     for (const id of ids) enqueue(id, { kind: "check", path: project.getMedia(id)!.path }, "");
 }
 
@@ -310,8 +310,7 @@ function reportFailure(id: string, status: MediaIssueStatus, error: FailureInfo,
 function enqueue(id: string, source: TaskSource, name: string): void {
     closeIssue(id);
     update({ id, stage: "queued" });
-    tasks.enqueue(id, source);
-    if (prioritized === id) tasks.setPriority(id, 1);
+    tasks.enqueue(id, source, prioritized === id ? 1 : 0);
     mediaImport.names.set(id, name);
     monitorValidation();
 }
