@@ -5,7 +5,7 @@ import { dropPoint } from "@tiptap/pm/transform";
 import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
-import { transcriptScrollPlugin, scrollTranscriptPlayback } from "./scroll";
+import { transcriptScrollPlugin, scrollTranscriptPlayback, scrollTranscriptSelectionHead, dispatchPreservingScroll } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep, projectionTransaction } from "./projectionStep";
 import { history, undo, redo, closeHistory } from "@tiptap/pm/history";
@@ -348,6 +348,21 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         .sort((left, right) => left.start - right.start);
     const latestEnd: number[] = [];
     for (const interval of intervals) latestEnd.push(Math.max(latestEnd.at(-1) ?? -Infinity, interval.end));
+    function playbackRanges(projection: TextProjection, time: number): number[] {
+        const ranges: number[] = [];
+        const first = firstTrue(intervals.length, index => intervals[index].start > time);
+        for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
+            const { segmentIdx, end } = intervals[i];
+            if (end <= time) continue;
+            for (const piece of sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])) {
+                if (piece.source.kind === "segment" && piece.source.index === segmentIdx) ranges.push(piece.utf16From + 1, piece.utf16To + 1);
+            }
+        }
+        return ranges;
+    }
+    function sameRanges(left: number[], right: number[]): boolean {
+        return left === right || left.length === right.length && left.every((position, i) => position === right[i]);
+    }
     const playback = new Plugin<PlaybackState>({
         key: playbackKey,
         state: {
@@ -363,17 +378,8 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 // Even a cancelled composition must resume at the latest playback time.
                 const unchanged = !compositionActive(oldState) && projection === previous.projection;
                 if (unchanged && time === previous.time) return follow === previous.follow ? previous : { ...previous, follow };
-                const ranges: number[] = [];
-                const first = firstTrue(intervals.length, index => intervals[index].start > time);
-                for (let i = first - 1; i >= 0 && latestEnd[i] > time; i--) {
-                    const { segmentIdx, end } = intervals[i];
-                    if (end <= time) continue;
-                    for (const piece of sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])) {
-                        if (piece.source.kind === "segment" && piece.source.index === segmentIdx) ranges.push(piece.utf16From + 1, piece.utf16To + 1);
-                    }
-                }
-                if (unchanged && ranges.length === previous.ranges.length
-                    && ranges.every((position, index) => position === previous.ranges[index])) return { ...previous, time, follow };
+                const ranges = playbackRanges(projection, time);
+                if (unchanged && sameRanges(ranges, previous.ranges)) return { ...previous, time, follow };
                 const decorations: Decoration[] = [];
                 for (let i = 0; i < ranges.length; i += 2) decorations.push(Decoration.inline(ranges[i], ranges[i + 1], { class: "current" }));
                 return { time, follow, projection, ranges, decorations: DecorationSet.create(state.doc, decorations) };
@@ -382,20 +388,22 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         props: {
             decorations: state => playbackKey.getState(state)?.decorations ?? DecorationSet.empty
         },
-        view() {
-            let followedRanges: readonly number[] | undefined;
-            let followedMarkers: HTMLElement[] = [];
+        view(view) {
+            let rendered = playbackKey.getState(view.state)!;
             return {
                 update(view) {
-                    if (compositionActive(view.state)) return;
-                    const playback = playbackKey.getState(view.state);
-                    const ranges = playback?.follow ? playback.ranges : undefined;
-                    const markers = playback?.follow ? transcriptPlaybackMarkers(view, playback.time) : [];
-                    if (ranges === followedRanges && markers.length === followedMarkers.length
-                        && markers.every((marker, index) => marker === followedMarkers[index])) return;
-                    followedRanges = ranges;
-                    followedMarkers = markers;
-                    if (ranges) scrollTranscriptPlayback(view, ranges, markers);
+                    if (compositionPending(view.state)) return;
+                    const previous = rendered;
+                    rendered = playbackKey.getState(view.state)!;
+                    if (!rendered.follow || previous.time === rendered.time) return;
+                    // Compare both times in the current transcript, including its currently visible markers.
+                    const before = previous.projection === rendered.projection ? previous.ranges : playbackRanges(rendered.projection, previous.time);
+                    const markers = transcriptPlaybackMarkers(view, rendered.time);
+                    if (sameRanges(before, rendered.ranges)) {
+                        const previousMarkers = new Set(transcriptPlaybackMarkers(view, previous.time));
+                        if (markers.length === previousMarkers.size && markers.every(marker => previousMarkers.has(marker))) return;
+                    }
+                    scrollTranscriptPlayback(view, rendered.ranges, markers);
                 }
             };
         }
@@ -517,7 +525,7 @@ export function alignTranscriptSelection(view: EditorView): boolean {
     if (!view.editable) return false;
     const aligned = transcriptAlignment(view);
     if (!aligned) return false;
-    view.dispatch(closeHistory(projectionTransaction(view.state, transcriptProjection(view.state), aligned)));
+    dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, transcriptProjection(view.state), aligned)));
     view.focus();
     return true;
 }
@@ -553,7 +561,7 @@ export function applyTranscriptReference(request: TranscriptMenuRequest, text: s
     const next = target.replacement ? replaceText(index, projection, target.replacement, text)
         : editText(index, projection, target.position, target.position, text, false);
     if (next === projection) return false;
-    view.dispatch(closeHistory(projectionTransaction(view.state, projection, next)).scrollIntoView());
+    dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, projection, next)));
     view.focus();
     return true;
 }
@@ -589,6 +597,7 @@ export function handleTranscriptEdit(element: HTMLElement | null, action: EditAc
             // Undo can remove a focused event marker. Keep the next edit command inside this editor.
             if (document.activeElement !== editor.view.dom && editor.view.dom.contains(document.activeElement)) editor.view.focus();
             editor.view.dispatch(transaction);
+            scrollTranscriptSelectionHead(editor.view);
         });
     }
     else {

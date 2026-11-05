@@ -8,6 +8,7 @@ import { transcriptSelection, transcriptTokenGroup, type InspectionInformation, 
 import { keyboardRectangle, pointerRectangle, type InspectionGeometry, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 import { projectionTransaction } from "./projectionStep";
+import { dispatchPreservingScroll } from "./scroll";
 
 export type TranscriptMenuTarget = {
     kind: "deletion" | "gap" | "token" | "selection" | "text";
@@ -70,8 +71,8 @@ export function restoreDeletion(view: EditorView, information: TranscriptInforma
     const restored = restoreTextDeletion(index, projection, information.sourceFrom, information.sourceTo);
     if (restored === projection) return false;
     // Explicit projection writes preserve added text and map the current selection through the insertion.
-    view.dispatch(closeHistory(projectionTransaction(view.state, projection, restored,
-        { from: information.from, to: information.from, text: information.original })).scrollIntoView());
+    dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, projection, restored,
+        { from: information.from, to: information.from, text: information.original })));
     view.focus();
     return true;
 }

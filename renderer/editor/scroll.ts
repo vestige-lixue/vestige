@@ -1,9 +1,10 @@
-import { Plugin } from "@tiptap/pm/state";
+import { Plugin, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { type EditorView } from "@tiptap/pm/view";
 import { textRectangles } from "./geometry";
 
 const topRatio = 0.2;
 const bottomRatio = 0.8;
+const navigationKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
 function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: number }): boolean {
     const viewport = view.dom.closest<HTMLElement>(".transcript-scroll");
@@ -18,11 +19,19 @@ function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: num
     return true;
 }
 
-export function scrollTranscriptPosition(view: EditorView, position: number): boolean {
-    return scrollTranscriptRect(view, view.coordsAtPos(position));
+export function scrollTranscriptSelectionHead(view: EditorView): void {
+    scrollTranscriptRect(view, view.coordsAtPos(view.state.selection.head));
 }
 
-function transcriptRangeRect(view: EditorView, from: number, to: number, includeDeleted = false): { top: number; bottom: number } {
+export function dispatchPreservingScroll(view: EditorView, transaction: Transaction): void {
+    const viewport = view.dom.closest<HTMLElement>(".transcript-scroll");
+    const top = viewport?.scrollTop ?? 0;
+    view.dispatch(transaction);
+    // Read after layout so an explicit write can undo just this transaction's anchor adjustment.
+    if (viewport && viewport.scrollTop !== top) viewport.scrollTo({ top, behavior: "instant" });
+}
+
+function transcriptRangeRect(view: EditorView, from: number, to: number): { top: number; bottom: number } {
     const start = view.domAtPos(from, 1);
     const end = view.domAtPos(to, -1);
     const range = view.dom.ownerDocument.createRange();
@@ -31,20 +40,11 @@ function transcriptRangeRect(view: EditorView, from: number, to: number, include
     let top = Infinity;
     let bottom = -Infinity;
     // Caret coordinates at a text boundary can belong to a neighboring triangle instead of the text.
-    for (const rect of textRectangles(view.dom, range, true, includeDeleted)) {
+    for (const rect of textRectangles(view.dom, range, true)) {
         top = Math.min(top, rect.top);
         bottom = Math.max(bottom, rect.bottom);
     }
     return { top, bottom };
-}
-
-function scrollTranscriptSelection(view: EditorView): boolean {
-    const { from, to, head, empty } = view.state.selection;
-    if (!empty) {
-        const rect = transcriptRangeRect(view, from, to, true);
-        if (rect.top <= rect.bottom) return scrollTranscriptRect(view, rect);
-    }
-    return scrollTranscriptPosition(view, head);
 }
 
 export function scrollTranscriptPlayback(view: EditorView, ranges: readonly number[], markers: readonly HTMLElement[]): boolean {
@@ -74,16 +74,11 @@ export function scrollTranscriptPlayback(view: EditorView, ranges: readonly numb
 }
 
 export function transcriptScrollPlugin(): Plugin {
-    let pressed = false;
-    let schedule = (): void => {};
     return new Plugin({
         props: {
-            handleScrollToSelection(view) {
-                if (pressed) return false;
-                // Native input can scroll again after the transaction; settle before the next paint.
-                schedule();
-                return scrollTranscriptSelection(view);
-            }
+            // ProseMirror also requests scrolling when repairing focus or applying commands.
+            // Direct input and history commands handle caret scrolling explicitly.
+            handleScrollToSelection: view => !!view.dom.closest(".transcript-scroll")
         },
         view(view) {
             const viewport = view.dom.closest<HTMLElement>(".transcript-scroll");
@@ -93,56 +88,55 @@ export function transcriptScrollPlugin(): Plugin {
             const listeners = new AbortController();
             const capture = { signal: listeners.signal, capture: true };
             let frame = 0;
-            let selectionChanged = false;
-            schedule = () => {
-                if (frame) return;
+            function cancel(): void {
+                window.cancelAnimationFrame(frame);
+                frame = 0;
+            }
+            function followCaret(before?: EditorState): void {
+                cancel();
                 frame = window.requestAnimationFrame(() => {
                     frame = 0;
-                    if (!view.isDestroyed && view.hasFocus() && !pressed) {
-                        scrollTranscriptSelection(view);
-                    }
+                    const selection = document.getSelection();
+                    if (!view.hasFocus() || !selection?.isCollapsed || !selection.focusNode || !view.dom.contains(selection.focusNode)) return;
+                    // Native navigation can move the DOM caret before ProseMirror receives selectionchange.
+                    const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
+                    if (before && before.doc === view.state.doc && before.selection.empty && before.selection.head === head) return;
+                    scrollTranscriptRect(view, view.coordsAtPos(head));
                 });
-            };
+            }
             function resize(): void {
                 // Only the last line needs extra room; the first lines may stay above the follow interval.
                 view.dom.style.setProperty("--transcript-scroll-padding", `${viewport!.clientHeight * (1 - bottomRatio)}px`);
-                schedule();
             }
-            function release(): void {
-                if (!pressed) return;
-                pressed = false;
-                if (selectionChanged) schedule();
-                selectionChanged = false;
+            function edit(): void {
+                if (view.editable) followCaret(view.state);
             }
-            view.dom.addEventListener("pointerdown", event => {
-                if (event.isPrimary && event.button === 0) {
-                    pressed = true;
-                    selectionChanged = false;
-                }
+            view.dom.addEventListener("keydown", event => {
+                cancel();
+                if (event.target !== view.dom || event.defaultPrevented || event.isComposing) return;
+                if (!event.shiftKey && navigationKeys.has(event.key)) followCaret(view.state);
+                // Key bindings can apply these edits before Chromium emits beforeinput.
+                else if (event.key === "Enter" || event.key === "Backspace" || event.key === "Delete") edit();
             }, capture);
-            // Also follow a click on the existing caret, after native selection and handled audio links settle.
+            for (const type of ["beforeinput", "cut", "paste", "drop"]) view.dom.addEventListener(type, edit, capture);
             view.dom.addEventListener("click", event => {
-                if (event.button === 0 && !event.defaultPrevented) schedule();
+                if (event.detail !== 1 || event.button !== 0 || event.defaultPrevented || event.shiftKey || event.ctrlKey || event.metaKey) return;
+                if (event.target instanceof Element && event.target.closest(".transcript-event-anchor, .transcript-deletion-expanded")) return;
+                followCaret();
             }, { signal: listeners.signal });
-            document.addEventListener("pointerup", release, capture);
-            document.addEventListener("pointercancel", release, capture);
-            window.addEventListener("blur", release, capture);
+            document.addEventListener("pointerdown", cancel, capture);
+            viewport.addEventListener("wheel", cancel, { ...capture, passive: true });
+            view.dom.addEventListener("focusout", cancel, capture);
+            window.addEventListener("blur", cancel, { signal: listeners.signal });
             const observer = new ResizeObserver(resize);
             observer.observe(viewport);
             resize();
             return {
-                update(view, previous) {
-                    if (view.state.doc !== previous.doc || !view.state.selection.eq(previous.selection)) {
-                        if (pressed) selectionChanged = true;
-                        schedule();
-                    }
-                },
                 destroy() {
-                    window.cancelAnimationFrame(frame);
+                    cancel();
                     listeners.abort();
                     observer.disconnect();
                     view.dom.style.removeProperty("--transcript-scroll-padding");
-                    schedule = () => {};
                 }
             };
         }
