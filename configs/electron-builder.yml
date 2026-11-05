@@ -45,6 +45,9 @@ linux:
     - deb
   category: Utility
   syncDesktopName: true
+  # The deb summary is the synopsis; the description is its body and also the .desktop Comment.
+  synopsis: A workspace for media transcription and records.
+  description: Vestige brings listening, transcription, and proofreading into one workspace.
 appImage:
   artifactName: ${name}-${version}-${arch}.${ext}
 deb:
