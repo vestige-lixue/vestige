@@ -577,12 +577,23 @@
         ...advancedFields
     ];
 
+    function applyChoice(id: string): void {
+        const active = document.activeElement;
+        if (active && draftFields.some(field => field.id === active.id && field.visible?.() === false)) {
+            const dialog = active.closest("[role=dialog]");
+            // Unmount the dependent field and any open listbox before the dialog handles its removal.
+            flushSync();
+            dialog?.querySelector<HTMLElement>(`#${id}`)?.focus({ preventScroll: true });
+        }
+        touch(id);
+        void applyFields([id]);
+    }
+
     function switchField(meta: FieldMeta, get: () => boolean, set: (value: boolean) => void, patch: (value: boolean) => SettingsPatch): SwitchField {
         return { ...meta, kind: "switch", get, valid: () => true, patch: () => patch(get()), set: value => {
             if (value === get()) return;
             set(value);
-            touch(meta.id);
-            void applyFields([meta.id]);
+            applyChoice(meta.id);
         } };
     }
 
@@ -591,8 +602,7 @@
         return { ...meta, kind: "select", get, items, valid: () => valid(get()), patch: () => patch(get()), set: value => {
             if (!valid(value) || value === get()) return;
             set(value);
-            touch(meta.id);
-            void applyFields([meta.id]);
+            applyChoice(meta.id);
         } };
     }
 

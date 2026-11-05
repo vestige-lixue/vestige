@@ -20,7 +20,7 @@
             </Tooltip>
         </div>
     </div>
-    <ConfigFields {dialogId} {config} {disabled} onchange={value => {
+    <ConfigFields {dialogId} {config} {disabled} clearableDirectories onchange={value => {
         config = value; selectedName = "";
     }} bind:validate />
     {#if failure}

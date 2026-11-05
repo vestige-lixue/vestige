@@ -1,5 +1,12 @@
-<Select.Root type="single" {items} {disabled} bind:value {onValueChange} bind:open>
-    <Select.Trigger {id} bind:ref={trigger} class={["dropdownSelector input-control hoverable activable focusable", className]}>
+<Select.Root type="single" {items} {disabled} bind:value {onValueChange} bind:open={() => open, value => {
+    // Let the dialog remember the trigger before the listbox opens its own focus scope.
+    if (value) trigger?.focus({ preventScroll: true });
+    open = value;
+}}>
+    <Select.Trigger {id} bind:ref={trigger} class={["dropdownSelector input-control hoverable activable focusable", className]} onblur={event => {
+        // Release the listbox's focus scope before the dialog receives focus on the next control.
+        if (open && event.relatedTarget instanceof Node && !content?.contains(event.relatedTarget)) flushSync(() => open = false);
+    }}>
         <span class="value">
             <Select.Value {placeholder} />
             {#each items as item (item.value)}
@@ -7,9 +14,10 @@
             {/each}
             <span class="measure">{placeholder}</span>
         </span>
+        <span class="dropdown-chevron" aria-hidden="true"></span>
     </Select.Trigger>
     <Select.Portal>
-        <Select.Content class="dropdownOptions option-surface" style={`z-index: ${modal.getTopLayer()}; font-size: ${fontSize};`} {align} sideOffset={6} collisionPadding={8}>
+        <Select.Content bind:ref={content} class="dropdownOptions option-surface" style={`z-index: ${modal.getTopLayer()}; font-size: ${fontSize};`} {align} sideOffset={6} collisionPadding={8}>
             {#each items as item (item.value)}
                 <Select.Item class="option-item activable" value={item.value} label={item.label} disabled={item.disabled}>
                     {#snippet children({ selected })}
@@ -37,16 +45,6 @@
         justify-content: space-between;
         gap: 12px;
         text-align: left;
-    }
-    :global(.dropdownSelector)::after {
-        content: "";
-        flex-shrink: 0;
-        width: 6px;
-        height: 6px;
-        margin-bottom: 3px;
-        border-right: 1.5px solid currentColor;
-        border-bottom: 1.5px solid currentColor;
-        transform: rotate(45deg);
     }
     .value {
         display: grid;
@@ -76,6 +74,7 @@
 
 
 <script lang="ts">
+    import { flushSync } from "svelte";
     import { Select } from "bits-ui";
     import * as modal from "../../states/modal.svelte";
     import { observeFontSize } from "../../dom";
@@ -105,6 +104,7 @@
 
     let open = $state(false);
     let trigger = $state<HTMLButtonElement | null>(null);
+    let content = $state<HTMLDivElement | null>(null);
     let fontSize = $state("inherit");
 
     $effect(() => {

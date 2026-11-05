@@ -8,7 +8,7 @@
     {#each directories as directory (directory.kind)}
         <div class="field">
             <label>{i18n.t(`transcription.config.${directory.kind}Directory.label`)}</label>
-            <Combobox id={`${id}-${directory.kind}`} {disabled} items={directory.items} header={`${directory.kind}s /`} bind:input={directory.input}
+            <Combobox id={`${id}-${directory.kind}`} {disabled} clearable={clearableDirectories} items={directory.items} header={`${directory.kind}s /`} bind:input={directory.input}
                 value={config[`${directory.kind}Directory`]} onValueChange={value => setDirectory(directory, value)} onOpenChange={open => {
                     if (open) void refreshDirectories(directory);
                 }}>
@@ -85,8 +85,9 @@
         onchange: (config: Config) => void;
         validate?: (requireDirectory?: boolean, report?: boolean) => boolean;
         disabled?: boolean;
+        clearableDirectories?: boolean;
     };
-    let { dialogId, config, onchange, validate = $bindable(), disabled = false }: Props = $props();
+    let { dialogId, config, onchange, validate = $bindable(), disabled = false, clearableDirectories = false }: Props = $props();
     const id = $props.id();
     const executorItems = executors.map(({ id, name }) => ({ value: id, label: name }));
     const directories = $state<DirectoryField[]>((["backend", "model"] as const).map(kind => ({ kind, input: null, items: [], version: 0 })));

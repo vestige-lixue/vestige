@@ -63,7 +63,7 @@
                     }} />
             </div>
             {#key selected}
-                <ConfigFields {dialogId} config={selected.config} onchange={config => {
+                <ConfigFields {dialogId} config={selected.config} clearableDirectories onchange={config => {
                     if (!selected?.deletable) return;
                     selected.config = config;
                     void persist();
