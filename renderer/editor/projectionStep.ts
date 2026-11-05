@@ -54,4 +54,8 @@ export class ProjectionStep extends Step {
     }
 }
 
-Step.jsonID("vestigeProjection", ProjectionStep);
+// HMR re-executes this module whenever a shared dependency changes, and ProseMirror rejects a second registration.
+if (!import.meta.hot?.data.projectionStepRegistered) {
+    Step.jsonID("vestigeProjection", ProjectionStep);
+    if (import.meta.hot) import.meta.hot.data.projectionStepRegistered = true;
+}
