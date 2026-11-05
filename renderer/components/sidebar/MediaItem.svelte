@@ -31,7 +31,7 @@
         <div class="media-secondary-wrapper">
             <div class="media-info">
                 {#if vestige}
-                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.types.audio" : "media.types.video"), duration: formatDuration(vestige.media.duration) })}
+                    {i18n.t("media.summary", { kind: i18n.t(vestige.media.kind === "audio" ? "media.types.audio" : "media.types.video"), duration: formatDuration(vestige.media.duration, { rounding: "floor" }) })}
                 {/if}
                 {#if mediaImport.isIssue(item)}
                     <button class="media-issue import-error focusable" disabled={project.projectState.locked}

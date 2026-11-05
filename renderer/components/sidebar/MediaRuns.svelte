@@ -13,7 +13,8 @@
         {/snippet}
     </Tooltip>
     <Popover.Portal>
-        <PopoverContent bind:ref={content} class="mediaRuns option-surface" customAnchor={anchor} align="start" sideOffset={6} collisionPadding={8}
+        <PopoverContent bind:ref={content} class="mediaRuns option-surface" customAnchor={anchor} align="start" sideOffset={6}
+            collisionBoundary={mediaList} collisionPadding={0} hideWhenDetached
             style={`z-index: ${layerIndex + 1}; font-size: ${fontSize};`}
             trapFocus={!hasDialog && !menuOpen} interactOutsideBehavior="ignore"
             onOpenAutoFocus={event => {
@@ -22,8 +23,8 @@
             }}
             onCloseAutoFocus={event => {
                 event.preventDefault();
-                if (!menuOpen && !pointerDismissed) modal.restoreFocus(trigger);
-                pointerDismissed = false;
+                if (!menuOpen && dismissReason !== "outside") modal.restoreFocus(trigger, { preventScroll: dismissReason === "detached" });
+                dismissReason = null;
             }}
             onkeydown={handleKeydown}
         >
@@ -171,12 +172,13 @@
     };
 
     let { mediaId, anchor, disabled, tabindex, onfocus }: Props = $props();
+    const mediaList = $derived(anchor?.closest(".media-list") ?? null);
     const vestige = $derived(project.getVestige(mediaId));
     const runCount = $derived(vestige?.runs.length ?? 0);
     const hasDialog = $derived(dialogs.state.dialogs.length > 0);
     const menuOpen = $derived(menu.get() !== "");
     let open = $state(false);
-    let pointerDismissed = false;
+    let dismissReason: "outside" | "detached" | null = null;
     let trigger = $state<HTMLButtonElement | null>(null);
     let content = $state<HTMLDivElement | null>(null);
     let fontSize = $state("inherit");
@@ -197,6 +199,18 @@
         const element = anchor;
         if (!open || !element) return;
         return observeFontSize(element, size => fontSize = size);
+    });
+
+    $effect(() => {
+        if (!open || !anchor) return;
+        // A card touching the list edge still intersects, but none of its area is visible.
+        const observer = new IntersectionObserver(entries => {
+            if (entries.at(-1)?.intersectionRatio !== 0) return;
+            dismissReason = "detached";
+            open = false;
+        }, { root: mediaList, threshold: Number.EPSILON });
+        observer.observe(anchor);
+        return () => observer.disconnect();
     });
 
     function formatStartedAt(value: number): string {
@@ -233,7 +247,7 @@
     function handlePointerdown(event: PointerEvent): void {
         if (!open) return;
         dismissOutside(event, target => !!(content?.contains(target) || trigger?.contains(target)), () => {
-            pointerDismissed = true;
+            dismissReason = "outside";
             flushSync(() => open = false);
         });
     }
