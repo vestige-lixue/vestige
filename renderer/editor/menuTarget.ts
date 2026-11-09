@@ -5,7 +5,7 @@ import { closeHistory } from "@tiptap/pm/history";
 import { type EditAction } from "../../shared/app";
 import { textPieces, restoreTextDeletion, type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { transcriptSelection, transcriptTokenGroup, type InspectionInformation, type TranscriptInformation } from "./informationModel";
-import { keyboardRectangle, pointerRectangle, type InspectionGeometry, type InspectionTarget } from "./geometry";
+import { pointerRectangle, type InspectionGeometry, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 import { projectionTransaction } from "./projectionStep";
 import { dispatchPreservingScroll } from "./scroll";
@@ -108,15 +108,13 @@ export function transcriptMenuController(
     function measure(target: TranscriptMenuTarget, keyboard: boolean, point?: { x: number; y: number }): InspectionTarget | null {
         const information = target.information;
         if (!information) return null;
+        const rectangles = geometry.rectangles(information);
         if (target.kind === "deletion" || target.kind === "gap") {
             const marker = view.dom.querySelector<HTMLElement>(`.transcript-event[data-inspection="${CSS.escape(information.key)}"]`);
-            return marker ? { information, rectangles: [], anchor: marker.getBoundingClientRect(), keyboard, pressed: false } : null;
+            return marker ? { information, rectangles, anchor: marker.getBoundingClientRect(), keyboard, pressed: false } : null;
         }
-        const rectangles = geometry.rectangles(information);
-        const rects = rectangles.flat();
-        const caret = view.coordsAtPos(target.position);
-        const anchor = point && pointerRectangle(rects, point, { top: 0, right: 0, bottom: 0, left: 0 })
-            || keyboardRectangle(rects, caret) || new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+        const anchor = point && pointerRectangle(rectangles.flat(), point, { top: 0, right: 0, bottom: 0, left: 0 })
+            || geometry.caretAnchor(rectangles, target.position);
         return { information, rectangles, anchor, keyboard, pressed: false };
     }
 
@@ -143,7 +141,7 @@ export function transcriptMenuController(
                 selectionKind: original ? added ? "mixed" : "original" : "added" };
         }
         const point = { x: event.clientX, y: event.clientY, pressed: false };
-        const hit = fromKeyboard ? geometry.keyboard(true, view.dom) : geometry.hover(point, null, { selection: false, measure: true });
+        const hit = fromKeyboard ? geometry.keyboard(true, view.dom) : geometry.hover(point, { selection: false });
         if (hit?.information.kind === "token") {
             const fragments = transcriptTokenGroup(index, projection, hit.information);
             return { kind: "token", from: Math.min(...fragments.map(item => item.from)) + 1, to: Math.max(...fragments.map(item => item.to)) + 1, position, information: hit.information };

@@ -6,7 +6,7 @@
             </svg>
         {/if}
         <div
-            class="editor" spellcheck={false} style:--transcript-font-size={`${settings.getEditing().fontSize}px`}
+            class="editor" spellcheck={false} style:--transcript-font-size={`${fontSize}px`}
             tabindex={-1} bind:this={element}
         ></div>
         {#if hoveredLineBreak}
@@ -307,6 +307,7 @@
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
     import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
+    import { invalidateTranscriptLayout, subscribeTranscriptLayout, transcriptLayoutVersion } from "../../editor/layout";
     import { textRectangles } from "../../editor/geometry";
     import { measureLineBreaks, sameLineBreaks, lineBreakAt, type LineBreakBox } from "../../editor/lineBreaks";
     import * as project from "../../states/project.svelte";
@@ -326,6 +327,7 @@
     let selectionRectangles = $state.raw<DOMRect[]>([]);
     let lineBreaks = $state.raw<LineBreakBox[]>([]);
     let hoveredBreak = $state(-1);
+    const fontSize = $derived(settings.getEditing().fontSize);
     // Index -1 means no hovered break and reads undefined.
     const hoveredLineBreak = $derived<LineBreakBox | undefined>(lineBreaks[hoveredBreak]);
     let tooltipOpen = $state(false);
@@ -500,46 +502,58 @@
     $effect(() => {
         const current = editor;
         if (!current) return;
+        const view = current.view;
         let frame = 0;
+        let measuredVersion = -1;
         let pointer: { x: number; y: number } | null = null;
-        function hover(): void {
-            const origin = element.getBoundingClientRect();
-            hoveredBreak = pointer ? lineBreakAt(lineBreaks, pointer.x - origin.left, pointer.y - origin.top) : -1;
-        }
         function refresh(): void {
             frame = 0;
-            if (current!.isDestroyed) return;
-            const next = measureLineBreaks(current!.view.dom, element.getBoundingClientRect());
-            if (!sameLineBreaks(next, lineBreaks)) lineBreaks = next;
-            hover();
+            if (view.isDestroyed) return;
+            let origin: DOMRect | undefined;
+            const version = transcriptLayoutVersion(view);
+            if (measuredVersion !== version) {
+                measuredVersion = version;
+                origin = element.getBoundingClientRect();
+                const next = measureLineBreaks(view.dom, origin);
+                if (!sameLineBreaks(next, lineBreaks)) lineBreaks = next;
+            }
+            if (!pointer || !lineBreaks.length) {
+                hoveredBreak = -1;
+                return;
+            }
+            origin ??= element.getBoundingClientRect();
+            hoveredBreak = lineBreakAt(lineBreaks, pointer.x - origin.left, pointer.y - origin.top);
         }
-        // Expanding a deletion or a playback change moves text without a document change.
         function schedule(): void {
             if (!frame) frame = requestAnimationFrame(refresh);
         }
         function move(event: PointerEvent): void {
-            pointer = event.pointerType === "touch" ? null : { x: event.clientX, y: event.clientY };
-            hover();
+            if (event.pointerType === "touch") return leave();
+            if (pointer?.x === event.clientX && pointer.y === event.clientY) return;
+            pointer = { x: event.clientX, y: event.clientY };
+            schedule();
         }
         function leave(): void {
+            if (!pointer) return;
             pointer = null;
-            hover();
+            schedule();
         }
-        const observer = new ResizeObserver(schedule);
-        observer.observe(current.view.dom);
-        current.on("transaction", schedule);
+        const unsubscribe = subscribeTranscriptLayout(view, schedule);
         element.addEventListener("pointermove", move);
         element.addEventListener("pointerleave", leave);
         // Scrolling moves text under a resting pointer without a pointer event.
-        window.addEventListener("scroll", hover, true);
-        schedule();
+        window.addEventListener("scroll", schedule, true);
+        $effect(() => {
+            // A short transcript can change font size without resizing the editor.
+            void fontSize;
+            untrack(() => invalidateTranscriptLayout(view));
+        });
         return () => {
             cancelAnimationFrame(frame);
-            observer.disconnect();
-            current.off("transaction", schedule);
+            unsubscribe();
             element.removeEventListener("pointermove", move);
             element.removeEventListener("pointerleave", leave);
-            window.removeEventListener("scroll", hover, true);
+            window.removeEventListener("scroll", schedule, true);
             lineBreaks = [];
             hoveredBreak = -1;
         };

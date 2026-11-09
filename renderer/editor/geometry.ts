@@ -3,6 +3,7 @@ import { type EditorView } from "@tiptap/pm/view";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type SelectionInformation } from "./informationModel";
 import { compositionPending } from "./composition";
+import { transcriptLayoutVersion } from "./layout";
 
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
 export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false, includeDeleted = false): DOMRect[] {
@@ -95,9 +96,21 @@ export function keyboardRectangle<T extends Rectangle>(rectangles: readonly T[],
 
 export type InspectionGeometry = {
     rectangles: (information: InspectionInformation) => DOMRect[][];
-    hover: (pointer: InspectionPointer | null, previous: InspectionTarget | null, options?: { measure?: boolean; selection?: boolean }) => InspectionTarget | null;
+    caretAnchor: (rectangles: DOMRect[][], position: number) => DOMRect;
+    scrolled: () => void;
+    hover: (pointer: InspectionPointer | null, options?: { selection?: boolean }) => InspectionTarget | null;
     overTextOrMarker: (point: Point) => boolean;
     keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
+};
+
+type ViewportGeometry = {
+    layout: number;
+    scroll: number;
+    projection: TextProjection;
+    groups: Map<string, DOMRect[][]>;
+    hit?: { from: number; to: number; boxes: DOMRect[] };
+    spacing?: { from: number; value: Spacing | null };
+    caret?: { position: number; rect: DOMRect };
 };
 
 export function inspectionGeometry(
@@ -109,9 +122,17 @@ export function inspectionGeometry(
         from: number;
         to: number;
         information: SelectionInformation | null;
-        rectangles?: DOMRect[][];
-        hit?: DOMRect[];
     } | undefined;
+    let scroll = 0;
+    let cached: ViewportGeometry | undefined;
+    const empty: DOMRect[][] = [];
+    function viewport(): ViewportGeometry {
+        const layout = transcriptLayoutVersion(view), projection = projectionOf(view.state);
+        if (!cached || cached.layout !== layout || cached.scroll !== scroll || cached.projection !== projection) {
+            cached = { layout, scroll, projection, groups: new Map() };
+        }
+        return cached;
+    }
     function eventMarker(target: EventTarget | null): HTMLElement | null {
         return target instanceof Element ? target.closest<HTMLElement>(".transcript-event") : null;
     }
@@ -119,21 +140,47 @@ export function inspectionGeometry(
         return transcriptRectangles(view, item);
     }
     function informationRectangles(information: InspectionInformation): DOMRect[][] {
-        const fragments = information.kind === "selection" ? information.fragments
-            : information.kind === "token" ? transcriptTokenGroup(index, projectionOf(view.state), information) : [];
-        return fragments.map(rectangles);
+        if (information.kind !== "selection" && information.kind !== "token") return empty;
+        const cache = viewport();
+        // Split pieces of a token share an outline. A menu may recreate information for the same selection.
+        const key = information.kind === "selection" ? `selection/${information.selectionFrom}/${information.selectionTo}` : information.key;
+        const previous = cache.groups.get(key);
+        if (previous) return previous;
+        const fragments = information.kind === "selection" ? information.fragments : transcriptTokenGroup(index, cache.projection, information);
+        const boxes = fragments.map(rectangles);
+        if (cache.groups.size === 8) cache.groups.delete(cache.groups.keys().next().value!);
+        cache.groups.set(key, boxes);
+        return boxes;
+    }
+    function hitRectangles(target: { from: number; to: number }): DOMRect[] {
+        const cache = viewport();
+        if (cache.hit?.from !== target.from || cache.hit.to !== target.to) {
+            cache.hit = { from: target.from, to: target.to, boxes: rectangles(target) };
+        }
+        return cache.hit.boxes;
+    }
+    function caretAnchor(boxes: DOMRect[][], position: number): DOMRect {
+        const cache = viewport();
+        if (cache.caret?.position !== position) {
+            const { left, top, right, bottom } = view.coordsAtPos(position);
+            cache.caret = { position, rect: new DOMRect(left, top, right - left, bottom - top) };
+        }
+        return keyboardRectangle(boxes.flat(), cache.caret.rect) ?? cache.caret.rect;
     }
     function spacingOf(item: { from: number }): Spacing | null {
+        const cache = viewport();
+        if (cache.spacing?.from === item.from) return cache.spacing.value;
         const start = view.domAtPos(item.from + 1, 1).node;
         const span = (start instanceof Element ? start : start.parentElement)?.closest(".transcript-text");
-        if (!span) return null;
-        const style = getComputedStyle(span);
-        return {
+        const style = span ? getComputedStyle(span) : null;
+        const value = style && {
             top: (parseFloat(style.marginTop) || 0) + (parseFloat(style.paddingTop) || 0),
             right: (parseFloat(style.marginRight) || 0) + (parseFloat(style.paddingRight) || 0),
             bottom: (parseFloat(style.marginBottom) || 0) + (parseFloat(style.paddingBottom) || 0),
             left: (parseFloat(style.marginLeft) || 0) + (parseFloat(style.paddingLeft) || 0)
         };
+        cache.spacing = { from: item.from, value };
+        return value;
     }
     function blocked(): boolean {
         return compositionPending(view.state) || view.composing;
@@ -153,18 +200,17 @@ export function inspectionGeometry(
     function selectionAtCaret(keyboard: boolean): InspectionTarget | null {
         const target = selectionGeometry();
         if (!target?.information) return null;
-        const boxes = target.rectangles ??= informationRectangles(target.information);
-        const caret = view.coordsAtPos(view.state.selection.head);
-        const anchor = keyboardRectangle(boxes.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+        const boxes = informationRectangles(target.information);
+        const anchor = caretAnchor(boxes, view.state.selection.head);
         return { information: target.information, rectangles: boxes, anchor, keyboard, pressed: !keyboard };
     }
     return {
         rectangles: informationRectangles,
-        hover(pointer, previous, { measure = false, selection = true } = {}) {
-            if (measure && selected) {
-                selected.rectangles = undefined;
-                selected.hit = undefined;
-            }
+        caretAnchor,
+        scrolled() {
+            scroll++;
+        },
+        hover(pointer, { selection = true } = {}) {
             if (!pointer || blocked()) return null;
             const { x, y, pressed } = pointer;
             // Native drag selection can lag behind the pointer as it crosses a token boundary.
@@ -174,15 +220,15 @@ export function inspectionGeometry(
             const button = eventMarker(element);
             if (button) {
                 const item = events().get(button.dataset.inspection!);
-                if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: false, pressed };
+                if (item) return { information: item, rectangles: empty, anchor: button.getBoundingClientRect(), keyboard: false, pressed };
             }
             if (selection) {
                 const target = selectionGeometry();
                 if (target?.information) {
                     const spacing = spacingOf(target) ?? { top: 0, right: 0, bottom: 0, left: 0 };
-                    const hit = pointerRectangle(target.hit ??= rectangles(target), pointer, spacing);
+                    const hit = pointerRectangle(hitRectangles(target), pointer, spacing);
                     if (hit) {
-                        const boxes = target.rectangles ??= informationRectangles(target.information);
+                        const boxes = informationRectangles(target.information);
                         const anchor = pointerRectangle(boxes.flat(), pointer, spacing) ?? hit;
                         return { information: target.information, rectangles: boxes, anchor, keyboard: false, pressed };
                     }
@@ -194,7 +240,7 @@ export function inspectionGeometry(
             // At a boundary try the following token first, then the preceding token's spacing.
             for (const item of transcriptTokens(index, projectionOf(view.state), offset).reverse()) {
                 if (offset < item.from || offset > item.to) continue;
-                const boxes = !measure && previous?.information === item ? previous.rectangles : informationRectangles(item);
+                const boxes = informationRectangles(item);
                 const rects = boxes.flat();
                 let anchor = pointerRectangle(rects, pointer, { top: 0, right: 0, bottom: 0, left: 0 });
                 if (!anchor) {
@@ -218,7 +264,7 @@ export function inspectionGeometry(
             const button = eventMarker(element);
             if (button && view.dom.contains(button) && button.matches(":focus-visible")) {
                 const item = events().get(button.dataset.inspection!);
-                if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: true, pressed: false };
+                if (item) return { information: item, rectangles: empty, anchor: button.getBoundingClientRect(), keyboard: true, pressed: false };
             }
             if (!control || element !== view.dom) return null;
             if (!view.state.selection.empty) return selectionAtCaret(true);
@@ -227,8 +273,7 @@ export function inspectionGeometry(
             const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);
             if (!item) return null;
             const boxes = informationRectangles(item);
-            const caret = view.coordsAtPos(view.state.selection.head);
-            const anchor = keyboardRectangle(boxes.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+            const anchor = caretAnchor(boxes, view.state.selection.head);
             return { information: item, rectangles: boxes, anchor, keyboard: true, pressed: false };
         }
     };

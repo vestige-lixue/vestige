@@ -5,6 +5,7 @@ import { dropPoint } from "@tiptap/pm/transform";
 import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
+import { transcriptLayoutPlugin } from "./layout";
 import { transcriptScrollPlugin, scrollTranscriptPlayback, scrollTranscriptSelectionHead, dispatchPreservingScroll } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep, projectionTransaction } from "./projectionStep";
@@ -408,7 +409,8 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             };
         }
     });
-    return [compositionPlugin(), bridge, caretPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
+    // Layout must update before the information plugin registered later reads viewport geometry.
+    return [compositionPlugin(), bridge, caretPlugin(), transcriptLayoutPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {

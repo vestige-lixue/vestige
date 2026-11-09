@@ -2,6 +2,7 @@ import { type EditorState } from "@tiptap/pm/state";
 import { type EditorView } from "@tiptap/pm/view";
 import { type InspectionGeometry, type InspectionPointer, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
+import { transcriptLayoutVersion } from "./layout";
 
 // Chords such as Ctrl+C or ⌘C press their key within this delay, so they never flash control inspection.
 const controlDelay = 250;
@@ -48,7 +49,7 @@ type InspectionState = {
     chorded: boolean;
     /** Control inspection, shown once the modifier has been held alone for the delay. */
     control: boolean;
-    pointer: InspectionPointer | null;
+    pointer: (InspectionPointer & { target: EventTarget | null }) | null;
     hovered: InspectionTarget | null;
     keyboard: InspectionTarget | null;
     priority: "pointer" | "keyboard";
@@ -80,6 +81,8 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     let menuPending = false;
     let focused: HTMLElement | null = null;
     let focusTimer: ReturnType<typeof setTimeout> | undefined;
+    let rendered = view.state;
+    let layout = transcriptLayoutVersion(view);
     function settleFocus(element: EventTarget | null): void {
         const next = !view.composing && !compositionPending(view.state) && document.hasFocus() && element instanceof HTMLElement
             && view.dom.contains(element) && element.matches(".transcript-event:focus-visible") ? element : null;
@@ -117,7 +120,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         return true;
     }
     function retarget(): void {
-        state.hovered = geometry.hover(state.pointer, state.hovered);
+        state.hovered = geometry.hover(state.pointer);
         inspect(state.control ? "keyboard" : state.priority);
     }
     /** Returns whether the hold or control inspection changed synchronously. */
@@ -146,9 +149,12 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     function move(event: PointerEvent): void {
         if (event.pointerType === "touch" || view.composing || compositionPending(view.state)) return leave();
         if (!primary(event)) state.chorded = false;
-        hold(inspectionModifier(event));
-        state.pointer = { x: event.clientX, y: event.clientY, pressed: event.buttons !== 0 };
-        state.hovered = geometry.hover(state.pointer, state.hovered);
+        const changed = hold(inspectionModifier(event));
+        const previous = state.pointer, pressed = event.buttons !== 0;
+        if (event.type === "pointermove" && !changed && previous && previous.target === event.target && previous.pressed === pressed
+            && previous.x === event.clientX && previous.y === event.clientY) return;
+        state.pointer = { x: event.clientX, y: event.clientY, pressed, target: event.target };
+        state.hovered = geometry.hover(state.pointer);
         options.onHover?.(event.type !== "pointerleave" && (!!state.hovered || geometry.overTextOrMarker(state.pointer)));
         inspect(state.hovered ? "pointer" : state.priority);
     }
@@ -178,7 +184,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         // A missed audio link must also keep the selection and the viewport where they are.
         event.preventDefault();
         event.stopPropagation();
-        const item = geometry.hover(state.pointer, null, { selection: false })?.information;
+        const item = geometry.hover(state.pointer, { selection: false })?.information;
         state.activation = { key: item?.range ? item.key : null };
     }
     function up(event: PointerEvent): void {
@@ -191,7 +197,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         event.preventDefault();
         event.stopImmediatePropagation();
         if (!activation.key || !inspectionModifier(event)) return;
-        const item = geometry.hover(state.pointer, null, { selection: false })?.information;
+        const item = geometry.hover(state.pointer, { selection: false })?.information;
         if (item?.range && item.key === activation.key) options.onSeek(item.range.start);
     }
     function reset(): void {
@@ -201,7 +207,10 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         state.held = false;
         state.chorded = false;
         state.control = false;
-        if (state.pointer) state.pointer.pressed = false;
+        if (state.pointer) {
+            state.pointer.pressed = false;
+            state.pointer.target = null;
+        }
         state.hovered = null;
         state.keyboard = null;
         state.activation = null;
@@ -220,26 +229,28 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         inspect();
     }
     function refresh(): void {
-        if (view.isDestroyed) return;
+        // A transaction closes obsolete menu targets before update() refreshes this state.
+        if (view.isDestroyed || rendered !== view.state) return;
+        layout = transcriptLayoutVersion(view);
         settleFocus(document.activeElement);
-        state.hovered = geometry.hover(state.pointer, state.hovered, { measure: true });
+        state.hovered = geometry.hover(state.pointer);
         state.keyboard = geometry.keyboard(state.control);
         inspect();
     }
     function update(previous: EditorState): void {
+        rendered = view.state;
         // Phase transitions can be metadata-only transactions, with no document or selection change.
         if (compositionPending(view.state)) {
             if (!compositionPending(previous)) reset();
             return;
         }
         if (compositionPending(previous)) return refresh();
-        const changed = view.state.doc !== previous.doc;
-        if (changed || !view.state.selection.eq(previous.selection)) {
+        const changed = rendered.doc !== previous.doc || !rendered.selection.eq(previous.selection);
+        if (changed) {
             if (state.activation) state.activation.key = null;
-            state.hovered = geometry.hover(state.pointer, state.hovered, changed ? { measure: true } : undefined);
-            state.keyboard = geometry.keyboard(state.control);
-            inspect(state.control ? "keyboard" : state.priority);
+            if (state.control) state.priority = "keyboard";
         }
+        if (changed || layout !== transcriptLayoutVersion(view)) refresh();
     }
     function pinMenu(target: (() => InspectionTarget | null) | null, pending = false): void {
         menuTarget = target;

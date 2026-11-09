@@ -3,6 +3,7 @@ import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { transcriptEvents, transcriptSelectionUnits, type TranscriptInformation } from "./informationModel";
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { inspectionGeometry } from "./geometry";
+import { subscribeTranscriptLayout } from "./layout";
 import { inspectionController, type InspectionCallbacks } from "./interaction";
 import { compositionPending } from "./composition";
 import { firstTrue } from "../../shared/util/search";
@@ -200,8 +201,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             const interaction = inspectionController(view, geometry, options);
             const menu = options.menu ? transcriptMenuController(view, index, projectionOf, options.duration,
                 () => informationKey.getState(view.state)!.byKey, geometry, interaction.pinMenu, options.menu) : null;
-            const observer = new ResizeObserver(interaction.refresh);
-            observer.observe(view.dom);
+            const unsubscribe = subscribeTranscriptLayout(view, interaction.refresh);
             const listeners = new AbortController();
             const normal = { signal: listeners.signal };
             const capture = { ...normal, capture: true };
@@ -244,19 +244,21 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             window.addEventListener("blur", interaction.reset, normal);
             window.addEventListener("blur", release, normal);
             window.addEventListener("focus", interaction.refresh, normal);
-            window.addEventListener("scroll", interaction.refresh, capture);
+            window.addEventListener("scroll", () => {
+                geometry.scrolled();
+                interaction.refresh();
+            }, capture);
             return {
                 update(_view, previous) {
                     menu?.update();
                     updatePlayback();
                     interaction.update(previous);
-                    if (informationKey.getState(previous)?.decorations !== informationKey.getState(view.state)?.decorations) interaction.refresh();
                 },
                 destroy() {
                     menu?.destroy();
                     release();
                     listeners.abort();
-                    observer.disconnect();
+                    unsubscribe();
                     interaction.reset();
                 }
             };
