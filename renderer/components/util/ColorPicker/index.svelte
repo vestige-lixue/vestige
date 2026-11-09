@@ -1,6 +1,6 @@
 <svelte:window onpointerup={finishPointer} onpointercancel={finishPointer} onblur={() => finish(true)} />
 
-<div class="colorPicker" class:dragging={areaPointer !== null || sliderPointer !== null} data-disabled={disabled || undefined}>
+<div class="colorPicker" data-disabled={disabled || undefined}>
     <div class="layout">
         <div class="area focusable" bind:this={area} tabindex={disabled ? -1 : 0} style:--hue={color.h}
             onpointerdown={startArea} onpointermove={moveArea} onpointerup={endArea}
@@ -239,11 +239,15 @@
     .colorPicker[data-disabled] .area {
         cursor: default;
     }
-    :global(html):has(.colorPicker.dragging), :global(html):has(.colorPicker.dragging) :global(*) {
+    :global(html.color-picker-dragging), :global(html.color-picker-dragging *) {
         cursor: none !important;
     }
 </style>
 
+
+<script module lang="ts">
+    let draggingPickers = 0;
+</script>
 
 <script lang="ts">
     import { onDestroy, tick, untrack } from "svelte";
@@ -294,6 +298,15 @@
     });
     $effect(() => {
         if (disabled) untrack(() => finish(true));
+    });
+    $effect(() => {
+        if (areaPointer === null && sliderPointer === null) return;
+        const root = document.documentElement;
+        draggingPickers++;
+        root.classList.add("color-picker-dragging");
+        return () => {
+            if (--draggingPickers === 0) root.classList.remove("color-picker-dragging");
+        };
     });
     $effect(() => {
         const target = anchor;
