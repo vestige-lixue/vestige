@@ -109,10 +109,9 @@ export function inspectionGeometry(
         from: number;
         to: number;
         information: SelectionInformation | null;
-        rectangles: DOMRect[][];
-        hit: DOMRect[];
+        rectangles?: DOMRect[][];
+        hit?: DOMRect[];
     } | undefined;
-    let measureSelection = false;
     function eventMarker(target: EventTarget | null): HTMLElement | null {
         return target instanceof Element ? target.closest<HTMLElement>(".transcript-event") : null;
     }
@@ -139,38 +138,37 @@ export function inspectionGeometry(
     function blocked(): boolean {
         return compositionPending(view.state) || view.composing;
     }
-    function selectionGeometry(measure = false): typeof selected {
+    function selectionGeometry(): typeof selected {
         const { from, to, empty } = view.state.selection;
         if (empty) return selected = undefined;
         const projection = projectionOf(view.state);
         if (!selected || selected.projection !== projection || selected.from !== from - 1 || selected.to !== to - 1) {
             selected = {
                 projection, from: from - 1, to: to - 1,
-                information: transcriptSelection(index, projection, duration, from - 1, to - 1), rectangles: [], hit: []
+                information: transcriptSelection(index, projection, duration, from - 1, to - 1)
             };
-            measure = true;
-        }
-        if (measure || measureSelection) {
-            selected.rectangles = selected.information ? informationRectangles(selected.information) : [];
-            selected.hit = rectangles(selected);
-            measureSelection = false;
         }
         return selected;
+    }
+    function selectionAtCaret(keyboard: boolean): InspectionTarget | null {
+        const target = selectionGeometry();
+        if (!target?.information) return null;
+        const boxes = target.rectangles ??= informationRectangles(target.information);
+        const caret = view.coordsAtPos(view.state.selection.head);
+        const anchor = keyboardRectangle(boxes.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
+        return { information: target.information, rectangles: boxes, anchor, keyboard, pressed: !keyboard };
     }
     return {
         rectangles: informationRectangles,
         hover(pointer, previous, { measure = false, selection = true } = {}) {
-            if (measure) measureSelection = true;
+            if (measure && selected) {
+                selected.rectangles = undefined;
+                selected.hit = undefined;
+            }
             if (!pointer || blocked()) return null;
             const { x, y, pressed } = pointer;
             // Native drag selection can lag behind the pointer as it crosses a token boundary.
-            if (selection && pressed && !view.state.selection.empty) {
-                const target = selectionGeometry(measure)!;
-                if (!target.information) return null;
-                const caret = view.coordsAtPos(view.state.selection.head);
-                const anchor = keyboardRectangle(target.rectangles.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
-                return { information: target.information, rectangles: target.rectangles, anchor, keyboard: false, pressed };
-            }
+            if (selection && pressed && !view.state.selection.empty) return selectionAtCaret(false);
             const element = document.elementFromPoint(x, y);
             if (!element || !view.dom.contains(element)) return null;
             const button = eventMarker(element);
@@ -179,13 +177,15 @@ export function inspectionGeometry(
                 if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: false, pressed };
             }
             if (selection) {
-                const target = selectionGeometry(measure);
-                const spacing = target && spacingOf(target) || { top: 0, right: 0, bottom: 0, left: 0 };
-                const hit = target && pointerRectangle(target.hit, pointer, spacing);
-                if (target && hit) {
-                    if (!target.information) return null;
-                    const anchor = pointerRectangle(target.rectangles.flat(), pointer, spacing) ?? hit;
-                    return { information: target.information, rectangles: target.rectangles, anchor, keyboard: false, pressed };
+                const target = selectionGeometry();
+                if (target?.information) {
+                    const spacing = spacingOf(target) ?? { top: 0, right: 0, bottom: 0, left: 0 };
+                    const hit = pointerRectangle(target.hit ??= rectangles(target), pointer, spacing);
+                    if (hit) {
+                        const boxes = target.rectangles ??= informationRectangles(target.information);
+                        const anchor = pointerRectangle(boxes.flat(), pointer, spacing) ?? hit;
+                        return { information: target.information, rectangles: boxes, anchor, keyboard: false, pressed };
+                    }
                 }
             }
             const position = view.posAtCoords({ left: x, top: y });
@@ -221,13 +221,7 @@ export function inspectionGeometry(
                 if (item) return { information: item, rectangles: [], anchor: button.getBoundingClientRect(), keyboard: true, pressed: false };
             }
             if (!control || element !== view.dom) return null;
-            if (!view.state.selection.empty) {
-                const target = selectionGeometry(true)!;
-                if (!target.information) return null;
-                const caret = view.coordsAtPos(view.state.selection.head);
-                const anchor = keyboardRectangle(target.rectangles.flat(), caret) ?? new DOMRect(caret.left, caret.top, caret.right - caret.left, caret.bottom - caret.top);
-                return { information: target.information, rectangles: target.rectangles, anchor, keyboard: true, pressed: false };
-            }
+            if (!view.state.selection.empty) return selectionAtCaret(true);
             const offset = view.state.selection.head - 1;
             // A caret at a boundary belongs to the following character; the document end has none.
             const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);

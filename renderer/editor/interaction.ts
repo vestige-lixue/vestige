@@ -236,7 +236,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         const changed = view.state.doc !== previous.doc;
         if (changed || !view.state.selection.eq(previous.selection)) {
             if (state.activation) state.activation.key = null;
-            state.hovered = geometry.hover(state.pointer, state.hovered, { measure: true });
+            state.hovered = geometry.hover(state.pointer, state.hovered, changed ? { measure: true } : undefined);
             state.keyboard = geometry.keyboard(state.control);
             inspect(state.control ? "keyboard" : state.priority);
         }
