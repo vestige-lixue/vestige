@@ -6,11 +6,12 @@ import "./styles/elements.css";
 import "./styles/layouts.css";
 import "./styles/colors.css";
 import * as settingsAPI from "./states/settings";
+import * as vocabularyAPI from "./states/vocabulary";
 
 document.documentElement.dataset.platform = window.api.platform;
 
 // Apply the saved language and colors before mounting or showing the window.
-const app = settingsAPI.initialize().then(async () => {
+const app = Promise.all([settingsAPI.initialize(), vocabularyAPI.initialize()]).then(async () => {
     const stopTheme = await theme.initialize();
     import.meta.hot?.dispose(stopTheme);
     const app = mount(App, { target: document.getElementById("app")! });

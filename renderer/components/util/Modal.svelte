@@ -25,7 +25,7 @@
                 event.preventDefault();
                 const target = returnFocus;
                 returnFocus = null;
-                modal.restoreFocus(target);
+                modal.restoreFocus(target, returnFocusOptions);
             }}
         >
             <div class="body" bind:this={scrollElement}>
@@ -210,6 +210,7 @@
     let closeVersion = 0;
     let disposed = false;
     let returnFocus: Element | null = null;
+    let returnFocusOptions: globalThis.FocusOptions | undefined;
     const lifecycle = getContext<DialogLifecycle | undefined>(dialogLifecycleKey);
     const layer = Symbol();
     const layerIndex = $derived(modal.getLayerIndex(layer));
@@ -264,8 +265,9 @@
     }
 
     // A domain editor may already have committed before choosing to close.
-    export function approveClose(): void {
+    export function approveClose(focusOptions?: globalThis.FocusOptions): void {
         if (disposed || phase === "closing" || phase === "closed") return;
+        returnFocusOptions = focusOptions;
         closeVersion++;
         phase = "closing";
         visible = false;

@@ -5,6 +5,7 @@ import * as mediaImport from "./mediaImport.svelte";
 import * as transcription from "./transcription.svelte";
 import { type Config } from "../../shared/transcription/Config";
 import * as project from "./project.svelte";
+import { type VocabularyRule } from "../../shared/vocabulary/Vocabulary";
 
 export type SaveChoice = "save" | "discard" | "cancel" | "memory" | "retry";
 // "continue" closes or quits with the accepted settings still active but unsaved.
@@ -19,6 +20,12 @@ export type MediaRefImportIssue = {
 
 type PanelDialog = {
     kind: "transcription-backends" | "transcription-models" | "vocabulary" | "settings" | "licenses" | "about" | "guide" | "parameter-guide";
+};
+
+type VocabularyRuleDialog = {
+    kind: "vocabulary-rule";
+    rule?: VocabularyRule;
+    source?: string;
 };
 
 type TranscriptionTasksDialog = {
@@ -99,6 +106,7 @@ type MediaRefImportErrorDialog = {
 
 export type DialogDescriptor = (
     PanelDialog |
+    VocabularyRuleDialog |
     TranscriptionTasksDialog |
     TranscriptionConfigDialog |
     SwitchDisplayedRunDialog |

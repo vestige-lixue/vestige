@@ -242,7 +242,7 @@
             {
                 "file": "lucide.txt",
                 "source": "https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE",
-                "note": "ISC section for the bundled files, folder-open, and languages icons; the upstream file also lists Feather-derived icons under MIT."
+                "note": "ISC section for the bundled files, folder-open, languages, and square-pen icons. The upstream file also lists Feather-derived icons under MIT."
             }
         ]
     }

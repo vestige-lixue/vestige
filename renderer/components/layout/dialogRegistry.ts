@@ -3,6 +3,7 @@ import * as dialogs from "../../states/dialogs.svelte";
 import TranscriptionBackends from "../dialogs/TranscriptionBackends.svelte";
 import TranscriptionModels from "../dialogs/TranscriptionModels.svelte";
 import Vocabulary from "../dialogs/Vocabulary.svelte";
+import VocabularyRule from "../dialogs/VocabularyRule.svelte";
 import TranscriptionTasks from "../dialogs/TranscriptionTasks.svelte";
 import Settings from "../dialogs/Settings.svelte";
 import OpenSourceLicenses from "../dialogs/OpenSourceLicenses.svelte";
@@ -40,7 +41,10 @@ function define<Kind extends DialogKind, View extends Component<never>>(_kind: K
 const registry: { [Kind in DialogKind]: Presenter<Kind> } = {
     "transcription-backends": define("transcription-backends", TranscriptionBackends, dialog => ({ dialogId: dialog.id })),
     "transcription-models": define("transcription-models", TranscriptionModels, dialog => ({ dialogId: dialog.id })),
-    vocabulary: define("vocabulary", Vocabulary, () => ({})),
+    vocabulary: define("vocabulary", Vocabulary, dialog => ({ dialogId: dialog.id })),
+    "vocabulary-rule": define("vocabulary-rule", VocabularyRule, dialog => ({
+        dialogId: dialog.id, rule: dialog.rule, source: dialog.source
+    })),
     settings: define("settings", Settings, dialog => ({ dialogId: dialog.id })),
     guide: define("guide", UserGuide, () => ({})),
     "parameter-guide": define("parameter-guide", ParameterGuide, () => ({})),
