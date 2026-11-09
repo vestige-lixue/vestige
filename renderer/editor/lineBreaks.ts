@@ -1,6 +1,9 @@
-// A hard break has no glyph, so it can carry neither the added-text underline nor a hover hint itself.
-// The editor draws both in an overlay outside contenteditable, which leaves caret hit zones and IME offsets alone.
+import { type EditorView } from "@tiptap/pm/view";
+
+// Hard breaks have no glyph. Selection blocks and hover hints share these boxes outside contenteditable.
 export type LineBreakBox = {
+    /** ProseMirror position immediately before the hard break. */
+    pos: number;
     /** Relative to the overlay origin; top and height are the break's text box, like a character's. */
     left: number;
     top: number;
@@ -13,10 +16,10 @@ export type LineBreakBox = {
     added: boolean;
 };
 
-export function measureLineBreaks(root: HTMLElement, origin: DOMRect): LineBreakBox[] {
+export function measureLineBreaks(view: EditorView, origin: DOMRect): LineBreakBox[] {
     const boxes: LineBreakBox[] = [];
     const range = document.createRange();
-    for (const element of root.querySelectorAll("br")) {
+    for (const element of view.dom.querySelectorAll("br")) {
         // ProseMirror's trailing break only holds an empty last line; expanded deletions are read-only previews.
         if (element.classList.contains("ProseMirror-trailingBreak") || element.closest("[contenteditable=\"false\"]")) continue;
         range.selectNode(element);
@@ -25,6 +28,7 @@ export function measureLineBreaks(root: HTMLElement, origin: DOMRect): LineBreak
         const fontSize = parseFloat(getComputedStyle(element).fontSize);
         const gap = element.parentElement ? parseFloat(getComputedStyle(element.parentElement).paddingTop) || 0 : 0;
         boxes.push({
+            pos: view.posAtDOM(element, 0, -1),
             left: rect.left - origin.left, top: rect.top - origin.top, height: rect.height, width: fontSize, gap, fontSize,
             added: !!element.closest(".transcript-added")
         });
@@ -35,7 +39,7 @@ export function measureLineBreaks(root: HTMLElement, origin: DOMRect): LineBreak
 export function sameLineBreaks(left: readonly LineBreakBox[], right: readonly LineBreakBox[]): boolean {
     return left.length === right.length && left.every((box, i) => {
         const other = right[i];
-        return box.left === other.left && box.top === other.top && box.height === other.height && box.width === other.width
+        return box.pos === other.pos && box.left === other.left && box.top === other.top && box.height === other.height && box.width === other.width
             && box.gap === other.gap && box.fontSize === other.fontSize && box.added === other.added;
     });
 }

@@ -6,15 +6,13 @@ import { compositionPending } from "./composition";
 import { transcriptLayoutVersion } from "./layout";
 
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
-export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false, includeDeleted = false): DOMRect[] {
+export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false): DOMRect[] {
     const result: DOMRect[] = [];
     const filter = {
         acceptNode: node => {
             const element = node instanceof Element ? node : node.parentElement;
-            if (includeDeleted && element?.matches(".transcript-deletion-expanded")) return NodeFilter.FILTER_SKIP;
             const readonly = element?.closest("[contenteditable=\"false\"]");
-            if (readonly && readonly !== root && root.contains(readonly)
-                && !(includeDeleted && readonly.classList.contains("transcript-deletion-expanded"))) return NodeFilter.FILTER_REJECT;
+            if (readonly && readonly !== root && root.contains(readonly)) return NodeFilter.FILTER_REJECT;
             return node.nodeType === Node.TEXT_NODE || includeBreaks && node instanceof HTMLBRElement
                 && !node.classList.contains("ProseMirror-trailingBreak") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         }

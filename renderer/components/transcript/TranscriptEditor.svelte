@@ -1,10 +1,9 @@
 <div class="editor-shell">
     <div class="editor-surface">
-        {#if selectionRectangles.length}
-            <svg class="selection-highlight">
-                {#each selectionRectangles as rect, index (index)}<rect x={rect.x} y={rect.y} width={rect.width} height={rect.height} />{/each}
-            </svg>
-        {/if}
+        {#each selectedBreaks as box (box.pos)}
+            <div class="selected-break" aria-hidden="true" style:left={`${box.left}px`} style:top={`${box.top}px`}
+                style:width={`${box.fontSize / 2}px`} style:height={`${box.height}px`}></div>
+        {/each}
         <div
             class="editor" spellcheck={false} style:--transcript-font-size={`${fontSize}px`}
             tabindex={-1} bind:this={element}
@@ -63,19 +62,19 @@
         flex-direction: column;
         flex: 1;
     }
-    .inspection-outline, .selection-highlight {
+    .selected-break {
+        position: absolute;
+        z-index: 0;
+        background-color: var(--c-selection);
+        pointer-events: none;
+    }
+    .inspection-outline {
         position: absolute;
         inset: 0;
         width: 100%;
         height: 100%;
         overflow: visible;
         pointer-events: none;
-    }
-    .selection-highlight {
-        z-index: 0;
-        fill: var(--c-selection);
-    }
-    .inspection-outline {
         z-index: 2;
         fill: none;
         stroke: var(--c-text-80p);
@@ -164,6 +163,9 @@
     }
     .editor :global(.tiptap::selection), .editor :global(.tiptap *::selection) {
         background-color: transparent;
+    }
+    .editor :global(::highlight(transcript-selection)) {
+        background-color: var(--c-selection);
     }
     .editor :global(.transcript-text) {
         display: inline;
@@ -301,15 +303,15 @@
     import TranscriptInformation from "./TranscriptInformation.svelte";
     import TranscriptMenu from "./TranscriptMenu.svelte";
     import { type TranscriptMenuCallbacks } from "../../editor/menuTarget";
-    import { type Editor } from "@tiptap/core";
-    import { Plugin, type Transaction } from "@tiptap/pm/state";
+    import { type Editor, type EditorEvents } from "@tiptap/core";
+    import { Plugin } from "@tiptap/pm/state";
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
     import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
-    import { invalidateTranscriptLayout, subscribeTranscriptLayout, transcriptLayoutVersion } from "../../editor/layout";
-    import { textRectangles } from "../../editor/geometry";
     import { measureLineBreaks, sameLineBreaks, lineBreakAt, type LineBreakBox } from "../../editor/lineBreaks";
+    import { invalidateTranscriptLayout, subscribeTranscriptLayout, transcriptLayoutVersion } from "../../editor/layout";
+    import { firstTrue } from "../../../shared/util/search";
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
     import * as settings from "../../states/settings.svelte";
@@ -324,8 +326,11 @@
     let editor = $state.raw<Editor>();
     let contextMenu: { show: TranscriptMenuCallbacks["open"]; edit: TranscriptMenuCallbacks["edit"] };
     let inspection = $state.raw<TranscriptInspection | null>(null);
-    let selectionRectangles = $state.raw<DOMRect[]>([]);
+    let selectionBounds = $state.raw<{ from: number; to: number } | null>(null);
     let lineBreaks = $state.raw<LineBreakBox[]>([]);
+    const firstSelectedBreak = $derived(selectionBounds ? breakIndex(selectionBounds.from) : 0);
+    const endSelectedBreak = $derived(selectionBounds ? breakIndex(selectionBounds.to) : 0);
+    const selectedBreaks = $derived(lineBreaks.slice(firstSelectedBreak, endSelectedBreak));
     let hoveredBreak = $state(-1);
     const fontSize = $derived(settings.getEditing().fontSize);
     // Index -1 means no hovered break and reads undefined.
@@ -355,6 +360,10 @@
                 + (index === rectangles.length - 1 ? ` M ${right} ${top} V ${bottom}` : "");
         }));
     });
+
+    function breakIndex(position: number): number {
+        return firstTrue(lineBreaks.length, i => lineBreaks[i].pos >= position);
+    }
 
     function closeTooltip(): void {
         clearTimeout(openTimer);
@@ -456,46 +465,36 @@
     $effect(() => {
         const current = editor;
         if (!current) return;
-        let frame = 0;
-        let paragraph: Element | null = null;
+        const view = current.view;
+        const name = "transcript-selection";
+        const highlight = new Highlight();
+        CSS.highlights.set(name, highlight);
         function refresh(): void {
-            frame = 0;
-            if (current!.isDestroyed) return;
-            const next = current!.view.dom.firstElementChild;
-            if (next !== paragraph) {
-                if (paragraph) observer.unobserve(paragraph);
-                paragraph = next;
-                if (paragraph) observer.observe(paragraph);
-            }
+            highlight.clear();
             const selection = document.getSelection();
-            if (!selection || selection.isCollapsed || !selection.rangeCount
-                || !current!.view.dom.contains(selection.anchorNode) || !current!.view.dom.contains(selection.focusNode)) {
-                selectionRectangles = [];
+            const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+            if (!range || range.collapsed || !view.dom.contains(range.startContainer) || !view.dom.contains(range.endContainer)) {
+                selectionBounds = null;
                 return;
             }
-            const origin = element.getBoundingClientRect();
-            selectionRectangles = textRectangles(current!.view.dom, selection.getRangeAt(0), true, true)
-                .map(rect => new DOMRect(rect.left - origin.left, rect.top - origin.top, rect.width, rect.height));
+            highlight.add(range.cloneRange());
+            // At an endpoint inside a leaf, exclude that leaf on either side.
+            selectionBounds = {
+                from: view.posAtDOM(range.startContainer, range.startOffset, 1),
+                to: view.posAtDOM(range.endContainer, range.endOffset, -1)
+            };
         }
-        function schedule(): void {
-            if (!frame) frame = requestAnimationFrame(refresh);
+        function update({ transaction, appendedTransactions }: EditorEvents["transaction"]): void {
+            if (transaction.docChanged || transaction.selectionSet || appendedTransactions.some(tr => tr.docChanged || tr.selectionSet)) refresh();
         }
-        function update({ transaction }: { transaction: Transaction }): void {
-            if (transaction.docChanged || transaction.selectionSet) schedule();
-        }
-        const observer = new ResizeObserver(schedule);
-        observer.observe(current.view.dom);
         current.on("transaction", update);
-        document.addEventListener("selectionchange", schedule);
-        window.addEventListener("scroll", schedule, true);
-        schedule();
+        document.addEventListener("selectionchange", refresh);
+        refresh();
         return () => {
-            cancelAnimationFrame(frame);
-            observer.disconnect();
             current.off("transaction", update);
-            document.removeEventListener("selectionchange", schedule);
-            window.removeEventListener("scroll", schedule, true);
-            selectionRectangles = [];
+            document.removeEventListener("selectionchange", refresh);
+            if (CSS.highlights.get(name) === highlight) CSS.highlights.delete(name);
+            selectionBounds = null;
         };
     });
 
@@ -514,7 +513,7 @@
             if (measuredVersion !== version) {
                 measuredVersion = version;
                 origin = element.getBoundingClientRect();
-                const next = measureLineBreaks(view.dom, origin);
+                const next = measureLineBreaks(view, origin);
                 if (!sameLineBreaks(next, lineBreaks)) lineBreaks = next;
             }
             if (!pointer || !lineBreaks.length) {
