@@ -86,7 +86,7 @@
             </Slider.Root>
             <span class="value">{volumePosition}%</span>
         </div>
-        <div class="buttons" onkeydown={handleButtonKeydown}>
+        <div class="buttons" onkeydown={navigateButtonGroup}>
             <Tooltip
                 text={i18n.t("player.actions.previousMedia")}
                 shortcut={shortcut({ kind: "selectAdjacentMedia", direction: -1 })}
@@ -401,7 +401,7 @@
     import { type AudioLevels } from "../../audio/levels";
     import { sliderToVolume, volumeToSlider } from "../../audio/volume";
     import { formatDuration } from "../../format";
-    import { focusIndex } from "../../dom";
+    import { navigateButtonGroup } from "../../dom";
     import { shortcut, seekProgress, cancelProgressNavigation } from "../../keybindings";
 
     import * as i18n from "../../i18n.svelte";
@@ -495,15 +495,6 @@
         commandDisabled({ kind: "seekAdjacentWord", direction: 1 })
     ]);
     const tabStop = $derived(buttonDisabled[focusedButton] ? buttonDisabled.findIndex(disabled => !disabled) : focusedButton);
-
-    function handleButtonKeydown(event: KeyboardEvent): void {
-        if (!(event.currentTarget instanceof HTMLDivElement) || !(event.target instanceof HTMLButtonElement)) return;
-        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
-        const next = focusIndex(event, buttons.indexOf(event.target), buttons.length, "horizontal");
-        if (next === null) return;
-        event.preventDefault();
-        buttons[next]?.focus();
-    }
 
     function handleProgressKeydown(event: KeyboardEvent): void {
         if (disabled) cancelProgressNavigation();

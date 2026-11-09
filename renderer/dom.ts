@@ -17,6 +17,15 @@ export function focusIndex(event: KeyboardEvent, index: number, count: number, a
     return (index + (event.key === next ? 1 : -1) + count) % count;
 }
 
+export function navigateButtonGroup(event: KeyboardEvent): void {
+    if (!(event.currentTarget instanceof HTMLElement) || !(event.target instanceof HTMLButtonElement)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+    const next = focusIndex(event, buttons.indexOf(event.target), buttons.length, "horizontal");
+    if (next === null) return;
+    event.preventDefault();
+    buttons[next]?.focus();
+}
+
 // Callers retain capture registration and flushSync ordering with their focus flags.
 export function dismissOutside(event: PointerEvent, contains: (target: Node) => boolean, dismiss: () => void): void {
     if (!(event.target instanceof Node) || contains(event.target)) return;
