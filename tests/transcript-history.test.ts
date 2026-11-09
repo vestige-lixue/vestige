@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { getSchema } from "@tiptap/core";
 import { AllSelection, EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { closeHistory, undo, redo, undoDepth, redoDepth } from "@tiptap/pm/history";
-import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText } from "../renderer/editor/transcript";
+import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText, applyTranscriptVocabulary } from "../renderer/editor/transcript";
 import { projectionTransaction } from "../renderer/editor/projectionStep";
 import { createTextIndex, editText, alignText, restoreTextDeletion, textReplacement, replaceText } from "../shared/transcript/text";
+import { vocabularyRuleIssue } from "../shared/vocabulary/Vocabulary";
 import { transcript } from "./support/fixtures";
 
 function editor(text: string): {
@@ -29,6 +30,41 @@ function editor(text: string): {
 }
 
 describe("transcript history selection", () => {
+    it.each([["新词", "甲新词丙丁"], ["", "甲丙丁"]])("applies vocabulary replacement %j across added text and Unicode as an isolated undo entry", (replacement, expected) => {
+        const value = editor("甲乙😀丙丁");
+        value.apply(value.state().tr.insertText("新增", 2));
+        value.select(2, 7);
+        const before = transcriptProjection(value.state());
+        const view = {
+            state: value.state(), isDestroyed: false, editable: true, composing: false,
+            dom: { closest: () => null },
+            dispatch(transaction: Transaction) {
+                value.apply(transaction);
+                view.state = value.state();
+            }
+        };
+        const request = { view, doc: view.state.doc } as Parameters<typeof applyTranscriptVocabulary>[0];
+        const match = { from: 1, to: 6, rule: {
+            id: "00000000-0000-4000-8000-000000000001", source: "新增乙😀", replacement, enabled: true
+        } };
+        expect(vocabularyRuleIssue(match.rule)).toBeNull();
+        expect(applyTranscriptVocabulary(request, match)).toBe(true);
+        expect(documentText(value.state().doc)).toBe(expected);
+        expect(undoDepth(value.state())).toBe(2);
+        const replaced = transcriptModifications(value.state());
+        expect(applyTranscriptVocabulary(request, match)).toBe(false);
+        value.apply(value.state().tr.insertText("!"));
+        expect(undoDepth(value.state())).toBe(3);
+        value.history("undo");
+        expect(documentText(value.state().doc)).toBe(expected);
+        value.history("undo");
+        expect(documentText(value.state().doc)).toBe(before.text);
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        value.history("redo");
+        expect(documentText(value.state().doc)).toBe(expected);
+        expect(transcriptModifications(value.state())).toEqual(replaced);
+    });
+
     it("records a disjoint reference replacement as one undo entry", () => {
         const value = editor("什么"), index = createTextIndex(transcript(["什么"]));
         const initial = transcriptProjection(value.state());

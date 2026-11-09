@@ -299,6 +299,8 @@
             "editRule": "编辑规则",
             "source": "将以下文字",
             "replacement": "替换为",
+            "replace": "词库替换",
+            "deleteText": "删除文字",
             "search": "搜索原文字或替换文字",
             "enableRule": "启用规则：{{source}}",
             "actions": "操作",

@@ -161,6 +161,9 @@
     .editor :global(.ProseMirror-hideselection) {
         caret-color: transparent;
     }
+    .editor :global(.transcript-vocabulary-match) {
+        background: var(--c-selection);
+    }
     .editor :global(.tiptap::selection), .editor :global(.tiptap *::selection) {
         background-color: transparent;
     }

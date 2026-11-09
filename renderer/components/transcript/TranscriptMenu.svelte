@@ -40,7 +40,49 @@
                     </DropdownMenu.Portal>
                 </DropdownMenu.Sub>
             {/if}
-            {#if references.length && (canAlign || actions.length)}<DropdownMenu.Separator class="menu-separator" />{/if}
+            {#if vocabularyMatches.length}
+                <DropdownMenu.Sub onOpenChange={value => {
+                    vocabularyFocusPending = value;
+                    if (!value && request) previewVocabulary(request, null);
+                }}>
+                    <DropdownMenu.SubTrigger class="reference-trigger activable focusable">
+                        <div>{i18n.t("transcription.vocabulary.replace")}</div>
+                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                        {@html chevronRight}
+                    </DropdownMenu.SubTrigger>
+                    <DropdownMenu.Portal>
+                        <DropdownMenu.SubContent class="transcript-menu transcript-vocabulary" data-keyboard={keyboard.current}
+                            align="start" sideOffset={8} collisionPadding={8} style={"z-index: " + (layerIndex + 1)} onkeydown={keydown}
+                            onOpenAutoFocus={event => {
+                                if (!vocabularyFocusPending) event.preventDefault();
+                                vocabularyFocusPending = false;
+                            }}>
+                            {#each vocabularyMatches as match (match.rule.id + ":" + match.from)}
+                                <DropdownMenu.Item class="vocabulary-item activable focusable" disabled={disabled("paste")}
+                                    onpointerenter={() => request && previewVocabulary(request, match)}
+                                    onpointerleave={() => request && previewVocabulary(request, null)}
+                                    onfocus={() => request && previewVocabulary(request, match)}
+                                    onblur={() => request && previewVocabulary(request, null)}
+                                    onSelect={() => applyVocabulary(match)}>
+                                    <div class="vocabulary-source">{match.rule.source}</div>
+                                    <span aria-hidden="true">→</span>
+                                    <div class="vocabulary-replacement">
+                                        {#if match.rule.replacement}{match.rule.replacement}{:else}<i>{i18n.t("transcription.vocabulary.deleteText")}</i>{/if}
+                                    </div>
+                                </DropdownMenu.Item>
+                            {/each}
+                        </DropdownMenu.SubContent>
+                    </DropdownMenu.Portal>
+                </DropdownMenu.Sub>
+            {/if}
+            {#if request && !request.selection.empty}
+                <DropdownMenu.Item class="activable focusable" disabled={vocabulary.operation.busy || !!vocabulary.getSnapshot().error} onSelect={addVocabulary}>
+                    <div>{i18n.t("transcription.vocabulary.add")}</div>
+                </DropdownMenu.Item>
+            {/if}
+            {#if (references.length || vocabularyMatches.length || request && !request.selection.empty) && (canAlign || actions.length)}
+                <DropdownMenu.Separator class="menu-separator" />
+            {/if}
             {#if canAlign}
                 <DropdownMenu.Item class="activable focusable" disabled={disabled("cut")} onSelect={align}>
                     <div>{i18n.t("transcript.information.align")}</div>
@@ -145,6 +187,16 @@
         font-size: 12px;
         white-space: nowrap;
     }
+    :global(.transcript-vocabulary .vocabulary-item) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 12px;
+    }
+    .vocabulary-source, .vocabulary-replacement {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .vocabulary-source { color: var(--c-text-80p); }
 </style>
 
 <script lang="ts">
@@ -165,6 +217,11 @@
     import * as project from "../../states/project.svelte";
     import * as modal from "../../states/modal.svelte";
     import * as i18n from "../../i18n.svelte";
+    import * as vocabulary from "../../states/vocabulary.svelte";
+    import * as dialogs from "../../states/dialogs";
+    import { type VocabularyMatch } from "../../../shared/vocabulary/match";
+    import { documentText, applyTranscriptVocabulary } from "../../editor/transcript";
+    import { previewVocabulary } from "../../editor/vocabulary";
 
     let { runs, run }: { runs: Run[]; run: Run } = $props();
     type ReferenceItem = { text: string; range: Range; target: Range; runs: number[] };
@@ -172,6 +229,8 @@
     let open = $state(false);
     let focusPending = false;
     let referenceFocusPending = false;
+    let vocabularyFocusPending = false;
+    let vocabularyRevision = -1;
     let referenceHover = $state<"trigger" | "content" | null>(null);
     const referencePreview = $derived(open && request?.target.kind === "selection" && referenceHover !== null);
     let content = $state<HTMLDivElement | null>(null);
@@ -179,6 +238,7 @@
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
     const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
     const references = $derived(request ? referenceItems(request) : []);
+    const vocabularyMatches = $derived(request ? vocabularyItems(request) : []);
     const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
@@ -188,11 +248,14 @@
     export function show(value: TranscriptMenuRequest | null): boolean {
         referenceHover = null;
         if (!value) {
+            if (request) previewVocabulary(request, null);
             open = false;
             return false;
         }
-        if (value.target.kind !== "deletion" && !transcriptMenuClipboardActions(value.target).length && !referenceItems(value).length) return false;
+        if (value.target.kind !== "deletion" && value.selection.empty && !transcriptMenuClipboardActions(value.target).length
+            && !referenceItems(value).length && !vocabularyItems(value).length) return false;
         request = value;
+        vocabularyRevision = vocabulary.getSnapshot().revision;
         keyboard.current = value.keyboard;
         focusPending = true;
         open = true;
@@ -202,12 +265,41 @@
     function changeOpen(value: boolean): void {
         open = value;
         if (!value) referenceHover = null;
+        if (!value && request) previewVocabulary(request, null);
         if (!value && request) dismissTranscriptMenu(request.view.dom);
     }
 
     function referenceOpenChange(value: boolean): void {
         referenceFocusPending = value;
         if (!value && referenceHover === "content") referenceHover = null;
+    }
+
+    function vocabularyItems(value: TranscriptMenuRequest): VocabularyMatch[] {
+        return vocabulary.matches(documentText(value.doc), value.selection.from - 1, value.selection.to - 1);
+    }
+
+    function applyVocabulary(match: VocabularyMatch): void {
+        if (!request || disabled("paste")) return;
+        const current = request, revision = vocabularyRevision;
+        changeOpen(false);
+        void tick().then(() => {
+            if (open || request !== current || revision !== vocabulary.getSnapshot().revision || disabled("paste")
+                || !vocabularyItems(current).some(item => item.from === match.from && item.to === match.to && item.rule.id === match.rule.id)
+                || !restoreTranscriptMenuSelection(current)) return;
+            applyTranscriptVocabulary(current, match);
+        });
+    }
+
+    function addVocabulary(): void {
+        if (!request || request.selection.empty) return;
+        const current = request;
+        const from = current.selection.from - 1, to = current.selection.to - 1;
+        const source = documentText(current.doc).slice(from, to);
+        changeOpen(false);
+        void tick().then(() => {
+            if (open || request !== current || !restoreTranscriptMenuSelection(current)) return;
+            dialogs.show({ kind: "vocabulary-rule", source });
+        });
     }
 
     function referenceItems(value: TranscriptMenuRequest): ReferenceItem[] {
@@ -326,7 +418,12 @@
         if (open) untrack(() => modal.openLayer(layer));
         else untrack(() => modal.closeLayer(layer));
     });
+    $effect(() => {
+        const revision = vocabulary.getSnapshot().revision;
+        if (open && revision !== vocabularyRevision) untrack(() => changeOpen(false));
+    });
     onDestroy(() => {
+        if (request) previewVocabulary(request, null);
         if (request) dismissTranscriptMenu(request.view.dom);
         modal.closeLayer(layer);
     });

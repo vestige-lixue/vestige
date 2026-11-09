@@ -299,6 +299,8 @@
             "editRule": "Edit rule",
             "source": "Replace",
             "replacement": "With",
+            "replace": "Vocabulary replacements",
+            "deleteText": "Delete text",
             "search": "Search source or replacement text",
             "enableRule": "Enable rule: {{source}}",
             "actions": "Actions",
