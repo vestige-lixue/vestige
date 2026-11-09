@@ -48,8 +48,9 @@ export function menuItems(group: MenuGroup): readonly (MenuAction | null)[] {
     switch (group) {
         case "project": return projectActions;
         case "media": return [
-            { kind: "importMedia" }, null, transcriptionCommand(), { kind: "removeSelectedMedia" }, null,
-            { kind: "moveSelectedMedia", direction: -1 }, { kind: "moveSelectedMedia", direction: 1 }
+            { kind: "importMedia" }, null,
+            { kind: "moveSelectedMedia", direction: -1 }, { kind: "moveSelectedMedia", direction: 1 }, null,
+            transcriptionCommand(), { kind: "removeSelectedMedia" }
         ];
         case "transcription": return [transcriptionCommand(), null, ...transcriptionActions];
         case "edit": return editActions.map(action => action ? { kind: "edit", action } : null);
