@@ -293,7 +293,13 @@
             }
         },
         "vocabulary": {
-            "title": "词库"
+            "title": "词库",
+            "errors": {
+                "invalidFile": "词库文件格式无效或版本不受支持，原有文件未被更改。",
+                "invalidRule": "词库规则无效。",
+                "duplicate": "这条规则已经存在。",
+                "conflict": "词库已发生变化，列表已刷新。请检查后重试。"
+            }
         }
     },
     "transcript": {

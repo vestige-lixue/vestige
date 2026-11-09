@@ -11,6 +11,7 @@ import { type DocumentationResult, type DocumentationKind } from "./documentatio
 import { type DownloadListResult, type DownloadStartResult, type DownloadKind } from "./downloads";
 import { type OperationResult } from "./failure";
 import { type NativeMenuState } from "./menu/NativeMenu";
+import { type VocabularyChange, type VocabularySnapshot, type VocabularyResult } from "./vocabulary/Vocabulary";
 
 export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
 
@@ -36,6 +37,11 @@ export type AppAPI = {
         update(patch: SettingsPatch): Promise<SettingsResult>;
         flush(revision: number): Promise<SettingsResult>;
         onChanged(listener: (snapshot: SettingsSnapshot) => void): () => void;
+    };
+    vocabulary: {
+        get(): Promise<VocabularySnapshot>;
+        change(revision: number, change: VocabularyChange): Promise<VocabularyResult>;
+        onChanged(listener: (snapshot: VocabularySnapshot) => void): () => void;
     };
     file: {
         getPathForFile(file: File): Promise<FilePathResult>;

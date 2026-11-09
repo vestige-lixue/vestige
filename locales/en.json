@@ -293,7 +293,13 @@
             }
         },
         "vocabulary": {
-            "title": "Vocabulary"
+            "title": "Vocabulary",
+            "errors": {
+                "invalidFile": "The vocabulary file is invalid or uses an unsupported version. The original file has not been changed.",
+                "invalidRule": "Invalid vocabulary rule.",
+                "duplicate": "This rule already exists.",
+                "conflict": "The vocabulary changed and the list was refreshed. Review it and try again."
+            }
         }
     },
     "transcript": {

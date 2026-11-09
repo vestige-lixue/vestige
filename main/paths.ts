@@ -4,6 +4,7 @@ import { parseAbsolutePath } from "./util/file";
 
 export type AppPaths = Readonly<{
     dataDirectory: AbsolutePath;
+    vocabularyPath: AbsolutePath;
     sessionDirectory: AbsolutePath;
     logsDirectory: AbsolutePath;
     resourcesDirectory: AbsolutePath;
@@ -38,6 +39,7 @@ export function createAppPaths(options: { packaged: boolean; appPath: string; re
     const backendDirectory = parseAbsolutePath(join(dataDirectory, "backends"));
     return Object.freeze({
         dataDirectory,
+        vocabularyPath: parseAbsolutePath(join(dataDirectory, "vocabulary.json")),
         sessionDirectory: parseAbsolutePath(join(dataDirectory, "chromium")),
         logsDirectory: parseAbsolutePath(join(dataDirectory, "logs")),
         resourcesDirectory,

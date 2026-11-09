@@ -32,6 +32,7 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
         | "transcription-empty-result" | "transcription-truncated-output"
         | "audio-invalid-wave" | "audio-truncated-wave" | "audio-empty-wave"
         | "settings-invalid-update"
+        | "vocabulary-invalid-file" | "vocabulary-invalid-rule" | "vocabulary-duplicate-rule" | "vocabulary-conflict"
         | "path-not-absolute" | "path-drive-relative" | "project-path-not-file" | "ipc-not-main-frame"
         | "file-invalid-directory";
 } | {

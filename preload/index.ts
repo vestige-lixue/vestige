@@ -6,6 +6,8 @@ import { transcriptionChannels } from "../shared/transcription/ipc";
 import { taskOutputChannels, type TaskSnapshot } from "../shared/task";
 import { documentationChannels } from "../shared/documentation";
 import { downloadChannels } from "../shared/downloads";
+import { vocabularyChannels } from "../shared/vocabulary/ipc";
+import { type VocabularySnapshot } from "../shared/vocabulary/Vocabulary";
 
 const taskSubscribers = new Map<string, Set<(snapshot: TaskSnapshot) => void>>();
 ipcRenderer.on(taskOutputChannels.changed, (_event: IpcRendererEvent, snapshot: TaskSnapshot) => {
@@ -64,6 +66,15 @@ const api: AppAPI = {
             const listener = (_event: IpcRendererEvent, snapshot: SettingsSnapshot): void => callback(snapshot);
             ipcRenderer.on(settingsChannels.changed, listener);
             return () => ipcRenderer.removeListener(settingsChannels.changed, listener);
+        }
+    },
+    vocabulary: {
+        get: () => ipcRenderer.invoke(vocabularyChannels.get),
+        change: (revision, change) => ipcRenderer.invoke(vocabularyChannels.change, revision, change),
+        onChanged(callback) {
+            const listener = (_event: IpcRendererEvent, snapshot: VocabularySnapshot): void => callback(snapshot);
+            ipcRenderer.on(vocabularyChannels.changed, listener);
+            return () => ipcRenderer.removeListener(vocabularyChannels.changed, listener);
         }
     },
     file: {

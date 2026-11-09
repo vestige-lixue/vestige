@@ -26,6 +26,8 @@ import { initializeApplicationMenu, registerMenuIPCs } from "./ui/menu";
 import { revealWindow } from "./ui/visibility";
 import { listen } from "./util/ipc";
 import { type FailureInfo } from "../shared/failure";
+import { VocabularyStore } from "./vocabulary/store";
+import { registerVocabularyIPCs } from "./vocabulary/ipc";
 
 app.setName("Vestige");
 registerMediaScheme();
@@ -57,6 +59,7 @@ function startApplication(): void {
         applicationLog?.close(`exit ${code}`);
     });
     settings.initialize(paths.dataDirectory);
+    const vocabulary = new VocabularyStore(paths.vocabularyPath);
     setLocale(settings.get().settings.language);
     settings.subscribe(snapshot => setLocale(snapshot.settings.language));
 
@@ -119,6 +122,7 @@ function startApplication(): void {
         registerAppIPCs(mainWindow, logs);
         if (process.platform === "darwin") registerMenuIPCs(mainWindow);
         registerProjectIPCs(mainWindow);
+        registerVocabularyIPCs(mainWindow, vocabulary);
         const rememberWindow = registerSettingsIPCs(mainWindow);
         registerWindowTheme(mainWindow);
         const stopTranscriptions = registerTranscriptionIPCs(mainWindow.webContents, {
@@ -129,7 +133,7 @@ function startApplication(): void {
             vadModelPath: paths.vadModelPath
         }, tasks, taskAdmission);
         registerWindowLifecycle(mainWindow, async () => {
-            await Promise.all([stopDownloads(), stopTranscriptions()]);
+            await Promise.all([stopDownloads(), stopTranscriptions(), vocabulary.settle()]);
         });
 
         let rendererReady = false, windowReady = false;
