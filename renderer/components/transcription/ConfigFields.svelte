@@ -1,13 +1,13 @@
 <div class="fields">
     <div class="field">
-        <label for={`${id}-executor`}>{i18n.t("transcription.config.executor.label")}</label>
+        <label class="field-label" for={`${id}-executor`}>{i18n.t("transcription.config.executor.label")}</label>
         <DropdownSelector id={`${id}-executor`} items={executorItems} {disabled} value={config.executor} onValueChange={value => {
             if (isExecutor(value)) onchange({ ...config, executor: value });
         }} />
     </div>
     {#each directories as directory (directory.kind)}
         <div class="field">
-            <label>{i18n.t(`transcription.config.${directory.kind}Directory.label`)}</label>
+            <label class="field-label">{i18n.t(`transcription.config.${directory.kind}Directory.label`)}</label>
             <Combobox id={`${id}-${directory.kind}`} {disabled} clearable={clearableDirectories} items={directory.items} header={`${directory.kind}s /`} bind:input={directory.input}
                 value={config[`${directory.kind}Directory`]} onValueChange={value => setDirectory(directory, value)} onOpenChange={open => {
                     if (open) void refreshDirectories(directory);
@@ -39,9 +39,6 @@
         flex-direction: column;
         gap: 8px;
         min-width: 0;
-    }
-    label {
-        font-weight: 600;
     }
     .folder {
         display: flex;

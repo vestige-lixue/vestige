@@ -17,7 +17,7 @@ button {
     }
 }
 
-b {
+b, .field-label {
     font-weight: 600;
 }
 

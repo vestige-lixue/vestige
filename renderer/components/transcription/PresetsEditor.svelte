@@ -54,7 +54,7 @@
     <div class="editor">
         {#if selected}
             <div class="name">
-                <label for="transcription-preset-name">{i18n.t("transcription.presets.name.label")}</label>
+                <label class="field-label" for="transcription-preset-name">{i18n.t("transcription.presets.name.label")}</label>
                 <input id="transcription-preset-name" class="input-control focusable" class:invalid={!!nameError()} bind:this={nameInput} disabled={pending || !selected.deletable}
                     spellcheck={false} autocomplete="off" value={selected.name} oninput={event => {
                         if (!selected?.deletable) return;
@@ -155,9 +155,6 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-    }
-    label {
-        font-weight: 600;
     }
     input {
         width: 100%;

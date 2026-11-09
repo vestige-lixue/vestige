@@ -4,7 +4,7 @@
     <Dialog.Title class="modal-title">{i18n.t("transcription.config.title")}</Dialog.Title>
     <Dialog.Description class="modal-description">{project.getMedia(mediaId)?.name ?? ""}</Dialog.Description>
     <div class="presetRow">
-        <label for="transcription-preset">{i18n.t("transcription.config.preset.label")}</label>
+        <label class="field-label" for="transcription-preset">{i18n.t("transcription.config.preset.label")}</label>
         <div class="presetControl">
             <DropdownSelector id="transcription-preset" items={presetItems} value={selectedName} {disabled} placeholder={i18n.t("transcription.config.preset.custom")} onValueChange={name => {
                 const preset = presets.find(preset => preset.name === name);
@@ -40,9 +40,6 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-    }
-    label {
-        font-weight: 600;
     }
     .presetControl {
         display: flex;
