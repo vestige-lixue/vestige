@@ -2,17 +2,19 @@ import { Plugin } from "@tiptap/pm/state";
 import { dropCursor } from "@tiptap/pm/dropcursor";
 import { dropPoint } from "@tiptap/pm/transform";
 
+type DropPointer = { left: number; top: number };
+
 export function dropCursorPlugin(): Plugin {
     const cursor = dropCursor({ color: "var(--c-accent)", width: 2, class: "transcript-dropcursor" });
     return new Plugin({
         view(view) {
             const overlay = cursor.spec.view!(view);
-            let pointer: { left: number; top: number } | undefined;
+            let pointer: DropPointer | undefined;
 
-            function refresh(): void {
+            function refresh(point: DropPointer): void {
                 const element = view.dom.offsetParent?.querySelector<HTMLElement>(".transcript-dropcursor");
                 if (!element) return;
-                const position = pointer && view.posAtCoords(pointer);
+                const position = view.posAtCoords(point);
                 const target = position && (view.dragging?.slice ? dropPoint(view.state.doc, position.pos, view.dragging.slice) : position.pos);
                 const { from, to } = view.state.selection;
                 // The transcript has one text block. Its outer boundaries cannot accept another block.
@@ -34,18 +36,29 @@ export function dropCursorPlugin(): Plugin {
 
             function dragover(event: DragEvent): void {
                 pointer = { left: event.clientX, top: event.clientY };
-                refresh();
+                refresh(pointer);
+            }
+
+            function clearPointer(): void {
+                pointer = undefined;
             }
 
             // Run after the upstream listener has created or repositioned its overlay.
-            view.dom.addEventListener("dragover", dragover);
+            const listeners = new AbortController();
+            const options = { signal: listeners.signal };
+            view.dom.addEventListener("dragover", dragover, options);
+            view.dom.addEventListener("dragleave", event => {
+                if (!(event.relatedTarget instanceof Node) || !view.dom.contains(event.relatedTarget)) clearPointer();
+            }, options);
+            view.dom.addEventListener("drop", clearPointer, options);
+            view.dom.addEventListener("dragend", clearPointer, options);
             return {
                 update(view, previous) {
                     overlay.update?.(view, previous);
-                    refresh();
+                    if (pointer) refresh(pointer);
                 },
                 destroy() {
-                    view.dom.removeEventListener("dragover", dragover);
+                    listeners.abort();
                     overlay.destroy?.();
                 }
             };
