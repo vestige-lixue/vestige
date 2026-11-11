@@ -216,6 +216,7 @@
     import * as i18n from "../../i18n.svelte";
     import * as vocabulary from "../../states/vocabulary.svelte";
     import * as dialogs from "../../states/dialogs";
+    import { vocabularyLineBreak } from "../../../shared/vocabulary/Vocabulary";
     import { type VocabularyGroup } from "../../../shared/vocabulary/match";
     import { documentText, applyTranscriptVocabulary } from "../../editor/transcript";
 
@@ -232,7 +233,8 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
-    const canAddVocabulary = $derived(request?.target.kind === "selection" && !request.selection.empty);
+    const selectedSource = $derived(request?.target.kind === "selection" ? request.doc.textBetween(request.selection.from, request.selection.to, "", "\n") : "");
+    const canAddVocabulary = $derived(!!selectedSource && !vocabularyLineBreak.test(selectedSource));
     const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
     const references = $derived(request ? referenceItems(request) : []);
     let vocabularyMatches = $state.raw<VocabularyGroup[]>([]);
@@ -287,9 +289,7 @@
 
     function addVocabulary(): void {
         if (!request || !canAddVocabulary) return;
-        const current = request;
-        const from = current.selection.from - 1, to = current.selection.to - 1;
-        const source = documentText(current.doc).slice(from, to);
+        const current = request, source = selectedSource;
         changeOpen(false);
         void tick().then(() => {
             if (open || request !== current || !restoreTranscriptMenuSelection(current)) return;

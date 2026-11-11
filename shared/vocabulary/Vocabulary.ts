@@ -19,12 +19,12 @@ export type VocabularyChange =
     | { kind: "remove"; id: string };
 export type VocabularyResult = { success: true; snapshot: VocabularySnapshot } | { success: false; error: FailureInfo };
 
-const lineBreak = /[\r\n\u2028\u2029]/u;
+export const vocabularyLineBreak = /[\r\n\u2028\u2029]/u;
 
 export function vocabularyRuleIssue(rule: Pick<VocabularyRule, "source" | "replacement">): "emptySource" | "multilineSource" | "multilineReplacement" | "unchanged" | null {
-    if (lineBreak.test(rule.source)) return "multilineSource";
+    if (vocabularyLineBreak.test(rule.source)) return "multilineSource";
     if (!rule.source.trim()) return "emptySource";
-    if (lineBreak.test(rule.replacement)) return "multilineReplacement";
+    if (vocabularyLineBreak.test(rule.replacement)) return "multilineReplacement";
     return rule.source === rule.replacement ? "unchanged" : null;
 }
 
