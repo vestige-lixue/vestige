@@ -69,12 +69,12 @@
                     </DropdownMenu.Portal>
                 </DropdownMenu.Sub>
             {/if}
-            {#if request && !request.selection.empty}
+            {#if canAddVocabulary}
                 <DropdownMenu.Item class="activable focusable" disabled={vocabulary.operation.busy || !!vocabulary.getSnapshot().error} onSelect={addVocabulary}>
                     <div>{i18n.t("transcription.vocabulary.add")}</div>
                 </DropdownMenu.Item>
             {/if}
-            {#if (references.length || vocabularyMatches.length || request && !request.selection.empty) && (canAlign || actions.length)}
+            {#if (references.length || vocabularyMatches.length || canAddVocabulary) && (canAlign || actions.length)}
                 <DropdownMenu.Separator class="menu-separator" />
             {/if}
             {#if canAlign}
@@ -232,6 +232,7 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
+    const canAddVocabulary = $derived(request?.target.kind === "selection" && !request.selection.empty);
     const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
     const references = $derived(request ? referenceItems(request) : []);
     let vocabularyMatches = $state.raw<VocabularyGroup[]>([]);
@@ -247,11 +248,12 @@
             open = false;
             return false;
         }
-        const text = documentText(value.doc);
-        const groups = vocabulary.replacements(text, Math.max(0, value.selection.from - 1), Math.min(text.length, value.selection.to - 1));
-        if (value.target.kind !== "deletion" && value.selection.empty && !transcriptMenuClipboardActions(value.target).length
-            && !referenceItems(value).length && !groups.length) return false;
-        vocabularyMatches = groups;
+        if (value.target.kind === "gap" && !referenceItems(value).length) return false;
+        if (value.target.kind === "deletion" || value.target.kind === "gap") vocabularyMatches = [];
+        else {
+            const text = documentText(value.doc);
+            vocabularyMatches = vocabulary.replacements(text, Math.max(0, value.selection.from - 1), Math.min(text.length, value.selection.to - 1));
+        }
         request = value;
         vocabularyRevision = vocabulary.getSnapshot().revision;
         keyboard.current = value.keyboard;
@@ -284,7 +286,7 @@
     }
 
     function addVocabulary(): void {
-        if (!request || request.selection.empty) return;
+        if (!request || !canAddVocabulary) return;
         const current = request;
         const from = current.selection.from - 1, to = current.selection.to - 1;
         const source = documentText(current.doc).slice(from, to);
