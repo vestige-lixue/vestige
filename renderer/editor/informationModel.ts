@@ -11,16 +11,17 @@ export type TranscriptInformation = {
     sourceFrom: number;
     sourceTo: number;
     range: Range | null;
-    // null means no unit is playable. undefined means the media duration is unknown.
-    playableStart: number | null | undefined;
+    // Both values are unknown until the media duration is known.
+    playable: boolean | undefined;
+    seekStart: number | null | undefined;
     original: string | null;
     probability: number | null;
     blankProbability: number | null;
     gaps?: TranscriptInformation[];
 };
 
-export function unplayableTimestamp(time: number, duration: number, playableStart: TranscriptInformation["playableStart"]): boolean {
-    return playableStart !== undefined && (playableStart === null || time < 0 || time > duration);
+export function unplayableTimestamp(time: number, duration: number, playable: boolean | undefined): boolean {
+    return playable !== undefined && (!playable || time < 0 || time > duration);
 }
 
 type SpeechInterval = { start: number; end: number; offset: number };
@@ -41,16 +42,18 @@ function intervalsOf(index: TextIndex, duration: number): SpeechInterval[] {
 
 function inspectionAudio(
     index: TextIndex, duration: number, tokens: readonly number[], deletions: readonly Pick<TextPiece, "sourceFrom" | "sourceTo">[] = []
-): Pick<TranscriptInformation, "range" | "playableStart"> {
+): Pick<TranscriptInformation, "range" | "playable" | "seekStart"> {
     const intervals = { start: Infinity, end: -Infinity };
     const points = { start: Infinity, end: -Infinity };
-    let earliest = Infinity;
+    let firstPlayable = Infinity;
+    let firstReachablePoint = Infinity;
     function include({ start, end }: Range): void {
         const envelope = end > start ? intervals : points;
         envelope.start = Math.min(envelope.start, start);
         envelope.end = Math.max(envelope.end, end);
         const clippedStart = Math.max(0, start);
-        if (clippedStart < Math.min(duration, end)) earliest = Math.min(earliest, clippedStart);
+        if (clippedStart < Math.min(duration, end)) firstPlayable = Math.min(firstPlayable, clippedStart);
+        else if (start === end && start >= 0 && start < duration) firstReachablePoint = Math.min(firstReachablePoint, start);
     }
     for (const token of tokens) include(index.transcript[token].range);
     for (const deletion of deletions) {
@@ -59,9 +62,12 @@ function inspectionAudio(
         for (let token = first; token <= last; token++) include(index.transcript[token].range);
     }
     const envelope = intervals.start < Infinity ? intervals : points;
+    const earliest = envelope === intervals ? firstPlayable : firstReachablePoint;
+    const knownDuration = Number.isFinite(duration) && duration > 0;
     return {
         range: envelope.start < Infinity ? envelope : null,
-        playableStart: Number.isFinite(duration) && duration > 0 ? (earliest < Infinity ? earliest : null) : undefined
+        playable: knownDuration ? firstPlayable < Infinity : undefined,
+        seekStart: knownDuration ? (earliest < Infinity ? earliest : null) : undefined
     };
 }
 
@@ -128,7 +134,7 @@ function gapInformation(index: TextIndex, projection: TextProjection, duration: 
         return {
             key: `gap-${gap.start}-${gap.end}`, kind: "gap", from, to: from,
             sourceFrom: gap.offset, sourceTo: gap.offset,
-            range: { start: gap.start, end: gap.end }, playableStart: gap.start, original: null, probability: null, blankProbability: null
+            range: { start: gap.start, end: gap.end }, playable: true, seekStart: gap.start, original: null, probability: null, blankProbability: null
         };
     });
 }
@@ -196,7 +202,7 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
     if (from >= to) return null;
     const { tokens: tokenIndices, deletions } = transcriptSelectionUnits(index, projection, duration, from, to);
     const tokens = [...tokenIndices];
-    const { range, playableStart } = inspectionAudio(index, duration, tokens, deletions);
+    const { range, playable, seekStart } = inspectionAudio(index, duration, tokens, deletions);
     if (!range) return null;
     let sourceFrom = index.characters.length;
     let sourceTo = 0;
@@ -221,9 +227,9 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
     }
     const comparison = selectionComparison(index, projection, { from: first, to: last, sourceFrom, sourceTo });
     return {
-        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${range.start}-${range.end}/${playableStart}/${JSON.stringify(comparison)}`,
+        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${range.start}-${range.end}/${playable}/${seekStart}/${JSON.stringify(comparison)}`,
         kind: "selection", from: first, to: last, selectionFrom: from, selectionTo: to, sourceFrom, sourceTo,
-        tokens, fragments, deletions, comparison, range, playableStart, original: null, probability: null, blankProbability: null
+        tokens, fragments, deletions, comparison, range, playable, seekStart, original: null, probability: null, blankProbability: null
     };
 }
 

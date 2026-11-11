@@ -400,7 +400,7 @@
             onInspect?.(value?.information ?? null);
             const information = value?.information;
             transcript.setInspection(information?.range ? {
-                mediaId: vestige.media.id, runId: run.id, range: information.range, playableStart: information.playableStart
+                mediaId: vestige.media.id, runId: run.id, range: information.range, playable: information.playable
             } : null);
         }
         if (!value || value.menu || value.pressed || informationDisplay !== "tooltip" || !changed) return;

@@ -168,9 +168,9 @@ describe("information previews", () => {
 describe("selection information", () => {
     it("marks each displayed timestamp and its tick using the same inclusive media bounds", () => {
         const times = [-1, 0, 120.79, 122.666667, 122.69];
-        const marks = (start: number | null | undefined): boolean[] => times.map(time => unplayableTimestamp(time, 122.666667, start));
-        expect(marks(120.79)).toEqual([true, false, false, false, true]);
-        expect(marks(null)).toEqual([true, true, true, true, true]);
+        const marks = (playable: boolean | undefined): boolean[] => times.map(time => unplayableTimestamp(time, 122.666667, playable));
+        expect(marks(true)).toEqual([true, false, false, false, true]);
+        expect(marks(false)).toEqual([true, true, true, true, true]);
         expect(marks(undefined)).toEqual([false, false, false, false, false]);
     });
 
@@ -180,7 +180,7 @@ describe("selection information", () => {
         const index = createTextIndex(spans);
         const projection = editText(index, projectText(index, []), 1, 2, "X");
         expect(transcriptSelection(index, projection, 1, 1, 2)).toMatchObject({
-            range: { start: 0, end: 0 }, playableStart: null, tokens: [], deletions: [{ original: "b", playableStart: null }]
+            range: { start: 0, end: 0 }, playable: false, seekStart: 0, tokens: [], deletions: [{ original: "b", playable: false, seekStart: 0 }]
         });
         expect(transcriptSelectionUnits(index, projection, 1, 1, 2).deletions.map(item => item.original)).toEqual(["b"]);
         expect(transcriptSelectionUnits(index, projection, 1, 0, 1).deletions).toEqual([]);
@@ -245,28 +245,33 @@ describe("selection information", () => {
         spans[2].range = { start: 2, end: 9 };
         const index = createTextIndex(spans);
         const projection = projectText(index, []);
-        expect(transcriptSelection(index, projection, 10, 0, 2)).toMatchObject({ range: { start: -2, end: 14 }, playableStart: 0 });
-        expect(transcriptSelection(index, projection, 10, 1, 3)).toMatchObject({ range: { start: -2, end: 9 }, playableStart: 0 });
-        expect(transcriptSelection(index, projection, 6, 0, 1)).toMatchObject({ range: { start: 7, end: 14 }, playableStart: null });
+        expect(transcriptSelection(index, projection, 10, 0, 2)).toMatchObject({ range: { start: -2, end: 14 }, playable: true, seekStart: 0 });
+        expect(transcriptSelection(index, projection, 10, 1, 3)).toMatchObject({ range: { start: -2, end: 9 }, playable: true, seekStart: 0 });
+        expect(transcriptSelection(index, projection, 6, 0, 1)).toMatchObject({ range: { start: 7, end: 14 }, playable: false, seekStart: null });
         expect(transcriptSelection(index, projection, 10, 0, 1)?.key).not.toBe(transcriptSelection(index, projection, 10, 0, 2)?.key);
     });
 
     it.each([
-        { name: "past the end", times: [[130.95, 134.94], [134.94, 140.38]], start: 130.95, end: 140.38, playableStart: null },
-        { name: "23ms beyond the end", times: [[120.79, 122.69]], start: 120.79, end: 122.69, playableStart: 120.79 },
-        { name: "playable and out of bounds", times: [[120.79, 122.69], [140.39, 145.83]], start: 120.79, end: 145.83, playableStart: 120.79 },
-        { name: "points around a playable token", times: [[1, 1], [5, 7], [150, 150]], start: 5, end: 7, playableStart: 5 },
-        { name: "coincident points", times: [[29.98, 29.98], [29.98, 29.98]], start: 29.98, end: 29.98, playableStart: null },
-        { name: "distinct points", times: [[30.5, 30.5], [29.98, 29.98]], start: 29.98, end: 30.5, playableStart: null },
-        { name: "outside on both sides", times: [[-4, -2], [130, 134]], start: -4, end: 134, playableStart: null },
-        { name: "a gap before the first playable unit", times: [[-4, -2], [7, 10]], start: -4, end: 10, playableStart: 7 }
-    ])("uses individual token times for selections and deletions with $name", ({ times, start, end, playableStart }) => {
+        { name: "past the end", times: [[130.95, 134.94], [134.94, 140.38]], start: 130.95, end: 140.38, playable: false, seekStart: null },
+        { name: "23ms beyond the end", times: [[120.79, 122.69]], start: 120.79, end: 122.69, playable: true, seekStart: 120.79 },
+        { name: "playable and out of bounds", times: [[120.79, 122.69], [140.39, 145.83]], start: 120.79, end: 145.83, playable: true, seekStart: 120.79 },
+        { name: "points around a playable token", times: [[1, 1], [5, 7], [150, 150]], start: 5, end: 7, playable: true, seekStart: 5 },
+        { name: "coincident points", times: [[29.98, 29.98], [29.98, 29.98]], start: 29.98, end: 29.98, playable: false, seekStart: 29.98 },
+        { name: "distinct points", times: [[30.5, 30.5], [29.98, 29.98]], start: 29.98, end: 30.5, playable: false, seekStart: 29.98 },
+        { name: "outside on both sides", times: [[-4, -2], [130, 134]], start: -4, end: 134, playable: false, seekStart: null },
+        { name: "a gap before the first playable unit", times: [[-4, -2], [7, 10]], start: -4, end: 10, playable: true, seekStart: 7 },
+        { name: "crosses zero", times: [[-2, 3]], start: -2, end: 3, playable: true, seekStart: 0 },
+        { name: "point at zero", times: [[0, 0]], start: 0, end: 0, playable: false, seekStart: 0 },
+        { name: "point at the media end", times: [[122.666667, 122.666667]], start: 122.666667, end: 122.666667, playable: false, seekStart: null },
+        { name: "point before zero", times: [[-1, -1]], start: -1, end: -1, playable: false, seekStart: null },
+        { name: "out-of-bounds interval with an in-bounds point", times: [[130, 134], [29.98, 29.98]], start: 130, end: 134, playable: false, seekStart: null }
+    ])("uses individual token times for selections and deletions with $name", ({ times, start, end, playable, seekStart }) => {
         const duration = 122.666667;
         const spans = transcript(times.map(() => "x"));
         spans.forEach((span, i) => span.range = { start: times[i][0], end: times[i][1] });
         const index = createTextIndex(spans);
         const projection = projectText(index, []);
-        const audio = { range: { start, end }, playableStart };
+        const audio = { range: { start, end }, playable, seekStart };
         expect(transcriptSelection(index, projection, duration, 0, spans.length)).toMatchObject({
             ...audio, tokens: spans.map((_, i) => i), fragments: [{ from: 0, to: spans.length }]
         });
@@ -281,14 +286,24 @@ describe("selection information", () => {
         spans[1].range = { start: 5, end: 5 };
         const index = createTextIndex(spans), projection = projectText(index, []);
         const keys = new Set<string>();
-        for (const [duration, playableStart] of [[10, 7], [6, null], [0, undefined], [-1, undefined], [NaN, undefined], [Infinity, undefined]] as const) {
+        const pointKeys = new Set<string>();
+        for (const [duration, playable, seekStart, pointSeek] of [
+            [10, true, 7, 5], [6, false, null, 5], [5, false, null, null],
+            [0, undefined, undefined, undefined], [-1, undefined, undefined, undefined],
+            [NaN, undefined, undefined, undefined], [Infinity, undefined, undefined, undefined]
+        ] as const) {
             const items = transcriptInformation(index, projection, duration).filter(item => item.kind === "token");
-            expect(items[0]).toMatchObject({ range: spans[0].range, playableStart });
-            expect(items[1]).toMatchObject({ range: spans[1].range, playableStart: playableStart === undefined ? undefined : null });
+            expect(items[0]).toMatchObject({ range: spans[0].range, playable, seekStart });
+            const pointAudio = { range: spans[1].range, playable: playable === undefined ? undefined : false, seekStart: pointSeek };
+            expect(items[1]).toMatchObject(pointAudio);
+            const point = transcriptSelection(index, projection, duration, 1, 2);
+            expect(point).toMatchObject(pointAudio);
+            pointKeys.add(point!.key);
             const selection = transcriptSelection(index, projection, duration, 0, 2);
-            expect(selection).toMatchObject({ range: spans[0].range, playableStart, fragments: [{ from: 0, to: 2 }] });
+            expect(selection).toMatchObject({ range: spans[0].range, playable, seekStart, fragments: [{ from: 0, to: 2 }] });
             keys.add(selection!.key);
         }
+        expect(pointKeys.size).toBe(3);
         expect(keys.size).toBe(3);
     });
 });

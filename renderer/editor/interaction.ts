@@ -103,7 +103,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         // Modifier-click seeks the token under the pointer even when the selection owns the tooltip.
         const clickTarget = state.held && state.hovered?.information.kind === "selection"
             ? geometry.hover(state.pointer, { selection: false }) : state.hovered;
-        view.dom.classList.toggle("transcript-seek", state.held && clickTarget?.information.playableStart != null);
+        view.dom.classList.toggle("transcript-seek", state.held && clickTarget?.information.seekStart != null);
         // Ending the latest input reveals the other target rather than discarding it.
         const target = menuTarget ? menuTarget() : state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
         const menu = menuPending || !!menuTarget;
@@ -178,7 +178,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         state.chorded = false;
         const changed = hold(true);
         if (setControl(true) || changed) retarget();
-        const start = state.inspection?.information.playableStart;
+        const start = state.inspection?.information.seekStart;
         if (!event.repeat && start != null) options.onSeek(start);
     }
     function down(event: PointerEvent): void {
@@ -189,7 +189,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         event.preventDefault();
         event.stopPropagation();
         const item = geometry.hover(state.pointer, { selection: false })?.information;
-        state.activation = { key: item?.playableStart != null ? item.key : null };
+        state.activation = { key: item?.seekStart != null ? item.key : null };
     }
     function up(event: PointerEvent): void {
         // Blink can collapse selected text on release even after the modifier press was consumed.
@@ -204,7 +204,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         event.stopImmediatePropagation();
         if (!activation.key || !inspectionModifier(event)) return;
         const item = geometry.hover(state.pointer, { selection: false })?.information;
-        if (item?.playableStart != null && item.key === activation.key) options.onSeek(item.playableStart);
+        if (item?.seekStart != null && item.key === activation.key) options.onSeek(item.seekStart);
     }
     function reset(): void {
         settleFocus(null);

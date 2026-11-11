@@ -11,12 +11,12 @@
                 {@render statistic(i18n.t("transcript.information.blankProbability"), formatProbability(information?.kind === "gap" ? 1 : information?.blankProbability))}
             </div>
         {/if}
-        <div class="range" role="group" aria-label={information?.playableStart === null ? i18n.t("transcript.information.noPlayableAudio") : undefined}>
+        <div class="range" role="group" aria-label={information?.playable === false ? i18n.t("transcript.information.noPlayableAudio") : undefined}>
             {#if information?.range}
                 {#if information.range.start === information.range.end}
-                    {@render timestamp(information.range.start, information.playableStart)}
+                    {@render timestamp(information.range.start, information.playable)}
                 {:else}
-                    {@render timestamp(information.range.start, information.playableStart)}–{@render timestamp(information.range.end, information.playableStart)} ({(information.range.end - information.range.start).toFixed(2)}s)
+                    {@render timestamp(information.range.start, information.playable)}–{@render timestamp(information.range.end, information.playable)} ({(information.range.end - information.range.start).toFixed(2)}s)
                 {/if}
             {:else}—{/if}
         </div>
@@ -29,8 +29,8 @@
     </div>
 {/snippet}
 
-{#snippet timestamp(time: number, playableStart: InspectionInformation["playableStart"])}
-    <span class:danger={unplayableTimestamp(time, duration, playableStart)}>{formatTimestamp(time)}</span>
+{#snippet timestamp(time: number, playable: InspectionInformation["playable"])}
+    <span class:danger={unplayableTimestamp(time, duration, playable)}>{formatTimestamp(time)}</span>
 {/snippet}
 
 {#snippet statistic(label: string, value: string, flexible = false)}
