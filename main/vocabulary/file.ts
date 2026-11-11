@@ -58,7 +58,8 @@ export async function readVocabularyImport(path: string): Promise<{ rules: Omit<
     if (extension === ".json" || /^\s*(?:\{|\[)/u.test(text)) {
         const json = parseJSON(text);
         // A JSON export can have any confirmed filename. A literal TSV source can also begin with a brace.
-        if (json !== undefined || extension === ".json" || !text.includes("\t")) return { rules: validatedVocabulary(json).rules, skipped: 0 };
+        const tabular = extension === ".tsv" || extension === ".txt" || /^[^\r\n]*\t/u.test(text);
+        if (json !== undefined || extension === ".json" || !tabular) return { rules: validatedVocabulary(json).rules, skipped: 0 };
     }
     const rules: Omit<VocabularyRule, "id">[] = [];
     let skipped = 0;
