@@ -472,30 +472,41 @@
         const name = "transcript-selection";
         const highlight = new Highlight();
         CSS.highlights.set(name, highlight);
-        function refresh(): void {
+        function paint(range: Range | null, from: number, to: number): void {
             highlight.clear();
+            if (range) highlight.add(range);
+            selectionBounds = range ? { from, to } : null;
+        }
+        function fromState(): void {
+            const { from, to, empty } = view.state.selection;
+            if (empty) return paint(null, from, to);
+            // Decoration redraws can detach both native endpoints while focus is in the player or menu.
+            const start = view.domAtPos(from, 1), end = view.domAtPos(to, -1);
+            const range = document.createRange();
+            range.setStart(start.node, start.offset);
+            range.setEnd(end.node, end.offset);
+            paint(range, from, to);
+        }
+        function fromDOM(): void {
+            if (!view.hasFocus()) return fromState();
             const selection = document.getSelection();
             const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-            if (!range || range.collapsed || !view.dom.contains(range.startContainer) || !view.dom.contains(range.endContainer)) {
-                selectionBounds = null;
-                return;
-            }
-            highlight.add(range.cloneRange());
-            // At an endpoint inside a leaf, exclude that leaf on either side.
-            selectionBounds = {
-                from: view.posAtDOM(range.startContainer, range.startOffset, 1),
-                to: view.posAtDOM(range.endContainer, range.endOffset, -1)
-            };
+            if (!range || !view.dom.contains(range.startContainer) || !view.dom.contains(range.endContainer)) return fromState();
+            if (range.collapsed) return paint(null, 0, 0);
+            // During a native drag Chromium moves first. Mirror its range in this same event.
+            paint(range.cloneRange(), view.posAtDOM(range.startContainer, range.startOffset, 1), view.posAtDOM(range.endContainer, range.endOffset, -1));
         }
         function update({ transaction, appendedTransactions }: EditorEvents["transaction"]): void {
-            if (transaction.docChanged || transaction.selectionSet || appendedTransactions.some(tr => tr.docChanged || tr.selectionSet)) refresh();
+            if (transaction.selectionSet || appendedTransactions.some(tr => tr.selectionSet)) fromState();
         }
+        const unsubscribe = subscribeTranscriptLayout(view, fromState);
         current.on("transaction", update);
-        document.addEventListener("selectionchange", refresh);
-        refresh();
+        document.addEventListener("selectionchange", fromDOM);
+        fromState();
         return () => {
+            unsubscribe();
             current.off("transaction", update);
-            document.removeEventListener("selectionchange", refresh);
+            document.removeEventListener("selectionchange", fromDOM);
             if (CSS.highlights.get(name) === highlight) CSS.highlights.delete(name);
             selectionBounds = null;
         };
