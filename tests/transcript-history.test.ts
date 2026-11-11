@@ -10,13 +10,13 @@ import { transcript } from "./support/fixtures";
 import { rule } from "./support/vocabulary";
 import { VocabularyIndex } from "../shared/vocabulary/match";
 
-function editor(text: string): {
+function editor(text: string | string[]): {
     state: () => EditorState;
     apply: (transaction: Transaction) => void;
     select: (anchor: number, head?: number) => void;
     history: (action: "undo" | "redo") => boolean;
 } {
-    const index = createTextIndex(transcript([text]));
+    const index = createTextIndex(transcript(typeof text === "string" ? [text] : text));
     const schema = getSchema(transcriptExtensions(index));
     let state = EditorState.create({ schema, doc: schema.nodeFromJSON(transcriptContent(index, [])), plugins: transcriptPlugins(index) });
     function apply(transaction: Transaction): void {
@@ -33,8 +33,11 @@ function editor(text: string): {
 
 function vocabularyRequest(value: ReturnType<typeof editor>): Parameters<typeof applyTranscriptVocabulary>[0] {
     const view = {
-        get state() { return value.state(); },
-        isDestroyed: false, editable: true, composing: false, dom: { closest: () => null }, dispatch: value.apply
+        state: value.state(), isDestroyed: false, editable: true, composing: false, dom: { closest: () => null },
+        dispatch(transaction: Transaction) {
+            value.apply(transaction);
+            view.state = value.state();
+        }
     };
     return { view, doc: view.state.doc, selection: view.state.selection } as Parameters<typeof applyTranscriptVocabulary>[0];
 }
@@ -87,6 +90,23 @@ describe("transcript history selection", () => {
         value.history("redo");
         expect(documentText(value.state().doc)).toBe("乙乙隔乙末");
         expect(transcriptModifications(value.state())).toEqual(after);
+    });
+
+    it.each(["改😀", ""])("keeps source marks and hard breaks between replacements of different lengths (%j)", replacement => {
+        const tokens = ["前甲", "😀\n", "乙甲末"];
+        const value = editor(tokens), index = createTextIndex(transcript(tokens));
+        value.select(8, 2);
+        const before = value.state().doc;
+        const [group] = new VocabularyIndex([rule("甲", replacement)]).replacements(documentText(before), 1, 7);
+        expect(applyTranscriptVocabulary(vocabularyRequest(value), group)).toBe(true);
+        const after = value.state().doc;
+        expect(documentText(after)).toBe(`前${replacement}😀\n乙${replacement}末`);
+        expect(after.eq(value.state().schema.nodeFromJSON(transcriptContent(index, transcriptModifications(value.state()))))).toBe(true);
+        expect(value.state().selection).toMatchObject({ anchor: 6 + replacement.length * 2, head: 2 });
+        value.history("undo");
+        expect(value.state().doc.eq(before)).toBe(true);
+        value.history("redo");
+        expect(value.state().doc.eq(after)).toBe(true);
     });
 
     it("records a disjoint reference replacement as one undo entry", () => {

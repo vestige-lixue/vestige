@@ -233,7 +233,7 @@
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
-    const selectedSource = $derived(request?.target.kind === "selection" ? request.doc.textBetween(request.selection.from, request.selection.to, "", "\n") : "");
+    let selectedSource = $state("");
     const canAddVocabulary = $derived(!!selectedSource && !vocabularyLineBreak.test(selectedSource));
     const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
     const references = $derived(request ? referenceItems(request) : []);
@@ -251,10 +251,15 @@
             return false;
         }
         if (value.target.kind === "gap" && !referenceItems(value).length) return false;
-        if (value.target.kind === "deletion" || value.target.kind === "gap") vocabularyMatches = [];
+        if (value.target.kind === "deletion" || value.target.kind === "gap") {
+            vocabularyMatches = [];
+            selectedSource = "";
+        }
         else {
             const text = documentText(value.doc);
-            vocabularyMatches = vocabulary.replacements(text, Math.max(0, value.selection.from - 1), Math.min(text.length, value.selection.to - 1));
+            const from = Math.max(0, value.selection.from - 1), to = Math.min(text.length, value.selection.to - 1);
+            vocabularyMatches = vocabulary.replacements(text, from, to);
+            selectedSource = value.target.kind === "selection" ? text.slice(from, to) : "";
         }
         request = value;
         vocabularyRevision = vocabulary.getSnapshot().revision;
@@ -281,8 +286,9 @@
         changeOpen(false);
         void tick().then(() => {
             const snapshot = vocabulary.getSnapshot();
-            if (open || request !== current || revision !== snapshot.revision || snapshot.error || disabled("paste")
-                || !vocabularyMatches.includes(group) || !restoreTranscriptMenuSelection(current)) return;
+            if (open || request !== current || revision !== snapshot.revision || snapshot.error || disabled("paste") || !vocabularyMatches.includes(group)) return;
+            const rule = snapshot.rules.find(rule => rule.id === group.rule.id);
+            if (!rule?.enabled || rule.source !== group.rule.source || rule.replacement !== group.rule.replacement || !restoreTranscriptMenuSelection(current)) return;
             applyTranscriptVocabulary(current, group);
         });
     }

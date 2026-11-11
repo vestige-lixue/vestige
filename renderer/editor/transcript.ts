@@ -95,11 +95,15 @@ function inlineContent(text: string, marks?: JSONContent["marks"]): JSONContent[
     return content;
 }
 
+function projectedContent(index: TextIndex, projection: TextProjection, from = 0, to = projection.text.length): JSONContent[] {
+    return textPieces(index, projection, from, to, true).flatMap(piece => {
+        const text = projection.text.slice(Math.max(from, piece.utf16From), Math.min(to, piece.utf16To));
+        return inlineContent(text, [{ type: "source", attrs: markSource(piece.source) }]);
+    });
+}
+
 function contentOf(index: TextIndex, projection: TextProjection): JSONContent {
-    return {
-        type: "doc",
-        content: [{ type: "paragraph", content: textPieces(index, projection).flatMap(piece => inlineContent(piece.text, [{ type: "source", attrs: markSource(piece.source) }])) }]
-    };
+    return { type: "doc", content: [{ type: "paragraph", content: projectedContent(index, projection) }] };
 }
 
 export function transcriptContent(index: TextIndex, modifications: readonly Modification[]): JSONContent {
@@ -586,7 +590,16 @@ export function applyTranscriptVocabulary(request: TranscriptMenuRequest, { rule
         next = editText(index, next, projectionOffset(projection, from, false), projectionOffset(projection, to, false), rule.replacement, false);
         right = from;
     }
-    dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, projection, next)));
+    // Supply the final marks in the same replace step. Re-marking every intervening token individually
+    // creates thousands of steps and mappings for one selection-wide replacement.
+    let replacement;
+    if (ranges.length > 1) {
+        const from = ranges[0].from, to = ranges[ranges.length - 1].to;
+        const end = to + next.text.length - projection.text.length;
+        const nodes = projectedContent(index, next, from, end).map(node => view.state.schema.nodeFromJSON(node));
+        replacement = { from, to, content: Fragment.fromArray(nodes) };
+    }
+    dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, projection, next, replacement)));
     // Keep the following keystroke out of this explicit replacement's undo entry too.
     view.dispatch(closeHistory(view.state.tr).setMeta("addToHistory", false));
     return true;
