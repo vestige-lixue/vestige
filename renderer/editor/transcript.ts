@@ -6,8 +6,7 @@ import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
 import { transcriptLayoutPlugin } from "./layout";
-import { vocabularyPreviewPlugin } from "./vocabulary";
-import { type VocabularyMatch } from "../../shared/vocabulary/match";
+import { type VocabularyGroup } from "../../shared/vocabulary/match";
 import { transcriptScrollPlugin, scrollTranscriptPlayback, scrollTranscriptSelectionHead, dispatchPreservingScroll } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep, projectionTransaction } from "./projectionStep";
@@ -412,7 +411,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         }
     });
     // Layout must update before the information plugin registered later reads viewport geometry.
-    return [compositionPlugin(), bridge, caretPlugin(), transcriptLayoutPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, vocabularyPreviewPlugin(), history()];
+    return [compositionPlugin(), bridge, caretPlugin(), transcriptLayoutPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {
@@ -570,15 +569,23 @@ export function applyTranscriptReference(request: TranscriptMenuRequest, text: s
     return true;
 }
 
-export function applyTranscriptVocabulary(request: TranscriptMenuRequest, match: VocabularyMatch): boolean {
+export function applyTranscriptVocabulary(request: TranscriptMenuRequest, { rule, ranges }: VocabularyGroup): boolean {
     const { view } = request;
     if (view.isDestroyed || !view.editable || view.state.doc !== request.doc || view.composing || compositionPending(view.state)) return false;
     const { index, projection } = bridgeKey.getState(view.state)!;
-    if (match.from < 0 || match.to > projection.text.length || match.from >= match.to
-        || projection.text.slice(match.from, match.to) !== match.rule.source || match.rule.source === match.rule.replacement) return false;
-    const from = projectionOffset(projection, match.from, false), to = projectionOffset(projection, match.to, false);
-    if (projectionOffset(projection, from, true) !== match.from || projectionOffset(projection, to, true) !== match.to) return false;
-    const next = editText(index, projection, from, to, match.rule.replacement, false);
+    if (!rule.enabled || !ranges.length || !rule.source || rule.source === rule.replacement) return false;
+    // Validate against the same immutable document used for matching, then work backwards so offsets stay valid.
+    const { empty, from: start, to: end } = request.selection;
+    if (empty && (ranges.length !== 1 || ranges[0].from > start - 1 || ranges[0].to < start - 1)) return false;
+    const lower = empty ? 0 : Math.max(0, start - 1);
+    let next = projection, right = empty ? projection.text.length : Math.min(end - 1, projection.text.length);
+    for (let i = ranges.length - 1; i >= 0; i--) {
+        const { from, to } = ranges[i];
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < lower || to > right || from >= to
+            || projection.text.slice(from, to) !== rule.source || splitsCodepoint(projection.text, from) || splitsCodepoint(projection.text, to)) return false;
+        next = editText(index, next, projectionOffset(projection, from, false), projectionOffset(projection, to, false), rule.replacement, false);
+        right = from;
+    }
     dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, projection, next)));
     // Keep the following keystroke out of this explicit replacement's undo entry too.
     view.dispatch(closeHistory(view.state.tr).setMeta("addToHistory", false));

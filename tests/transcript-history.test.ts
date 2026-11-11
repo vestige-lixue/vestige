@@ -7,6 +7,8 @@ import { projectionTransaction } from "../renderer/editor/projectionStep";
 import { createTextIndex, editText, alignText, restoreTextDeletion, textReplacement, replaceText } from "../shared/transcript/text";
 import { vocabularyRuleIssue } from "../shared/vocabulary/Vocabulary";
 import { transcript } from "./support/fixtures";
+import { rule } from "./support/vocabulary";
+import { VocabularyIndex } from "../shared/vocabulary/match";
 
 function editor(text: string): {
     state: () => EditorState;
@@ -29,24 +31,22 @@ function editor(text: string): {
     };
 }
 
+function vocabularyRequest(value: ReturnType<typeof editor>): Parameters<typeof applyTranscriptVocabulary>[0] {
+    const view = {
+        get state() { return value.state(); },
+        isDestroyed: false, editable: true, composing: false, dom: { closest: () => null }, dispatch: value.apply
+    };
+    return { view, doc: view.state.doc, selection: view.state.selection } as Parameters<typeof applyTranscriptVocabulary>[0];
+}
+
 describe("transcript history selection", () => {
     it.each([["新词", "甲新词丙丁"], ["", "甲丙丁"]])("applies vocabulary replacement %j across added text and Unicode as an isolated undo entry", (replacement, expected) => {
         const value = editor("甲乙😀丙丁");
         value.apply(value.state().tr.insertText("新增", 2));
         value.select(2, 7);
         const before = transcriptProjection(value.state());
-        const view = {
-            state: value.state(), isDestroyed: false, editable: true, composing: false,
-            dom: { closest: () => null },
-            dispatch(transaction: Transaction) {
-                value.apply(transaction);
-                view.state = value.state();
-            }
-        };
-        const request = { view, doc: view.state.doc } as Parameters<typeof applyTranscriptVocabulary>[0];
-        const match = { from: 1, to: 6, rule: {
-            id: "00000000-0000-4000-8000-000000000001", source: "新增乙😀", replacement, enabled: true
-        } };
+        const request = vocabularyRequest(value);
+        const match = { ranges: [{ from: 1, to: 6 }], rule: rule("新增乙😀", replacement) };
         expect(vocabularyRuleIssue(match.rule)).toBeNull();
         expect(applyTranscriptVocabulary(request, match)).toBe(true);
         expect(documentText(value.state().doc)).toBe(expected);
@@ -63,6 +63,30 @@ describe("transcript history selection", () => {
         value.history("redo");
         expect(documentText(value.state().doc)).toBe(expected);
         expect(transcriptModifications(value.state())).toEqual(replaced);
+    });
+
+    it("undoes and redoes all vocabulary occurrences together, including their original modifications", () => {
+        const value = editor("甲😀隔甲😀末");
+        value.apply(value.state().tr.insertText("甲😀", 1));
+        const before = transcriptProjection(value.state());
+        value.select(before.text.length + 1, 1);
+        const request = vocabularyRequest(value);
+        const [group] = new VocabularyIndex([rule("甲😀", "乙")]).replacements(before.text, 0, before.text.length);
+        expect(group.ranges).toHaveLength(3);
+        expect(applyTranscriptVocabulary(request, group)).toBe(true);
+        expect(documentText(value.state().doc)).toBe("乙乙隔乙末");
+        const after = transcriptModifications(value.state());
+        expect(undoDepth(value.state())).toBe(2);
+        value.apply(value.state().tr.insertText("!"));
+        expect(undoDepth(value.state())).toBe(3);
+        value.history("undo");
+        expect(transcriptModifications(value.state())).toEqual(after);
+        value.history("undo");
+        expect(documentText(value.state().doc)).toBe(before.text);
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        value.history("redo");
+        expect(documentText(value.state().doc)).toBe("乙乙隔乙末");
+        expect(transcriptModifications(value.state())).toEqual(after);
     });
 
     it("records a disjoint reference replacement as one undo entry", () => {

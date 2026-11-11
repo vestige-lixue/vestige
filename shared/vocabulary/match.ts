@@ -2,6 +2,7 @@ import { type VocabularyRule } from "./Vocabulary";
 
 // Offsets refer to the displayed UTF-16 text, never to tokens or source identities.
 export type VocabularyMatch = { from: number; to: number; rule: VocabularyRule };
+export type VocabularyGroup = { rule: VocabularyRule; ranges: { from: number; to: number }[] };
 type Trie = { children: Map<string, Trie>; rules: VocabularyRule[] };
 const trie = (): Trie => ({ children: new Map(), rules: [] });
 const wordCharacter = (value: string): boolean => /[\p{Script=Latin}\p{Number}\p{Mark}_]/u.test(value);
@@ -26,6 +27,17 @@ export class VocabularyIndex {
             }
             node.rules.push(rule);
         });
+    }
+
+    replacements(text: string, from: number, to = from): VocabularyGroup[] {
+        const groups = new Map<string, VocabularyGroup>();
+        // find orders each rule's occurrences from left to right, and its first hit establishes menu order.
+        for (const { rule, from: start, to: end } of this.find(text, from, to)) {
+            const group = groups.get(rule.id);
+            if (!group) groups.set(rule.id, { rule, ranges: [{ from: start, to: end }] });
+            else if (from !== to && group.ranges[group.ranges.length - 1].to <= start) group.ranges.push({ from: start, to: end });
+        }
+        return [...groups.values()];
     }
 
     find(text: string, from: number, to = from): VocabularyMatch[] {

@@ -41,10 +41,7 @@
                 </DropdownMenu.Sub>
             {/if}
             {#if vocabularyMatches.length}
-                <DropdownMenu.Sub onOpenChange={value => {
-                    vocabularyFocusPending = value;
-                    if (!value && request) previewVocabulary(request, null);
-                }}>
+                <DropdownMenu.Sub onOpenChange={value => vocabularyFocusPending = value}>
                     <DropdownMenu.SubTrigger class="reference-trigger activable focusable">
                         <div>{i18n.t("transcription.vocabulary.replace")}</div>
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -57,18 +54,15 @@
                                 if (!vocabularyFocusPending) event.preventDefault();
                                 vocabularyFocusPending = false;
                             }}>
-                            {#each vocabularyMatches as match (match.rule.id + ":" + match.from)}
+                            {#each vocabularyMatches as group (group.rule.id)}
                                 <DropdownMenu.Item class="vocabulary-item activable focusable" disabled={disabled("paste")}
-                                    onpointerenter={() => request && previewVocabulary(request, match)}
-                                    onpointerleave={() => request && previewVocabulary(request, null)}
-                                    onfocus={() => request && previewVocabulary(request, match)}
-                                    onblur={() => request && previewVocabulary(request, null)}
-                                    onSelect={() => applyVocabulary(match)}>
-                                    <div class="vocabulary-source">{match.rule.source}</div>
+                                    onSelect={() => applyVocabulary(group)}>
+                                    <div class="vocabulary-source">{group.rule.source}</div>
                                     <span aria-hidden="true">→</span>
                                     <div class="vocabulary-replacement">
-                                        {#if match.rule.replacement}{match.rule.replacement}{:else}<i>{i18n.t("transcription.vocabulary.deleteText")}</i>{/if}
+                                        {#if group.rule.replacement}{group.rule.replacement}{:else}<i>{i18n.t("transcription.vocabulary.deleteText")}</i>{/if}
                                     </div>
+                                    {#if group.ranges.length > 1}<span class="reference-runs">×{group.ranges.length}</span>{/if}
                                 </DropdownMenu.Item>
                             {/each}
                         </DropdownMenu.SubContent>
@@ -189,8 +183,11 @@
     }
     :global(.transcript-vocabulary .vocabulary-item) {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
         gap: 12px;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    }
+    :global(.transcript-vocabulary .vocabulary-item:has(.reference-runs)) {
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
     }
     .vocabulary-source, .vocabulary-replacement {
         white-space: pre-wrap;
@@ -219,9 +216,8 @@
     import * as i18n from "../../i18n.svelte";
     import * as vocabulary from "../../states/vocabulary.svelte";
     import * as dialogs from "../../states/dialogs";
-    import { type VocabularyMatch } from "../../../shared/vocabulary/match";
+    import { type VocabularyGroup } from "../../../shared/vocabulary/match";
     import { documentText, applyTranscriptVocabulary } from "../../editor/transcript";
-    import { previewVocabulary } from "../../editor/vocabulary";
 
     let { runs, run }: { runs: Run[]; run: Run } = $props();
     type ReferenceItem = { text: string; range: Range; target: Range; runs: number[] };
@@ -238,7 +234,7 @@
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
     const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
     const references = $derived(request ? referenceItems(request) : []);
-    const vocabularyMatches = $derived(request ? vocabularyItems(request) : []);
+    let vocabularyMatches = $state.raw<VocabularyGroup[]>([]);
     const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
@@ -248,12 +244,14 @@
     export function show(value: TranscriptMenuRequest | null): boolean {
         referenceHover = null;
         if (!value) {
-            if (request) previewVocabulary(request, null);
             open = false;
             return false;
         }
+        const text = documentText(value.doc);
+        const groups = vocabulary.replacements(text, Math.max(0, value.selection.from - 1), Math.min(text.length, value.selection.to - 1));
         if (value.target.kind !== "deletion" && value.selection.empty && !transcriptMenuClipboardActions(value.target).length
-            && !referenceItems(value).length && !vocabularyItems(value).length) return false;
+            && !referenceItems(value).length && !groups.length) return false;
+        vocabularyMatches = groups;
         request = value;
         vocabularyRevision = vocabulary.getSnapshot().revision;
         keyboard.current = value.keyboard;
@@ -265,7 +263,6 @@
     function changeOpen(value: boolean): void {
         open = value;
         if (!value) referenceHover = null;
-        if (!value && request) previewVocabulary(request, null);
         if (!value && request) dismissTranscriptMenu(request.view.dom);
     }
 
@@ -274,19 +271,15 @@
         if (!value && referenceHover === "content") referenceHover = null;
     }
 
-    function vocabularyItems(value: TranscriptMenuRequest): VocabularyMatch[] {
-        return vocabulary.matches(documentText(value.doc), value.selection.from - 1, value.selection.to - 1);
-    }
-
-    function applyVocabulary(match: VocabularyMatch): void {
+    function applyVocabulary(group: VocabularyGroup): void {
         if (!request || disabled("paste")) return;
         const current = request, revision = vocabularyRevision;
         changeOpen(false);
         void tick().then(() => {
-            if (open || request !== current || revision !== vocabulary.getSnapshot().revision || disabled("paste")
-                || !vocabularyItems(current).some(item => item.from === match.from && item.to === match.to && item.rule.id === match.rule.id)
-                || !restoreTranscriptMenuSelection(current)) return;
-            applyTranscriptVocabulary(current, match);
+            const snapshot = vocabulary.getSnapshot();
+            if (open || request !== current || revision !== snapshot.revision || snapshot.error || disabled("paste")
+                || !vocabularyMatches.includes(group) || !restoreTranscriptMenuSelection(current)) return;
+            applyTranscriptVocabulary(current, group);
         });
     }
 
@@ -423,7 +416,6 @@
         if (open && revision !== vocabularyRevision) untrack(() => changeOpen(false));
     });
     onDestroy(() => {
-        if (request) previewVocabulary(request, null);
         if (request) dismissTranscriptMenu(request.view.dom);
         modal.closeLayer(layer);
     });
