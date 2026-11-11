@@ -18,15 +18,18 @@
             {/if}
         </div>
         <TextButton disabled={busy || !!snapshot.error} onclick={() => edit()}>{i18n.t("transcription.vocabulary.addRule")}</TextButton>
+        <TextButton disabled={busy || !!snapshot.error} onclick={() => void importRules()}>{i18n.t("transcription.vocabulary.import")}</TextButton>
+        <TextButton disabled={busy || !!snapshot.error} onclick={() => void saveFile(vocabularyAPI.exportRules)}>{i18n.t("transcription.vocabulary.export")}</TextButton>
     </div>
     {#if snapshot.error}
         <div class="error-message" role="alert">{describeFailure(snapshot.error)}</div>
         <div class="toolbar">
             <TextButton disabled={busy} onclick={() => void retry()}>{i18n.t("common.retry")}</TextButton>
-            <TextButton disabled={busy} onclick={() => void backupAndReset()}>{i18n.t("transcription.vocabulary.backupAndReset")}</TextButton>
+            <TextButton disabled={busy} onclick={() => void saveFile(vocabularyAPI.backupAndReset)}>{i18n.t("transcription.vocabulary.backupAndReset")}</TextButton>
         </div>
     {/if}
     {#if failure}<div class="error-message" role="alert">{describeFailure(failure)}</div>{/if}
+    {#if importSummary}<div role="status">{i18n.t("transcription.vocabulary.importSummary", importSummary)}</div>{/if}
     {#if !snapshot.error}
         <div class="rules">
             {#if !filtered.length}
@@ -122,7 +125,7 @@
     import { Dialog } from "bits-ui";
     import { tick } from "svelte";
     import { SvelteMap } from "svelte/reactivity";
-    import { type VocabularyRule, type VocabularyChange } from "../../../shared/vocabulary/Vocabulary";
+    import { type VocabularyRule, type VocabularyChange, type VocabularyFileResult } from "../../../shared/vocabulary/Vocabulary";
     import { type FailureInfo } from "../../../shared/failure";
     import * as i18n from "../../i18n.svelte";
     import * as vocabulary from "../../states/vocabulary.svelte";
@@ -143,6 +146,7 @@
     let search = $state("");
     let searchInput = $state<HTMLInputElement>();
     let pending = $state(false);
+    let importSummary = $state<{ imported: number; skipped: number } | null>(null);
     let failure = $state<FailureInfo | null>(null);
     const rowTabStops = new SvelteMap<string, number>();
     const snapshot = $derived(vocabulary.getSnapshot());
@@ -164,9 +168,18 @@
         if (document.activeElement === document.body) modal.restoreFocus(target, { preventScroll: true });
     }
 
-    async function backupAndReset(): Promise<void> {
+    async function importRules(): Promise<void> {
         failure = null;
-        const result = await vocabularyAPI.backupAndReset();
+        importSummary = null;
+        const result = await vocabularyAPI.importRules();
+        if (!result.success) failure = result.error;
+        else if (!result.canceled) importSummary = { imported: result.imported, skipped: result.skipped };
+    }
+
+    async function saveFile(operation: () => Promise<VocabularyFileResult>): Promise<void> {
+        failure = null;
+        importSummary = null;
+        const result = await operation();
         if (!result.success) failure = result.error;
     }
 

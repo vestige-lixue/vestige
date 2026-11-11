@@ -23,6 +23,8 @@ export type VocabularyFileResult<T = unknown> = VocabularyFailure
     | { success: true; canceled: true; snapshot: VocabularySnapshot }
     | ({ success: true; canceled: false; snapshot: VocabularySnapshot } & T);
 
+export type VocabularyImportResult = VocabularyFileResult<{ imported: number; skipped: number }>;
+
 export const vocabularyLineBreak = /[\r\n\u2028\u2029]/u;
 
 export function vocabularyRuleIssue(rule: Pick<VocabularyRule, "source" | "replacement">): "emptySource" | "multilineSource" | "multilineReplacement" | "unchanged" | null {

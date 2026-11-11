@@ -1,30 +1,12 @@
-import { copyFile, readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { copyFile } from "node:fs/promises";
 import typia from "typia";
-import { type VocabularyFile, type VocabularyRule, type VocabularyChange, type VocabularySnapshot, type VocabularyResult, type VocabularyFailure, type VocabularyFileResult, vocabularyRuleIssue, vocabularyRuleKey } from "../../shared/vocabulary/Vocabulary";
+import { type VocabularyRule, type VocabularyChange, type VocabularySnapshot, type VocabularyResult, type VocabularyFailure, type VocabularyFileResult, type VocabularyImportResult, vocabularyRuleIssue, vocabularyRuleKey } from "../../shared/vocabulary/Vocabulary";
 import { VestigeErrors, type FailureInfo, isExpectedFailure, toFailureInfo } from "../../shared/failure";
-import { errorCode, fileOperationFailure, statOrNull, writeFileAtomic } from "../util/fs";
+import { errorCode, fileOperationFailure, statOrNull } from "../util/fs";
+import { readVocabulary, readVocabularyImport, writeVocabulary } from "./file";
 
-export async function readVocabulary(path: string): Promise<VocabularyFile> {
-    let text: string;
-    try {
-        text = await readFile(path, "utf8");
-    }
-    catch (error) {
-        throw new VestigeErrors(fileOperationFailure(error as NodeJS.ErrnoException, "read", path), { cause: error });
-    }
-    let value: unknown;
-    try {
-        value = JSON.parse(text.replace(/^\uFEFF/u, ""));
-    }
-    catch {
-        throw new VestigeErrors({ kind: "vocabulary-invalid-file" });
-    }
-    if (!typia.equals<VocabularyFile>(value) || value.rules.some(vocabularyRuleIssue)
-        || new Set(value.rules.map(rule => rule.id.toLowerCase())).size !== value.rules.length) {
-        throw new VestigeErrors({ kind: "vocabulary-invalid-file" });
-    }
-    return value;
-}
+export { readVocabulary } from "./file";
 
 export class VocabularyStore {
     private snapshot: VocabularySnapshot = { rules: [], revision: 0, error: null };
@@ -56,12 +38,7 @@ export class VocabularyStore {
     }
 
     private async save(rules: VocabularyRule[]): Promise<void> {
-        try {
-            await writeFileAtomic(this.path, JSON.stringify({ version: 1, rules } satisfies VocabularyFile, null, 4), { sync: true, mode: undefined });
-        }
-        catch (error) {
-            throw new VestigeErrors(fileOperationFailure(error as NodeJS.ErrnoException, "write", this.path), { cause: error });
-        }
+        await writeVocabulary(this.path, rules);
         this.snapshot = { rules, revision: this.snapshot.revision + 1, error: null };
         this.broadcast();
     }
@@ -104,6 +81,45 @@ export class VocabularyStore {
 
     settle(): Promise<unknown> {
         return this.pending;
+    }
+
+    private async checkRevision(revision: unknown): Promise<void> {
+        await this.load();
+        if (this.snapshot.error) throw new VestigeErrors(this.snapshot.error);
+        if (this.snapshot.revision !== revision) throw new VestigeErrors({ kind: "vocabulary-conflict" });
+    }
+
+    importRules(revision: unknown, selectPath: () => Promise<string | null>): Promise<VocabularyImportResult> {
+        return this.request<VocabularyImportResult>(async () => {
+            await this.checkRevision(revision);
+            const path = await selectPath();
+            if (!path) return { success: true, canceled: true, snapshot: this.snapshot };
+            const file = await readVocabularyImport(path);
+            const rules = [...this.snapshot.rules], keys = new Set(rules.map(vocabularyRuleKey));
+            let imported = 0, skipped = file.skipped;
+            for (const rule of file.rules) {
+                const key = vocabularyRuleKey(rule);
+                if (vocabularyRuleIssue(rule) || keys.has(key)) {
+                    skipped++;
+                    continue;
+                }
+                keys.add(key);
+                rules.push({ ...rule, id: randomUUID() });
+                imported++;
+            }
+            await this.save(rules);
+            return { success: true, canceled: false, snapshot: this.snapshot, imported, skipped };
+        });
+    }
+
+    exportRules(revision: unknown, selectPath: () => Promise<string | null>): Promise<VocabularyFileResult> {
+        return this.request<VocabularyFileResult>(async () => {
+            await this.checkRevision(revision);
+            const path = await selectPath();
+            if (!path) return { success: true, canceled: true, snapshot: this.snapshot };
+            await writeVocabulary(path, this.snapshot.rules);
+            return { success: true, canceled: false, snapshot: this.snapshot };
+        });
     }
 
     backupAndReset(revision: unknown, selectPath: () => Promise<string | null>): Promise<VocabularyFileResult> {

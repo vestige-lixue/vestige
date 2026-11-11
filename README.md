@@ -25,7 +25,7 @@ Vestige brings listening, transcription, and proofreading into one workspace. Th
 
 1. **Fully local transcription**: Transcribe audio and video on your own computer with any model compliant with whisper.cpp and sherpa-onnx.
 2. **Multiple transcription results**: Keep results from different models alongside the same recording and choose one as the basis for corrections.
-3. **Custom vocabulary**: Keep reusable word and phrase corrections and get matching suggestions while proofreading.
+3. **Custom vocabulary**. Right-click a selection to apply a rule to every non-overlapping match in one undo step. Select the whole transcript to correct it throughout, or place the caret on one occurrence. The vocabulary manager supports JSON export and JSON or tab-separated import. If the vocabulary file is unreadable, choose **Back up and reset…** to save its original bytes before starting with an empty list.
 4. **Playback and proofreading**: Listen to the source recording while reviewing the transcript, correcting mistakes, and filling in missing words.
 5. **Saving projects**: Organize recordings and transcripts in `.vestige` files in JSON format, with automatic saving and references to the original media files.
 6. **Exporting transcripts**: Export the original transcripts or the corrected versions in plain text or SRT subtitle format.

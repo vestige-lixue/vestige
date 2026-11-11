@@ -1,4 +1,4 @@
-import { type VocabularyChange, type VocabularyResult, type VocabularyFailure, type VocabularyFileResult } from "../../shared/vocabulary/Vocabulary";
+import { type VocabularyChange, type VocabularyResult, type VocabularyFailure, type VocabularyFileResult, type VocabularyImportResult } from "../../shared/vocabulary/Vocabulary";
 import { toFailureInfo } from "../../shared/failure";
 import * as vocabulary from "./vocabulary.svelte";
 
@@ -19,6 +19,14 @@ export async function initialize(): Promise<void> {
 
 export function change(value: VocabularyChange, revision = vocabulary.getSnapshot().revision): Promise<VocabularyResult> {
     return request(() => window.api.vocabulary.change(revision, value));
+}
+
+export function importRules(): Promise<VocabularyImportResult> {
+    return request(() => window.api.vocabulary.importRules(vocabulary.getSnapshot().revision));
+}
+
+export function exportRules(): Promise<VocabularyFileResult> {
+    return request(() => window.api.vocabulary.exportRules(vocabulary.getSnapshot().revision));
 }
 
 export function backupAndReset(): Promise<VocabularyFileResult> {

@@ -50,10 +50,19 @@ export async function selectOpenProjectPath(window: BrowserWindow): Promise<Abso
     return result.canceled || !result.filePaths[0] ? null : parseAbsolutePath(result.filePaths[0]);
 }
 
-export async function selectVocabularyBackupPath(window: BrowserWindow): Promise<string | null> {
-    const timestamp = new Date().toISOString().replace(/[:.]/gu, "-");
+export async function selectVocabularyImportPath(window: BrowserWindow): Promise<string | null> {
+    const result = await dialog.showOpenDialog(window, {
+        title: t("transcription.vocabulary.importTitle"), properties: ["openFile"],
+        filters: [{ name: t("native.filters.vocabulary"), extensions: ["json", "tsv", "txt"] }, { name: t("native.filters.all"), extensions: ["*"] }]
+    });
+    return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
+}
+
+export async function selectVocabularySavePath(window: BrowserWindow, kind: "backup" | "export"): Promise<string | null> {
+    const backup = kind === "backup";
     const result = await dialog.showSaveDialog(window, {
-        title: t("transcription.vocabulary.backupTitle"), defaultPath: `vocabulary-backup-${timestamp}.json`,
+        title: t(backup ? "transcription.vocabulary.backupTitle" : "transcription.vocabulary.exportTitle"),
+        defaultPath: backup ? `vocabulary-backup-${new Date().toISOString().replace(/[:.]/gu, "-")}.json` : "vocabulary.json",
         properties: ["showOverwriteConfirmation"]
     });
     return result.canceled || !result.filePath ? null : result.filePath;

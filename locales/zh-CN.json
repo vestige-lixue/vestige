@@ -297,6 +297,11 @@
             "add": "添加到词库",
             "addRule": "新增规则",
             "backupAndReset": "备份并重置…",
+            "import": "导入…",
+            "export": "导出…",
+            "importTitle": "导入词库规则",
+            "exportTitle": "导出词库规则",
+            "importSummary": "已导入 {{imported}} 条规则，跳过 {{skipped}} 条。",
             "backupTitle": "保存词库备份",
             "editRule": "编辑规则",
             "source": "将以下文字",
@@ -644,6 +649,7 @@
     },
     "native": {
         "filters": {
+            "vocabulary": "词库文件（JSON 或制表符分隔文本）",
             "media": "音视频文件",
             "all": "所有文件",
             "project": "Vestige 项目"

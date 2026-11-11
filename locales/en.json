@@ -297,6 +297,11 @@
             "add": "Add to vocabulary",
             "addRule": "Add",
             "backupAndReset": "Back up and reset…",
+            "import": "Import…",
+            "export": "Export…",
+            "importTitle": "Import vocabulary rules",
+            "exportTitle": "Export vocabulary rules",
+            "importSummary": "Imported {{imported}} and skipped {{skipped}}.",
             "backupTitle": "Save vocabulary backup",
             "editRule": "Edit rule",
             "source": "Replace",
@@ -644,6 +649,7 @@
     },
     "native": {
         "filters": {
+            "vocabulary": "Vocabulary files (JSON or tab-separated text)",
             "media": "Audio and video files",
             "all": "All files",
             "project": "Vestige project"

@@ -71,6 +71,8 @@ const api: AppAPI = {
     vocabulary: {
         get: () => ipcRenderer.invoke(vocabularyChannels.get),
         change: (revision, change) => ipcRenderer.invoke(vocabularyChannels.change, revision, change),
+        importRules: revision => ipcRenderer.invoke(vocabularyChannels.importRules, revision),
+        exportRules: revision => ipcRenderer.invoke(vocabularyChannels.exportRules, revision),
         backupAndReset: revision => ipcRenderer.invoke(vocabularyChannels.backupAndReset, revision),
         onChanged(callback) {
             const listener = (_event: IpcRendererEvent, snapshot: VocabularySnapshot): void => callback(snapshot);
