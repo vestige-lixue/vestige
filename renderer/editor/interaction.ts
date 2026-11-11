@@ -100,7 +100,10 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     }
     function inspect(preferred = state.priority): void {
         state.priority = preferred;
-        view.dom.classList.toggle("transcript-seek", state.held && !!state.hovered?.information.range);
+        // Modifier-click seeks the token under the pointer even when the selection owns the tooltip.
+        const clickTarget = state.held && state.hovered?.information.kind === "selection"
+            ? geometry.hover(state.pointer, { selection: false }) : state.hovered;
+        view.dom.classList.toggle("transcript-seek", state.held && clickTarget?.information.playableStart != null);
         // Ending the latest input reveals the other target rather than discarding it.
         const target = menuTarget ? menuTarget() : state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
         const menu = menuPending || !!menuTarget;
@@ -175,7 +178,8 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         state.chorded = false;
         const changed = hold(true);
         if (setControl(true) || changed) retarget();
-        if (!event.repeat && state.inspection?.information.range) options.onSeek(state.inspection.information.range.start);
+        const start = state.inspection?.information.playableStart;
+        if (!event.repeat && start != null) options.onSeek(start);
     }
     function down(event: PointerEvent): void {
         state.activation = null;
@@ -185,9 +189,11 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         event.preventDefault();
         event.stopPropagation();
         const item = geometry.hover(state.pointer, { selection: false })?.information;
-        state.activation = { key: item?.range ? item.key : null };
+        state.activation = { key: item?.playableStart != null ? item.key : null };
     }
     function up(event: PointerEvent): void {
+        // Blink can collapse selected text on release even after the modifier press was consumed.
+        if (state.activation && event.button === 0) event.preventDefault();
         if (state.pointer?.pressed) move(event);
     }
     function click(event: MouseEvent): void {
@@ -198,7 +204,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         event.stopImmediatePropagation();
         if (!activation.key || !inspectionModifier(event)) return;
         const item = geometry.hover(state.pointer, { selection: false })?.information;
-        if (item?.range && item.key === activation.key) options.onSeek(item.range.start);
+        if (item?.playableStart != null && item.key === activation.key) options.onSeek(item.playableStart);
     }
     function reset(): void {
         settleFocus(null);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
-import { transcriptEvents, transcriptInformation, transcriptSelection, transcriptSelectionUnits } from "../renderer/editor/informationModel";
+import { transcriptEvents, transcriptInformation, transcriptSelection, transcriptSelectionUnits, unplayableTimestamp } from "../renderer/editor/informationModel";
 import { createTextIndex, projectText, editText } from "../shared/transcript/text";
 import { modification, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange } from "./support/generators";
@@ -166,12 +166,22 @@ describe("information previews", () => {
 });
 
 describe("selection information", () => {
-    it("keeps zero-duration deletions available to selection view commands", () => {
+    it("marks each displayed timestamp and its tick using the same inclusive media bounds", () => {
+        const times = [-1, 0, 120.79, 122.666667, 122.69];
+        const marks = (start: number | null | undefined): boolean[] => times.map(time => unplayableTimestamp(time, 122.666667, start));
+        expect(marks(120.79)).toEqual([true, false, false, false, true]);
+        expect(marks(null)).toEqual([true, true, true, true, true]);
+        expect(marks(undefined)).toEqual([false, false, false, false, false]);
+    });
+
+    it("inspects zero-duration replacements and keeps their deletions available to view commands", () => {
         const spans = transcript(["a", "b", "c"]);
         spans.forEach(span => span.range = { start: 0, end: 0 });
         const index = createTextIndex(spans);
         const projection = editText(index, projectText(index, []), 1, 2, "X");
-        expect(transcriptSelection(index, projection, 1, 1, 2)).toBeNull();
+        expect(transcriptSelection(index, projection, 1, 1, 2)).toMatchObject({
+            range: { start: 0, end: 0 }, playableStart: null, tokens: [], deletions: [{ original: "b", playableStart: null }]
+        });
         expect(transcriptSelectionUnits(index, projection, 1, 1, 2).deletions.map(item => item.original)).toEqual(["b"]);
         expect(transcriptSelectionUnits(index, projection, 1, 0, 1).deletions).toEqual([]);
         expect(transcriptSelectionUnits(index, projection, 1, 0, 2).deletions.map(item => item.original)).toEqual(["b"]);
@@ -228,17 +238,58 @@ describe("selection information", () => {
         });
     });
 
-    it("takes the envelope of unsorted overlapping times and clips it to duration", () => {
+    it("keeps the raw envelope of unsorted overlapping units and seeks to the earliest playable start", () => {
         const spans = transcript(["a", "b", "c"]);
         spans[0].range = { start: 7, end: 14 };
         spans[1].range = { start: -2, end: 3 };
         spans[2].range = { start: 2, end: 9 };
         const index = createTextIndex(spans);
         const projection = projectText(index, []);
-        expect(transcriptSelection(index, projection, 10, 0, 2)?.range).toEqual({ start: 0, end: 10 });
-        expect(transcriptSelection(index, projection, 10, 1, 3)?.range).toEqual({ start: 0, end: 9 });
-        expect(transcriptSelection(index, projection, 6, 0, 1)).toBeNull();
+        expect(transcriptSelection(index, projection, 10, 0, 2)).toMatchObject({ range: { start: -2, end: 14 }, playableStart: 0 });
+        expect(transcriptSelection(index, projection, 10, 1, 3)).toMatchObject({ range: { start: -2, end: 9 }, playableStart: 0 });
+        expect(transcriptSelection(index, projection, 6, 0, 1)).toMatchObject({ range: { start: 7, end: 14 }, playableStart: null });
         expect(transcriptSelection(index, projection, 10, 0, 1)?.key).not.toBe(transcriptSelection(index, projection, 10, 0, 2)?.key);
+    });
+
+    it.each([
+        { name: "past the end", times: [[130.95, 134.94], [134.94, 140.38]], start: 130.95, end: 140.38, playableStart: null },
+        { name: "23ms beyond the end", times: [[120.79, 122.69]], start: 120.79, end: 122.69, playableStart: 120.79 },
+        { name: "playable and out of bounds", times: [[120.79, 122.69], [140.39, 145.83]], start: 120.79, end: 145.83, playableStart: 120.79 },
+        { name: "points around a playable token", times: [[1, 1], [5, 7], [150, 150]], start: 5, end: 7, playableStart: 5 },
+        { name: "coincident points", times: [[29.98, 29.98], [29.98, 29.98]], start: 29.98, end: 29.98, playableStart: null },
+        { name: "distinct points", times: [[30.5, 30.5], [29.98, 29.98]], start: 29.98, end: 30.5, playableStart: null },
+        { name: "outside on both sides", times: [[-4, -2], [130, 134]], start: -4, end: 134, playableStart: null },
+        { name: "a gap before the first playable unit", times: [[-4, -2], [7, 10]], start: -4, end: 10, playableStart: 7 }
+    ])("uses individual token times for selections and deletions with $name", ({ times, start, end, playableStart }) => {
+        const duration = 122.666667;
+        const spans = transcript(times.map(() => "x"));
+        spans.forEach((span, i) => span.range = { start: times[i][0], end: times[i][1] });
+        const index = createTextIndex(spans);
+        const projection = projectText(index, []);
+        const audio = { range: { start, end }, playableStart };
+        expect(transcriptSelection(index, projection, duration, 0, spans.length)).toMatchObject({
+            ...audio, tokens: spans.map((_, i) => i), fragments: [{ from: 0, to: spans.length }]
+        });
+        const replacement = projectText(index, modification(spans, 0, spans.length, "Y"));
+        expect(transcriptEvents(index, replacement, duration).find(item => item.kind === "deletion")).toMatchObject(audio);
+        expect(transcriptSelection(index, replacement, duration, 0, 1)).toMatchObject({ ...audio, tokens: [], deletions: [audio] });
+    });
+
+    it("evaluates cached tokens and selection keys against the current duration", () => {
+        const spans = transcript(["a", "b"]);
+        spans[0].range = { start: 7, end: 14 };
+        spans[1].range = { start: 5, end: 5 };
+        const index = createTextIndex(spans), projection = projectText(index, []);
+        const keys = new Set<string>();
+        for (const [duration, playableStart] of [[10, 7], [6, null], [0, undefined], [-1, undefined], [NaN, undefined], [Infinity, undefined]] as const) {
+            const items = transcriptInformation(index, projection, duration).filter(item => item.kind === "token");
+            expect(items[0]).toMatchObject({ range: spans[0].range, playableStart });
+            expect(items[1]).toMatchObject({ range: spans[1].range, playableStart: playableStart === undefined ? undefined : null });
+            const selection = transcriptSelection(index, projection, duration, 0, 2);
+            expect(selection).toMatchObject({ range: spans[0].range, playableStart, fragments: [{ from: 0, to: 2 }] });
+            keys.add(selection!.key);
+        }
+        expect(keys.size).toBe(3);
     });
 });
 

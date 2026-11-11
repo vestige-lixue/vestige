@@ -143,7 +143,7 @@ export function transcriptMenuController(
         const point = { x: event.clientX, y: event.clientY, pressed: false };
         const hit = fromKeyboard ? geometry.keyboard(true, view.dom) : geometry.hover(point, { selection: false });
         if (hit?.information.kind === "token") {
-            const fragments = transcriptTokenGroup(index, projection, hit.information);
+            const fragments = transcriptTokenGroup(index, projection, duration, hit.information);
             return { kind: "token", from: Math.min(...fragments.map(item => item.from)) + 1, to: Math.max(...fragments.map(item => item.to)) + 1, position, information: hit.information };
         }
         return { kind: "text", from: position, to: position, position, information: null };

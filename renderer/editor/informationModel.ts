@@ -11,11 +11,17 @@ export type TranscriptInformation = {
     sourceFrom: number;
     sourceTo: number;
     range: Range | null;
+    // null means no unit is playable. undefined means the media duration is unknown.
+    playableStart: number | null | undefined;
     original: string | null;
     probability: number | null;
     blankProbability: number | null;
     gaps?: TranscriptInformation[];
 };
+
+export function unplayableTimestamp(time: number, duration: number, playableStart: TranscriptInformation["playableStart"]): boolean {
+    return playableStart !== undefined && (playableStart === null || time < 0 || time > duration);
+}
 
 type SpeechInterval = { start: number; end: number; offset: number };
 const speechIntervals = new WeakMap<TextIndex, { duration: number; intervals: SpeechInterval[] }>();
@@ -33,23 +39,40 @@ function intervalsOf(index: TextIndex, duration: number): SpeechInterval[] {
     return intervals;
 }
 
-const tokenCache = new WeakMap<TextProjection, Map<string, TranscriptInformation>>();
-function pieceInformation(index: TextIndex, piece: TextPiece): TranscriptInformation {
-    const segment = piece.source.kind === "segment" ? index.transcript[piece.source.index] : null;
-    let range: Range | null = segment?.range ?? null;
-    if (!segment && piece.sourceFrom < piece.sourceTo) {
-        const first = textPosition(index, piece.sourceFrom).segmentIdx;
-        const last = textPosition(index, piece.sourceTo - 1).segmentIdx;
-        range = { ...index.transcript[first].range };
-        for (let segmentIdx = first + 1; segmentIdx <= last; segmentIdx++) {
-            range.start = Math.min(range.start, index.transcript[segmentIdx].range.start);
-            range.end = Math.max(range.end, index.transcript[segmentIdx].range.end);
-        }
+function inspectionAudio(
+    index: TextIndex, duration: number, tokens: readonly number[], deletions: readonly Pick<TextPiece, "sourceFrom" | "sourceTo">[] = []
+): Pick<TranscriptInformation, "range" | "playableStart"> {
+    const intervals = { start: Infinity, end: -Infinity };
+    const points = { start: Infinity, end: -Infinity };
+    let earliest = Infinity;
+    function include({ start, end }: Range): void {
+        const envelope = end > start ? intervals : points;
+        envelope.start = Math.min(envelope.start, start);
+        envelope.end = Math.max(envelope.end, end);
+        const clippedStart = Math.max(0, start);
+        if (clippedStart < Math.min(duration, end)) earliest = Math.min(earliest, clippedStart);
     }
+    for (const token of tokens) include(index.transcript[token].range);
+    for (const deletion of deletions) {
+        const first = textPosition(index, deletion.sourceFrom).segmentIdx;
+        const last = textPosition(index, deletion.sourceTo - 1).segmentIdx;
+        for (let token = first; token <= last; token++) include(index.transcript[token].range);
+    }
+    const envelope = intervals.start < Infinity ? intervals : points;
+    return {
+        range: envelope.start < Infinity ? envelope : null,
+        playableStart: Number.isFinite(duration) && duration > 0 ? (earliest < Infinity ? earliest : null) : undefined
+    };
+}
+
+const tokenCache = new WeakMap<TextProjection, Map<string, TranscriptInformation>>();
+function pieceInformation(index: TextIndex, piece: TextPiece, duration: number): TranscriptInformation {
+    const segment = piece.source.kind === "segment" ? index.transcript[piece.source.index] : null;
+    const audio = segment ? inspectionAudio(index, duration, [piece.source.index]) : inspectionAudio(index, duration, [], [piece]);
     return {
         key: `${piece.source.kind}-${piece.source.index}`,
         kind: segment ? "token" : "deletion",
-        from: piece.utf16From, to: piece.utf16To, range,
+        from: piece.utf16From, to: piece.utf16To, ...audio,
         sourceFrom: piece.sourceFrom, sourceTo: piece.sourceTo,
         original: segment ? null : index.characters.slice(piece.sourceFrom, piece.sourceTo).join(""),
         probability: segment?.token.prob ?? null,
@@ -57,27 +80,27 @@ function pieceInformation(index: TextIndex, piece: TextPiece): TranscriptInforma
     };
 }
 
-function tokens(index: TextIndex, projection: TextProjection, pieces: TextPiece[]): TranscriptInformation[] {
+function tokens(index: TextIndex, projection: TextProjection, duration: number, pieces: TextPiece[]): TranscriptInformation[] {
     let cache = tokenCache.get(projection);
     if (!cache) tokenCache.set(projection, cache = new Map());
     return pieces.filter(piece => piece.source.kind === "segment").map(piece => {
-        const key = `${piece.source.index}/${piece.sourceFrom}/${piece.sourceTo}`;
+        const key = `${piece.source.index}/${piece.sourceFrom}/${piece.sourceTo}/${duration}`;
         let item = cache.get(key);
         if (!item) {
-            item = pieceInformation(index, piece); cache.set(key, item);
+            item = pieceInformation(index, piece, duration); cache.set(key, item);
         }
         return item;
     });
 }
 
-export function transcriptTokens(index: TextIndex, projection: TextProjection, from: number, to = from): TranscriptInformation[] {
-    return tokens(index, projection, textPieces(index, projection, from, to, true));
+export function transcriptTokens(index: TextIndex, projection: TextProjection, duration: number, from: number, to = from): TranscriptInformation[] {
+    return tokens(index, projection, duration, textPieces(index, projection, from, to, true));
 }
 
-export function transcriptTokenGroup(index: TextIndex, projection: TextProjection, token: TranscriptInformation): TranscriptInformation[] {
+export function transcriptTokenGroup(index: TextIndex, projection: TextProjection, duration: number, token: TranscriptInformation): TranscriptInformation[] {
     // Token keys refer to immutable Run indices, including when edits split one token into pieces.
     const segmentIdx = Number(token.key.slice("segment-".length));
-    return tokens(index, projection, sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])
+    return tokens(index, projection, duration, sourceTextPieces(index, projection, index.starts[segmentIdx], index.starts[segmentIdx + 1])
         .filter(piece => piece.source.kind === "segment" && piece.source.index === segmentIdx));
 }
 
@@ -105,7 +128,7 @@ function gapInformation(index: TextIndex, projection: TextProjection, duration: 
         return {
             key: `gap-${gap.start}-${gap.end}`, kind: "gap", from, to: from,
             sourceFrom: gap.offset, sourceTo: gap.offset,
-            range: { start: gap.start, end: gap.end }, original: null, probability: null, blankProbability: null
+            range: { start: gap.start, end: gap.end }, playableStart: gap.start, original: null, probability: null, blankProbability: null
         };
     });
 }
@@ -121,7 +144,7 @@ export function transcriptEvents(index: TextIndex, projection: TextProjection, d
         const information = pieceInformation(index, {
             source: { kind: "modification", index: modificationIdx }, sourceFrom, sourceTo,
             from: 0, to: 0, utf16From: position, utf16To: position, text: ""
-        });
+        }, duration);
         information.gaps = [];
         result.push(information);
         deletions.set(position, information);
@@ -136,7 +159,7 @@ export function transcriptEvents(index: TextIndex, projection: TextProjection, d
 
 export function transcriptInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
     return [
-        ...tokens(index, projection, textPieces(index, projection)),
+        ...tokens(index, projection, duration, textPieces(index, projection)),
         ...transcriptEvents(index, projection, duration)
     ];
 }
@@ -170,30 +193,20 @@ export function transcriptSelectionUnits(index: TextIndex, projection: TextProje
 
 // Selection and geometry use displayed UTF-16 offsets; source identities remain codepoint offsets.
 export function transcriptSelection(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): SelectionInformation | null {
-    if (from >= to || !Number.isFinite(duration) || duration <= 0) return null;
+    if (from >= to) return null;
     const { tokens: tokenIndices, deletions } = transcriptSelectionUnits(index, projection, duration, from, to);
     const tokens = [...tokenIndices];
-    let start = Infinity;
-    let end = -Infinity;
-    let sourceFrom = Infinity;
-    let sourceTo = -Infinity;
-    function include(range: Range | null, first: number, last: number): void {
-        if (!range) return;
-        start = Math.min(start, range.start);
-        end = Math.max(end, range.end);
-        sourceFrom = Math.min(sourceFrom, first);
-        sourceTo = Math.max(sourceTo, last);
-    }
-    for (const segmentIdx of tokens) include(index.transcript[segmentIdx].range, index.starts[segmentIdx], index.starts[segmentIdx + 1]);
-    for (const deletion of deletions) include(deletion.range, deletion.sourceFrom, deletion.sourceTo);
-    start = Math.max(0, Math.min(duration, start));
-    end = Math.max(0, Math.min(duration, end));
-    if (start >= end) return null;
+    const { range, playableStart } = inspectionAudio(index, duration, tokens, deletions);
+    if (!range) return null;
+    let sourceFrom = index.characters.length;
+    let sourceTo = 0;
     let first = from;
     let last = to;
     const fragments: SelectionInformation["fragments"] = [];
     if (tokens.length) {
-        for (const piece of sourceTextPieces(index, projection, index.starts[tokens[0]], index.starts[tokens[tokens.length - 1] + 1])) {
+        sourceFrom = index.starts[tokens[0]];
+        sourceTo = index.starts[tokens[tokens.length - 1] + 1];
+        for (const piece of sourceTextPieces(index, projection, sourceFrom, sourceTo)) {
             if (piece.source.kind !== "segment" || !tokenIndices.has(piece.source.index)) continue;
             first = Math.min(first, piece.utf16From);
             last = Math.max(last, piece.utf16To);
@@ -202,11 +215,15 @@ export function transcriptSelection(index: TextIndex, projection: TextProjection
             else fragments.push({ from: piece.utf16From, to: piece.utf16To });
         }
     }
+    for (const deletion of deletions) {
+        sourceFrom = Math.min(sourceFrom, deletion.sourceFrom);
+        sourceTo = Math.max(sourceTo, deletion.sourceTo);
+    }
     const comparison = selectionComparison(index, projection, { from: first, to: last, sourceFrom, sourceTo });
     return {
-        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${start}-${end}/${JSON.stringify(comparison)}`,
+        key: `selection/${from}/${to}/${tokens.join(",")}/${deletions.map(item => `${item.sourceFrom}-${item.sourceTo}`).join(",")}/${range.start}-${range.end}/${playableStart}/${JSON.stringify(comparison)}`,
         kind: "selection", from: first, to: last, selectionFrom: from, selectionTo: to, sourceFrom, sourceTo,
-        tokens, fragments, deletions, comparison, range: { start, end }, original: null, probability: null, blankProbability: null
+        tokens, fragments, deletions, comparison, range, playableStart, original: null, probability: null, blankProbability: null
     };
 }
 

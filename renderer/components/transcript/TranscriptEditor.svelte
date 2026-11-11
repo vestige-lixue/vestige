@@ -30,7 +30,7 @@
     <Tooltip.Portal>
         {#if tooltipOpen && inspection && informationDisplay === "tooltip"}
             <Tooltip.Content class="tooltip-content transcript-tooltip" customAnchor={anchor} side="top" sideOffset={7} collisionPadding={8}>
-                <TranscriptInformation information={inspection.information} hideTrivialInformation={settings.getEditing().hideTrivialInformation} />
+                <TranscriptInformation information={inspection.information} duration={vestige.media.duration} hideTrivialInformation={settings.getEditing().hideTrivialInformation} />
             </Tooltip.Content>
         {/if}
     </Tooltip.Portal>
@@ -398,8 +398,10 @@
         inspection = value;
         if (informationChanged) {
             onInspect?.(value?.information ?? null);
-            const range = value?.information.range;
-            transcript.setInspection(range ? { mediaId: vestige.media.id, runId: run.id, range } : null);
+            const information = value?.information;
+            transcript.setInspection(information?.range ? {
+                mediaId: vestige.media.id, runId: run.id, range: information.range, playableStart: information.playableStart
+            } : null);
         }
         if (!value || value.menu || value.pressed || informationDisplay !== "tooltip" || !changed) return;
         if (value.control ? controlDismissed : dismissedHover) return;
@@ -413,12 +415,13 @@
     $effect(() => {
         const current = vestige;
         const displayed = run;
+        const duration = current.media.duration;
         // Dismiss before inspection modifiers, editor shortcuts and the tooltip's Escape layer.
         window.addEventListener("keydown", inspectionKeydown, true);
         const instance = untrack(() => createTranscriptEditor(element, displayed, $state.snapshot(current.modifications), modifications => {
             if (project.getVestige(current.media.id) === current) projectAPI.updateModifications(current.media.id, displayed.id, modifications);
         }, () => !project.projectState.locked, {
-            duration: current.media.duration, onChange: inspect,
+            duration, onChange: inspect,
             menu: { open: request => contextMenu.show(request), edit: action => contextMenu.edit(action) },
             onHover: hovered => {
                 hovering = hovered;

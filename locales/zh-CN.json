@@ -336,6 +336,7 @@
         "information": {
             "tokenProbability": "置信度",
             "blankProbability": "无语音",
+            "noPlayableAudio": "无可播放音频",
             "gap": "无语音段",
             "gaps": "{{count}} ({{duration}}s)",
             "restore": "恢复已删除的文字",

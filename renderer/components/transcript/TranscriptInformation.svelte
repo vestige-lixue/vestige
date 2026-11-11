@@ -11,9 +11,13 @@
                 {@render statistic(i18n.t("transcript.information.blankProbability"), formatProbability(information?.kind === "gap" ? 1 : information?.blankProbability))}
             </div>
         {/if}
-        <div class="range">
+        <div class="range" role="group" aria-label={information?.playableStart === null ? i18n.t("transcript.information.noPlayableAudio") : undefined}>
             {#if information?.range}
-                {formatDuration(information.range.start, { precision: 2 })}–{formatDuration(information.range.end, { precision: 2 })} ({(information.range.end - information.range.start).toFixed(2)}s)
+                {#if information.range.start === information.range.end}
+                    {@render timestamp(information.range.start, information.playableStart)}
+                {:else}
+                    {@render timestamp(information.range.start, information.playableStart)}–{@render timestamp(information.range.end, information.playableStart)} ({(information.range.end - information.range.start).toFixed(2)}s)
+                {/if}
             {:else}—{/if}
         </div>
         {#if information?.gaps?.length}
@@ -23,6 +27,10 @@
             }), true)}</div>
         {/if}
     </div>
+{/snippet}
+
+{#snippet timestamp(time: number, playableStart: InspectionInformation["playableStart"])}
+    <span class:danger={unplayableTimestamp(time, duration, playableStart)}>{formatTimestamp(time)}</span>
 {/snippet}
 
 {#snippet statistic(label: string, value: string, flexible = false)}
@@ -143,6 +151,9 @@
         white-space: nowrap;
         text-align: center;
     }
+    .range .danger {
+        color: var(--c-danger);
+    }
     .compact .range {
         order: -1;
         flex-shrink: 0;
@@ -208,16 +219,21 @@
     import * as i18n from "../../i18n.svelte";
     import { formatDuration } from "../../format";
     import { type InspectionInformation } from "../../editor/information";
+    import { unplayableTimestamp } from "../../editor/informationModel";
     import { fitPreview, previewUnits, comparisonPreview } from "../../editor/preview";
 
-    let { information, compact = false, hideTrivialInformation = false }: {
-        information: InspectionInformation | null; compact?: boolean; hideTrivialInformation?: boolean;
+    let { information, duration, compact = false, hideTrivialInformation = false }: {
+        information: InspectionInformation | null; duration: number; compact?: boolean; hideTrivialInformation?: boolean;
     } = $props();
     const hideProbabilities = $derived(!compact && hideTrivialInformation && (information?.kind === "gap"
         || information?.kind === "token" && information.probability === 1 && information.blankProbability === 0));
     const preview = $derived(information?.kind === "selection" ? comparisonPreview(information.comparison)
         : information?.original ? previewUnits(information.original, "deleted", information.gaps, information.sourceFrom) : []);
     const suffix = $derived(information?.kind === "deletion" ? `(${Array.from(information.original ?? "").length})` : undefined);
+
+    function formatTimestamp(seconds: number): string {
+        return (seconds < 0 ? "−" : "") + formatDuration(Math.abs(seconds), { precision: 2 });
+    }
 
     function formatProbability(value: number | null | undefined): string {
         return value == null ? "—" : `${(value * 100).toFixed(1).replace(/\.0$/, "")}%`;

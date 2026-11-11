@@ -29,10 +29,9 @@
             >
                 <div class="track">
                     <Slider.Range class="slider-range" />
-                    {#if inspectedRange && duration > 0}
-                        <span class="inspection-tick" style:left={`${Math.max(0, Math.min(1, inspectedRange.start / duration)) * 100}%`}></span>
-                        <span class="inspection-tick" style:left={`${Math.max(0, Math.min(1, inspectedRange.end / duration)) * 100}%`}></span>
-                    {/if}
+                    {#each inspectionTicks as tick (tick.time)}
+                        <span class="inspection-tick" class:danger={tick.danger} style:left={`${tick.time / duration * 100}%`}></span>
+                    {/each}
                 </div>
                 <Slider.Thumb
                     bind:ref={progressThumb}
@@ -358,6 +357,9 @@
         transform: translateX(-50%);
         pointer-events: none;
     }
+    .inspection-tick.danger {
+        background: var(--c-danger);
+    }
     .time {
         white-space: nowrap;
         font-size: 14px;
@@ -452,7 +454,7 @@
     const selectedMedia = $derived(project.getMedia(mediaSelection.get()));
     const media = $derived(selectedMedia && mediaImport.isReady(selectedMedia.id) ? selectedMedia : null);
     const duration = $derived(media?.duration ?? 0);
-    const inspectedRange = $derived(transcript.getInspectionRange());
+    const inspectionTicks = $derived(transcript.getInspectionTicks(duration));
     const unavailable = $derived(!media || !mediaImport.isReady(media.id) || !Number.isFinite(duration) || duration <= 0);
     const disabled = $derived(unavailable || !player.getURL());
     const progress = $derived(unavailable || !Number.isFinite(player.getCurrentTime())

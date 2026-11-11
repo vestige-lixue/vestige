@@ -144,7 +144,7 @@ export function inspectionGeometry(
         const key = information.kind === "selection" ? `selection/${information.selectionFrom}/${information.selectionTo}` : information.key;
         const previous = cache.groups.get(key);
         if (previous) return previous;
-        const fragments = information.kind === "selection" ? information.fragments : transcriptTokenGroup(index, cache.projection, information);
+        const fragments = information.kind === "selection" ? information.fragments : transcriptTokenGroup(index, cache.projection, duration, information);
         const boxes = fragments.map(rectangles);
         if (cache.groups.size === 8) cache.groups.delete(cache.groups.keys().next().value!);
         cache.groups.set(key, boxes);
@@ -236,7 +236,7 @@ export function inspectionGeometry(
             if (!position) return null;
             const offset = position.pos - 1;
             // At a boundary try the following token first, then the preceding token's spacing.
-            for (const item of transcriptTokens(index, projectionOf(view.state), offset).reverse()) {
+            for (const item of transcriptTokens(index, projectionOf(view.state), duration, offset).reverse()) {
                 if (offset < item.from || offset > item.to) continue;
                 const boxes = informationRectangles(item);
                 const rects = boxes.flat();
@@ -268,7 +268,7 @@ export function inspectionGeometry(
             if (!view.state.selection.empty) return selectionAtCaret(true);
             const offset = view.state.selection.head - 1;
             // A caret at a boundary belongs to the following character; the document end has none.
-            const item = transcriptTokens(index, projectionOf(view.state), offset).find(item => item.from <= offset && offset < item.to);
+            const item = transcriptTokens(index, projectionOf(view.state), duration, offset).find(item => item.from <= offset && offset < item.to);
             if (!item) return null;
             const boxes = informationRectangles(item);
             const anchor = caretAnchor(boxes, view.state.selection.head);

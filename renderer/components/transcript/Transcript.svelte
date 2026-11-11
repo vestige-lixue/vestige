@@ -2,7 +2,7 @@
     {#if run && vestige}
         {#if settings.getEditing().informationDisplay === "bar"}
             <div class="information-bar">
-                <TranscriptInformation {information} compact />
+                <TranscriptInformation {information} duration={vestige.media.duration} compact />
             </div>
         {/if}
         <div class="transcript-scroll" use:scrollWithControl>

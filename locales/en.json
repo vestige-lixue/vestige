@@ -336,6 +336,7 @@
         "information": {
             "tokenProbability": "Confidence",
             "blankProbability": "No speech",
+            "noPlayableAudio": "No playable audio",
             "gap": "No-speech gaps",
             "gaps": "{{count}} ({{duration}}s)",
             "restore": "Restore deleted text",
