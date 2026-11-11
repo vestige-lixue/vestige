@@ -21,49 +21,54 @@
     </div>
     {#if snapshot.error}
         <div class="error-message" role="alert">{describeFailure(snapshot.error)}</div>
-        <TextButton disabled={busy} onclick={() => void retry()}>{i18n.t("common.retry")}</TextButton>
+        <div class="toolbar">
+            <TextButton disabled={busy} onclick={() => void retry()}>{i18n.t("common.retry")}</TextButton>
+            <TextButton disabled={busy} onclick={() => void backupAndReset()}>{i18n.t("transcription.vocabulary.backupAndReset")}</TextButton>
+        </div>
     {/if}
     {#if failure}<div class="error-message" role="alert">{describeFailure(failure)}</div>{/if}
-    <div class="rules">
-        {#if !filtered.length}
-            <div class="empty">{i18n.t(search ? "transcription.vocabulary.noResults" : "transcription.vocabulary.empty")}</div>
-        {:else}
-            <table>
-                <thead><tr>
-                    <th>{i18n.t("transcription.vocabulary.source")}</th>
-                    <th>{i18n.t("transcription.vocabulary.replacement")}</th>
-                    <th><span class="sr-only">{i18n.t("transcription.vocabulary.actions")}</span></th>
-                </tr></thead>
-                <tbody>
-                    {#each filtered as rule (rule.id)}
-                        {@const tabStop = rowTabStops.get(rule.id) ?? 0}
-                        <tr class:inactive={!rule.enabled}>
-                            <td class="rule-text">{rule.source}</td>
-                            <td class="rule-text">{rule.replacement}</td>
-                            <td><div class="row-actions" onkeydown={navigateButtonGroup}>
-                                <Switch bind:checked={() => rule.enabled, enabled => void update({ kind: "save", rule: { ...rule, enabled } })} disabled={busy || !!snapshot.error}
-                                    tabindex={tabStop === 0 ? 0 : -1} onfocus={() => rowTabStops.set(rule.id, 0)}
-                                    aria-label={i18n.t("transcription.vocabulary.enableRule", { source: rule.source })}
-                                />
-                                <Tooltip text={editLabel} disabled={busy || !!snapshot.error} disableCloseOnTriggerClick={false} onclick={() => edit(rule)}
-                                    tabindex={tabStop === 1 ? 0 : -1} onfocus={() => rowTabStops.set(rule.id, 1)}>
-                                    {#snippet child({ props })}
-                                        <button {...props} class="edit icon-button hoverable activable focusable" aria-label={editLabel}>
-                                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                            {@html editIcon}
-                                        </button>
-                                    {/snippet}
-                                </Tooltip>
-                                <ConfirmDeleteButton text={i18n.t("transcription.vocabulary.remove")} disabled={busy || !!snapshot.error}
-                                    tabindex={tabStop === 2 ? 0 : -1} onfocus={() => rowTabStops.set(rule.id, 2)}
-                                    size="30px" onconfirm={() => void update({ kind: "remove", id: rule.id })} />
-                            </div></td>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        {/if}
-    </div>
+    {#if !snapshot.error}
+        <div class="rules">
+            {#if !filtered.length}
+                <div class="empty">{i18n.t(search ? "transcription.vocabulary.noResults" : "transcription.vocabulary.empty")}</div>
+            {:else}
+                <table>
+                    <thead><tr>
+                        <th>{i18n.t("transcription.vocabulary.source")}</th>
+                        <th>{i18n.t("transcription.vocabulary.replacement")}</th>
+                        <th><span class="sr-only">{i18n.t("transcription.vocabulary.actions")}</span></th>
+                    </tr></thead>
+                    <tbody>
+                        {#each filtered as rule (rule.id)}
+                            {@const tabStop = rowTabStops.get(rule.id) ?? 0}
+                            <tr class:inactive={!rule.enabled}>
+                                <td class="rule-text">{rule.source}</td>
+                                <td class="rule-text">{rule.replacement}</td>
+                                <td><div class="row-actions" onkeydown={navigateButtonGroup}>
+                                    <Switch bind:checked={() => rule.enabled, enabled => void update({ kind: "save", rule: { ...rule, enabled } })} disabled={busy || !!snapshot.error}
+                                        tabindex={tabStop === 0 ? 0 : -1} onfocus={() => rowTabStops.set(rule.id, 0)}
+                                        aria-label={i18n.t("transcription.vocabulary.enableRule", { source: rule.source })}
+                                    />
+                                    <Tooltip text={editLabel} disabled={busy || !!snapshot.error} disableCloseOnTriggerClick={false} onclick={() => edit(rule)}
+                                        tabindex={tabStop === 1 ? 0 : -1} onfocus={() => rowTabStops.set(rule.id, 1)}>
+                                        {#snippet child({ props })}
+                                            <button {...props} class="edit icon-button hoverable activable focusable" aria-label={editLabel}>
+                                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                                {@html editIcon}
+                                            </button>
+                                        {/snippet}
+                                    </Tooltip>
+                                    <ConfirmDeleteButton text={i18n.t("transcription.vocabulary.remove")} disabled={busy || !!snapshot.error}
+                                        tabindex={tabStop === 2 ? 0 : -1} onfocus={() => rowTabStops.set(rule.id, 2)}
+                                        size="30px" onconfirm={() => void update({ kind: "remove", id: rule.id })} />
+                                </div></td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
+            {/if}
+        </div>
+    {/if}
 </Modal>
 
 <style>
@@ -159,7 +164,14 @@
         if (document.activeElement === document.body) modal.restoreFocus(target, { preventScroll: true });
     }
 
+    async function backupAndReset(): Promise<void> {
+        failure = null;
+        const result = await vocabularyAPI.backupAndReset();
+        if (!result.success) failure = result.error;
+    }
+
     async function retry(): Promise<void> {
+        failure = null;
         pending = true;
         try {
             await vocabularyAPI.reload();

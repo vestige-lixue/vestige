@@ -296,6 +296,8 @@
             "title": "词库",
             "add": "添加到词库",
             "addRule": "新增规则",
+            "backupAndReset": "备份并重置…",
+            "backupTitle": "保存词库备份",
             "editRule": "编辑规则",
             "source": "将以下文字",
             "replacement": "替换为",
@@ -309,6 +311,7 @@
             "empty": "还没有规则。",
             "noResults": "没有找到匹配的规则。",
             "errors": {
+                "backupPath": "请选择与当前词库不同的备份文件。",
                 "emptySource": "请输入要替换的原文。",
                 "multilineSource": "不支持换行。请去掉原文中的换行。",
                 "multilineReplacement": "不支持换行。请去掉替换文字中的换行。",

@@ -296,6 +296,8 @@
             "title": "Vocabulary",
             "add": "Add to vocabulary",
             "addRule": "Add",
+            "backupAndReset": "Back up and reset…",
+            "backupTitle": "Save vocabulary backup",
             "editRule": "Edit rule",
             "source": "Replace",
             "replacement": "With",
@@ -309,6 +311,7 @@
             "empty": "No rules yet.",
             "noResults": "No matching rules.",
             "errors": {
+                "backupPath": "Choose a different file for the backup.",
                 "emptySource": "Enter the text you want to replace.",
                 "multilineSource": "Multiline text is not supported. Remove the line breaks from the original text.",
                 "multilineReplacement": "Multiline text is not supported. Remove the line breaks from the replacement text.",

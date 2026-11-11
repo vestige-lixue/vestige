@@ -1,4 +1,4 @@
-import { type VocabularyChange, type VocabularyResult } from "../../shared/vocabulary/Vocabulary";
+import { type VocabularyChange, type VocabularyResult, type VocabularyFailure, type VocabularyFileResult } from "../../shared/vocabulary/Vocabulary";
 import { toFailureInfo } from "../../shared/failure";
 import * as vocabulary from "./vocabulary.svelte";
 
@@ -17,11 +17,19 @@ export async function initialize(): Promise<void> {
     await reload();
 }
 
-export async function change(value: VocabularyChange, revision = vocabulary.getSnapshot().revision): Promise<VocabularyResult> {
+export function change(value: VocabularyChange, revision = vocabulary.getSnapshot().revision): Promise<VocabularyResult> {
+    return request(() => window.api.vocabulary.change(revision, value));
+}
+
+export function backupAndReset(): Promise<VocabularyFileResult> {
+    return request(() => window.api.vocabulary.backupAndReset(vocabulary.getSnapshot().revision));
+}
+
+async function request<T extends VocabularyResult>(operation: () => Promise<T>): Promise<T | VocabularyFailure> {
     if (vocabulary.operation.busy) return { success: false, error: { kind: "vocabulary-conflict" } };
     vocabulary.operation.busy = true;
     try {
-        const result = await window.api.vocabulary.change(revision, value);
+        const result = await operation();
         if (result.success) vocabulary.accept(result.snapshot);
         else if (result.error.kind === "vocabulary-conflict") await reload();
         return result;

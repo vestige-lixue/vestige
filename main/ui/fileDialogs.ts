@@ -50,6 +50,15 @@ export async function selectOpenProjectPath(window: BrowserWindow): Promise<Abso
     return result.canceled || !result.filePaths[0] ? null : parseAbsolutePath(result.filePaths[0]);
 }
 
+export async function selectVocabularyBackupPath(window: BrowserWindow): Promise<string | null> {
+    const timestamp = new Date().toISOString().replace(/[:.]/gu, "-");
+    const result = await dialog.showSaveDialog(window, {
+        title: t("transcription.vocabulary.backupTitle"), defaultPath: `vocabulary-backup-${timestamp}.json`,
+        properties: ["showOverwriteConfirmation"]
+    });
+    return result.canceled || !result.filePath ? null : result.filePath;
+}
+
 export async function selectSaveProjectPath(window: BrowserWindow, path: unknown, saveAs: boolean): Promise<AbsolutePath | null> {
     const result = await dialog.showSaveDialog(window, {
         title: t(saveAs ? "native.project.saveAs.title" : "native.project.save.title"),

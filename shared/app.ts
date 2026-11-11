@@ -11,7 +11,7 @@ import { type DocumentationResult, type DocumentationKind } from "./documentatio
 import { type DownloadListResult, type DownloadStartResult, type DownloadKind } from "./downloads";
 import { type OperationResult } from "./failure";
 import { type NativeMenuState } from "./menu/NativeMenu";
-import { type VocabularyChange, type VocabularySnapshot, type VocabularyResult } from "./vocabulary/Vocabulary";
+import { type VocabularyChange, type VocabularySnapshot, type VocabularyResult, type VocabularyFileResult } from "./vocabulary/Vocabulary";
 
 export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
 
@@ -41,6 +41,7 @@ export type AppAPI = {
     vocabulary: {
         get(): Promise<VocabularySnapshot>;
         change(revision: number, change: VocabularyChange): Promise<VocabularyResult>;
+        backupAndReset(revision: number): Promise<VocabularyFileResult>;
         onChanged(listener: (snapshot: VocabularySnapshot) => void): () => void;
     };
     file: {

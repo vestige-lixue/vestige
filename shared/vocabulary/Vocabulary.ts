@@ -17,7 +17,11 @@ export type VocabularySnapshot = {
 export type VocabularyChange =
     | { kind: "save"; rule: VocabularyRule }
     | { kind: "remove"; id: string };
-export type VocabularyResult = { success: true; snapshot: VocabularySnapshot } | { success: false; error: FailureInfo };
+export type VocabularyFailure = { success: false; error: FailureInfo };
+export type VocabularyResult = { success: true; snapshot: VocabularySnapshot } | VocabularyFailure;
+export type VocabularyFileResult<T = unknown> = VocabularyFailure
+    | { success: true; canceled: true; snapshot: VocabularySnapshot }
+    | ({ success: true; canceled: false; snapshot: VocabularySnapshot } & T);
 
 export const vocabularyLineBreak = /[\r\n\u2028\u2029]/u;
 

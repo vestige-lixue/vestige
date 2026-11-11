@@ -36,6 +36,7 @@ const failureKeys = {
     "vocabulary-invalid-file": "transcription.vocabulary.errors.invalidFile",
     "vocabulary-invalid-rule": "transcription.vocabulary.errors.invalidRule",
     "vocabulary-duplicate-rule": "transcription.vocabulary.errors.duplicate",
+    "vocabulary-backup-path": "transcription.vocabulary.errors.backupPath",
     "vocabulary-conflict": "transcription.vocabulary.errors.conflict",
     "path-not-absolute": "errors.path.notAbsolute",
     "path-drive-relative": "errors.path.driveRelative",
