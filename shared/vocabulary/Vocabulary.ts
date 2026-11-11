@@ -23,7 +23,7 @@ export const vocabularyLineBreak = /[\r\n\u2028\u2029]/u;
 
 export function vocabularyRuleIssue(rule: Pick<VocabularyRule, "source" | "replacement">): "emptySource" | "multilineSource" | "multilineReplacement" | "unchanged" | null {
     if (vocabularyLineBreak.test(rule.source)) return "multilineSource";
-    if (!rule.source.trim()) return "emptySource";
+    if (rule.source === "") return "emptySource";
     if (vocabularyLineBreak.test(rule.replacement)) return "multilineReplacement";
     return rule.source === rule.replacement ? "unchanged" : null;
 }
