@@ -11,30 +11,29 @@ A local workspace for media transcription and proofreading.
 
 ## Motivation
 
-Memories fade with time, and language captures only part of a thought.
+Memories fade with time, and language can express only part of a thought.
 
-A recording preserves a trace of a moment; a transcript carries some of that trace into text.
+A recording preserves a trace of a moment; a transcript turns part of that trace into text.
 
-These are the fragments that give *Vestige* its name: something we can return to when the moment itself is gone.
+These fragments are where the name *Vestige* comes from: though the moment has long passed, we can still look back on the traces it left, as archaeologists do, from scattered words.
 
-Automatic transcription gives us a draft. Turning it into a record we can trust still takes close listening: correcting misheard words, filling in omissions, and checking unfamiliar names. Moving between a media player and a text editor makes this work tedious and easy to lose track of.
+Automatic transcription gives us a first draft. Turning it into a record we can trust still takes careful listening: correcting misrecognized words, filling in omissions, and checking unfamiliar names. Switching back and forth between a media player and a text editor makes this work tedious, and makes it easy to lose track of where you left off.
 
-Vestige brings listening, transcription, and proofreading into one workspace. The aim is to make careful review easier, keeping the text connected to the recording so that we can preserve and revisit what was said.
+Vestige brings listening, transcription, and proofreading into one workspace. The aim is to make careful proofreading easier and to keep the text connected to the recording, so that we can preserve and revisit the traces of the past.
 
 ## Features
 
-1. **Fully local transcription**: Transcribe audio and video on your own computer with any model compliant with whisper.cpp and sherpa-onnx.
-2. **Multiple transcription results**: Keep results from different models alongside the same recording and choose one as the basis for corrections.
-3. **Custom vocabulary**. Right-click a selection to apply a rule to every non-overlapping match in one undo step. Select the whole transcript to correct it throughout, or place the caret on one occurrence. The vocabulary manager supports JSON export and JSON or tab-separated import. If the vocabulary file is unreadable, choose **Back up and reset…** to save its original bytes before starting with an empty list.
-4. **Playback and proofreading**: Listen to the source recording while reviewing the transcript, correcting mistakes, and filling in missing words.
-5. **Saving projects**: Organize recordings and transcripts in `.vestige` files in JSON format, with automatic saving and references to the original media files.
-6. **Exporting transcripts**: Export the original transcripts or the corrected versions in plain text or SRT subtitle format.
+1. **Fully local transcription**: Transcribe audio and video on your own computer with models compatible with whisper.cpp or sherpa-onnx.
+2. **Smooth editing**: Compare multiple transcriptions, apply a custom vocabulary, and rely on autosave, undo/redo, and find/replace to proofread more efficiently.
+3. **Playback and proofreading**: Listen to the original recording and jump to timestamps while reviewing the transcript, correcting mistakes, and filling in omissions.
+4. **Saving projects**: Organize recordings and transcripts in `.vestige` project files in JSON format, with autosave and references to the original media files.
+5. **Exporting transcripts**: Export the original or corrected transcripts as plain text or SRT subtitles.
 
 ## Development
 
 ### Requirements
 
-- Node.js 22.12+ (22.x) or 24+
+- Node.js 24+
 - pnpm 12.5.1
 - Git
 
