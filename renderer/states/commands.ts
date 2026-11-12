@@ -12,12 +12,15 @@ import * as settings from "./settings.svelte";
 import * as dialogsAPI from "./dialogs";
 import * as transcriptionAPI from "./transcription";
 import * as transcriptAPI from "./transcript";
+import * as transcriptFind from "./transcriptFind.svelte";
 import * as projectAPI from "./project";
 import * as playerAPI from "./player";
 import { isTranscriptEditorTarget, toggleTranscriptDeletions, transcriptDeletionRestorable, restoreTranscriptDeletion } from "../editor/transcript";
 
 type ParameterlessCommand = {
-    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode" | "toggleSelectionDeletions";
+    kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode" | "toggleSelectionDeletions"
+        | "openTranscriptFind" | "openTranscriptReplace" | "closeTranscriptFind" | "toggleTranscriptFindCase" | "toggleTranscriptFindWord"
+        | "replaceTranscriptMatch" | "replaceAllTranscriptMatches" | "toggleTranscriptFindPreserveCase";
 };
 
 // Select a project file, read it, and handle saving the current project before switching.
@@ -277,6 +280,29 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         label: () => i18n.t(player.isPlaying() ? "player.actions.pause" : "player.actions.play")
     },
     cyclePlaybackMode: { run: () => playerAPI.cycleMode(), enabled: always, label: () => i18n.t(`player.modes.${player.getMode()}`) },
+    openTranscriptFind: { run: () => transcriptFind.open(false), enabled: transcriptFind.available, label: label("transcript.find.title") },
+    openTranscriptReplace: { run: () => transcriptFind.open(true), enabled: transcriptFind.available, label: label("transcript.find.replacement") },
+    closeTranscriptFind: { run: transcriptFind.close, enabled: () => transcriptFind.state.open, label: label("transcript.find.close") },
+    findTranscriptMatch: {
+        run: command => transcriptFind.navigate(command.direction),
+        enabled: () => transcriptFind.state.open && transcriptFind.state.count > 0,
+        label: command => i18n.t(command.direction === -1 ? "transcript.find.previous" : "transcript.find.next")
+    },
+    toggleTranscriptFindCase: {
+        run: () => transcriptFind.toggle("caseSensitive"), enabled: () => transcriptFind.state.open, label: label("transcript.find.caseSensitive")
+    },
+    toggleTranscriptFindWord: {
+        run: () => transcriptFind.toggle("wholeWord"), enabled: () => transcriptFind.state.open, label: label("transcript.find.wholeWord")
+    },
+    toggleTranscriptFindPreserveCase: {
+        run: () => transcriptFind.toggle("preserveCase"), enabled: () => transcriptFind.state.open, label: label("transcript.find.preserveCase")
+    },
+    replaceTranscriptMatch: {
+        run: () => transcriptFind.replace(false), enabled: () => !project.projectState.locked && transcriptFind.canReplace(), label: label("transcript.find.replace")
+    },
+    replaceAllTranscriptMatches: {
+        run: () => transcriptFind.replace(true), enabled: () => !project.projectState.locked && transcriptFind.canReplace(), label: label("transcript.find.replaceAll")
+    },
     toggleSelectionDeletions: {
         run: () => {
             toggleTranscriptDeletions(document.activeElement instanceof HTMLElement ? document.activeElement : null);

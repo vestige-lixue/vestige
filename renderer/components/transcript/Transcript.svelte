@@ -5,11 +5,22 @@
                 <TranscriptInformation {information} duration={vestige.media.duration} compact />
             </div>
         {/if}
+        {#if transcriptFind.state.open}<TranscriptFind />{/if}
         <div class="transcript-scroll" use:scrollWithControl>
             <TranscriptEditor {vestige} {run} onInspect={value => information = value} />
         </div>
     {:else}
-        <div class="placeholder">{mediaSelection.get() ? i18n.t("transcript.emptyMedia") : i18n.t("transcript.empty")}</div>
+        <div class="placeholder">
+            {mediaSelection.get() ? i18n.t("transcript.emptyMedia") : i18n.t("transcript.empty")}
+            {#if mediaSelection.get()}
+                <span class="new-transcription">
+                    <kbd>{shortcut(transcriptionCommand)}</kbd>
+                    <button type="button" class="link-button focusable" disabled={commandDisabled(transcriptionCommand)} onclick={() => runCommand(transcriptionCommand)}>
+                        {i18n.t("transcription.actions.new")}
+                    </button>
+                </span>
+            {/if}
+        </div>
     {/if}
 </section>
 
@@ -40,22 +51,36 @@
         margin: 24px;
         color: var(--c-text-80p);
     }
+    .new-transcription {
+        display: inline-flex;
+        align-items: baseline;
+        gap: .5em;
+    }
+    .new-transcription button {
+        color: inherit;
+        text-underline-offset: .2em;
+    }
 </style>
 
 
 <script lang="ts">
     import * as i18n from "../../i18n.svelte";
     import TranscriptEditor from "./TranscriptEditor.svelte";
+    import TranscriptFind from "./TranscriptFind.svelte";
+    import * as transcriptFind from "../../states/transcriptFind.svelte";
     import TranscriptInformation from "./TranscriptInformation.svelte";
     import { type InspectionInformation } from "../../editor/information";
     import * as project from "../../states/project.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
     import * as transcript from "../../states/transcript.svelte";
     import * as settings from "../../states/settings.svelte";
+    import { shortcut } from "../../keybindings";
+    import { commandDisabled, runCommand, type Command } from "../../states/commands";
 
     let information = $state.raw<InspectionInformation | null>(null);
     const run = $derived(transcript.getRun());
     const vestige = $derived(project.getVestige(mediaSelection.get()));
+    const transcriptionCommand = $derived<Command>({ kind: "openTranscriptionConfig", mediaId: mediaSelection.get() });
 
     function scrollWithControl(element: HTMLElement): { destroy: () => void } {
         function wheel(event: WheelEvent): void {

@@ -182,6 +182,8 @@ export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
 
 // View commands share inclusion rules even when the selected units have no playable audio.
 export function transcriptSelectionUnits(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): { tokens: Set<number>; deletions: TranscriptInformation[] } {
+    from = Math.max(0, from);
+    to = Math.min(projection.text.length, to);
     if (from >= to) return { tokens: new Set(), deletions: [] };
     const tokenIndices = new Set<number>();
     const replacements = new Set<number>();

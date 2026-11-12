@@ -166,6 +166,23 @@ describe("information previews", () => {
 });
 
 describe("selection information", () => {
+    it("excludes document-edge deletions and keeps interior endpoints strict", () => {
+        const spans = transcript(["削AB除CD消"]), index = createTextIndex(spans);
+        const projection = projectText(index, [
+            ...modification(spans, 0, 1, ""), ...modification(spans, 3, 4, ""), ...modification(spans, 6, 7, "")
+        ]);
+        expect(projection.text).toBe("ABCD");
+        const selected = (from: number, to: number): string[] => transcriptSelectionUnits(index, projection, 2, from, to).deletions.map(item => item.original!);
+        expect(selected(0, projection.text.length)).toEqual(["除"]);
+        expect(selected(-1, projection.text.length + 1)).toEqual(["除"]);
+        expect(selected(0, 2)).toEqual([]);
+        expect(selected(2, 3)).toEqual([]);
+        expect(selected(2, projection.text.length)).toEqual([]);
+        const empty = projectText(index, modification(spans, 0, 7, ""));
+        expect(transcriptSelectionUnits(index, empty, 2, 0, 0).deletions).toEqual([]);
+        expect(transcriptSelectionUnits(index, empty, 2, -1, 1).deletions).toEqual([]);
+    });
+
     it("marks each displayed timestamp and its tick using the same inclusive media bounds", () => {
         const times = [-1, 0, 120.79, 122.666667, 122.69];
         const marks = (playable: boolean | undefined): boolean[] => times.map(time => unplayableTimestamp(time, 122.666667, playable));

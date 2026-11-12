@@ -330,6 +330,21 @@
         }
     },
     "transcript": {
+        "find": {
+            "title": "Find",
+            "replacement": "Replace",
+            "replace": "Replace",
+            "replaceAll": "Replace All",
+            "previous": "Previous Match",
+            "next": "Next Match",
+            "close": "Close Find",
+            "caseSensitive": "Match Case",
+            "preserveCase": "Preserve Case",
+            "wholeWord": "Match Whole Word",
+            "expand": "Show Replace",
+            "collapse": "Hide Replace",
+            "addToVocabulary": "Add to Vocabulary"
+        },
         "reference": {
             "replace": "Replace with",
             "insert": "Insert"

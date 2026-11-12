@@ -6,10 +6,10 @@ export function formatShortcut(shortcut: Shortcut, mac: boolean): string {
     const names: Record<string, string> = mac
         ? { " ": "␣", enter: "↩", escape: "⎋", tab: "⇥", backspace: "⌫", delete: "⌦" }
         : { " ": "Space", enter: "Enter", escape: "Esc", tab: "Tab", backspace: "Backspace", delete: "Delete" };
-    return [
-        ...(shortcut.mod ? [mac ? "⌘" : "Ctrl"] : []),
-        ...(shortcut.alt ? [mac ? "⌥" : "Alt"] : []),
-        ...(shortcut.shift ? ["⇧"] : []),
-        arrows[key] ?? names[key] ?? key.toUpperCase()
-    ].join(mac ? "" : "+");
+    const modifiers = mac ? [
+        ...shortcut.alt ? ["⌥"] : [], ...shortcut.shift ? ["⇧"] : [], ...shortcut.mod ? ["⌘"] : []
+    ] : [
+        ...shortcut.mod ? ["Ctrl"] : [], ...shortcut.alt ? ["Alt"] : [], ...shortcut.shift ? ["Shift"] : []
+    ];
+    return [...modifiers, arrows[key] ?? names[key] ?? key.toUpperCase()].join(mac ? "" : "+");
 }

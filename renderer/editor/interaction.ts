@@ -3,8 +3,9 @@ import { type EditorView } from "@tiptap/pm/view";
 import { type InspectionGeometry, type InspectionPointer, type InspectionTarget } from "./geometry";
 import { compositionPending } from "./composition";
 import { transcriptLayoutVersion } from "./layout";
+import { transcriptScrollIdleDelay } from "./viewport";
 
-// Chords such as Ctrl+C or ⌘C press their key within this delay, so they never flash control inspection.
+// Delay only the tooltip so chords such as Ctrl+C or ⌘C never flash it.
 const controlDelay = 250;
 // Modifiers and caret movement keep a held inspection modifier inspecting; any other key turns the hold into a chord.
 const holdKeys = new Set(["Control", "Shift", "Alt", "AltGraph", "Meta", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
@@ -22,11 +23,11 @@ function inspectionModifier(event: KeyboardEvent | MouseEvent): boolean {
     return primary(event) && (mac() ? !event.ctrlKey : !event.metaKey) && !event.altKey;
 }
 
-export type TranscriptInspection = InspectionTarget & { control: boolean; menu?: boolean };
+export type TranscriptInspection = InspectionTarget & { control: boolean; menu?: boolean; suspended?: boolean; tooltipPending?: boolean };
 export type InspectionCallbacks = {
     onChange: (inspection: TranscriptInspection | null) => void;
     onSeek: (time: number) => void;
-    onHover?: (hovered: boolean) => void;
+    onHover?: (hovered: boolean | "paused") => void;
 };
 
 export function sameRect(left: DOMRect, right: DOMRect): boolean {
@@ -38,7 +39,8 @@ export function sameInspection(left: TranscriptInspection | null, right: Transcr
     if (!left || !right) return false;
     // Information and measured rectangle groups are cached by identity; the anchor is a value snapshot.
     return left.information === right.information && left.rectangles === right.rectangles && sameRect(left.anchor, right.anchor)
-        && left.keyboard === right.keyboard && left.pressed === right.pressed && left.control === right.control && left.menu === right.menu;
+        && left.keyboard === right.keyboard && left.pressed === right.pressed && left.control === right.control && left.menu === right.menu
+        && !!left.suspended === !!right.suspended && !!left.tooltipPending === !!right.tooltipPending;
 }
 
 type InspectionState = {
@@ -47,9 +49,11 @@ type InspectionState = {
     held: boolean;
     /** A key other than a modifier or caret movement was pressed during this hold. */
     chorded: boolean;
-    /** Control inspection, shown once the modifier has been held alone for the delay. */
+    /** Control inspection is active immediately unless the modifier is part of a chord. */
     control: boolean;
-    pointer: (InspectionPointer & { target: EventTarget | null }) | null;
+    /** Only opening the tooltip waits for the modifier hold delay. */
+    tooltipPending: boolean;
+    pointer: (InspectionPointer & { target: EventTarget | null; inside: boolean }) | null;
     hovered: InspectionTarget | null;
     keyboard: InspectionTarget | null;
     priority: "pointer" | "keyboard";
@@ -57,7 +61,7 @@ type InspectionState = {
     activation: { key: string | null } | null;
 };
 
-export function inspectionController(view: EditorView, geometry: InspectionGeometry, options: InspectionCallbacks): {
+export function inspectionController(view: EditorView, geometry: InspectionGeometry, options: InspectionCallbacks, setNeeded: (needed: boolean) => void): {
     move: (event: PointerEvent) => void;
     leave: (event?: PointerEvent) => void;
     down: (event: PointerEvent) => void;
@@ -68,11 +72,13 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     focus: (event: FocusEvent) => void;
     blur: (event: FocusEvent) => void;
     refresh: () => void;
+    schedule: () => void;
+    scrolled: (user: boolean) => void;
     update: (previous: EditorState) => void;
     pinMenu: (target: (() => InspectionTarget | null) | null, pending?: boolean) => void;
 } {
     const state: InspectionState = {
-        inspection: null, held: false, chorded: false, control: false, pointer: null, hovered: null, keyboard: null,
+        inspection: null, held: false, chorded: false, control: false, tooltipPending: false, pointer: null, hovered: null, keyboard: null,
         priority: "pointer", activation: null
     };
     let controlTimer: ReturnType<typeof setTimeout> | undefined;
@@ -83,6 +89,30 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     let focusTimer: ReturnType<typeof setTimeout> | undefined;
     let rendered = view.state;
     let layout = transcriptLayoutVersion(view);
+    let scrolling = false, scrollFrame = 0;
+    let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+    const emptyRectangles: DOMRect[][] = [];
+    function needWindow(): void {
+        const drag = !scrolling && !!state.pointer?.pressed && !view.state.selection.empty;
+        setNeeded(!!menuTarget || drag || !scrolling && (!!state.pointer?.inside || !!focused || state.control && view.dom.contains(document.activeElement)));
+    }
+    function hoverTarget(): InspectionTarget | null {
+        if (scrolling) return null;
+        return state.pointer?.pressed && !view.state.selection.empty ? geometry.drag() : geometry.hover(state.pointer);
+    }
+    function pointerHovered(): boolean {
+        return !!state.pointer?.inside && (!!state.hovered || geometry.overTextOrMarker(state.pointer));
+    }
+    function keyboardTarget(element?: EventTarget | null): InspectionTarget | null {
+        return scrolling ? null : geometry.keyboard(state.control, element);
+    }
+    function endScroll(): void {
+        scrolling = false;
+        clearTimeout(scrollTimer);
+        scrollTimer = undefined;
+        cancelAnimationFrame(scrollFrame);
+        scrollFrame = 0;
+    }
     function settleFocus(element: EventTarget | null): void {
         const next = !view.composing && !compositionPending(view.state) && document.hasFocus() && element instanceof HTMLElement
             && view.dom.contains(element) && element.matches(".transcript-event:focus-visible") ? element : null;
@@ -94,20 +124,24 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         focusTimer = setTimeout(() => {
             focusTimer = undefined;
             if (view.isDestroyed || document.activeElement !== next || !document.hasFocus()) return;
-            state.keyboard = geometry.keyboard(state.control);
+            state.keyboard = keyboardTarget();
             inspect();
         }, 100);
     }
     function inspect(preferred = state.priority): void {
         state.priority = preferred;
+        needWindow();
         // Modifier-click seeks the token under the pointer even when the selection owns the tooltip.
-        const clickTarget = state.held && state.hovered?.information.kind === "selection"
+        const clickTarget = scrolling ? null : state.held && state.hovered?.information.kind === "selection"
             ? geometry.hover(state.pointer, { selection: false }) : state.hovered;
         view.dom.classList.toggle("transcript-seek", state.held && clickTarget?.information.seekStart != null);
         // Ending the latest input reveals the other target rather than discarding it.
         const target = menuTarget ? menuTarget() : state.priority === "pointer" ? state.hovered ?? state.keyboard : state.keyboard ?? state.hovered;
         const menu = menuPending || !!menuTarget;
-        const next = target ? { ...target, control: menu ? false : state.control, menu } : null;
+        // Keep the information bar and command range stable while hiding stale screen geometry.
+        const suspended = scrolling && !menu;
+        const next = suspended && displayed ? displayed.suspended ? displayed : { ...displayed, rectangles: emptyRectangles, suspended: true }
+            : target ? { ...target, control: menu ? false : state.control, menu, tooltipPending: !menu && state.tooltipPending } : null;
         // Commands follow native focus immediately; only the visual details wait for Tab to settle.
         state.inspection = next;
         if (!menu && focusTimer !== undefined && next?.keyboard && !next.control || sameInspection(displayed, next)) return;
@@ -117,13 +151,14 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     function setControl(value: boolean): boolean {
         clearTimeout(controlTimer);
         controlTimer = undefined;
-        if (state.control === value) return false;
+        const changed = state.control !== value || state.tooltipPending;
         state.control = value;
-        state.keyboard = geometry.keyboard(state.control);
-        return true;
+        state.tooltipPending = false;
+        if (changed) state.keyboard = keyboardTarget();
+        return changed;
     }
     function retarget(): void {
-        state.hovered = geometry.hover(state.pointer);
+        state.hovered = hoverTarget();
         inspect(state.control ? "keyboard" : state.priority);
     }
     /** Returns whether the hold or control inspection changed synchronously. */
@@ -135,10 +170,17 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
             if (state.activation) state.activation.key = null;
         }
         if (!value || state.chorded) return setControl(false) || changed;
-        if (!state.control && controlTimer === undefined) controlTimer = setTimeout(() => {
-            controlTimer = undefined;
-            if (!view.isDestroyed && setControl(true)) retarget();
-        }, controlDelay);
+        if (!state.control) {
+            setControl(true);
+            state.tooltipPending = true;
+            controlTimer = setTimeout(() => {
+                controlTimer = undefined;
+                if (view.isDestroyed) return;
+                state.tooltipPending = false;
+                retarget();
+            }, controlDelay);
+            return true;
+        }
         return changed;
     }
     function leave(event?: PointerEvent): void {
@@ -156,9 +198,11 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         const previous = state.pointer, pressed = event.buttons !== 0;
         if (event.type === "pointermove" && !changed && previous && previous.target === event.target && previous.pressed === pressed
             && previous.x === event.clientX && previous.y === event.clientY) return;
-        state.pointer = { x: event.clientX, y: event.clientY, pressed, target: event.target };
-        state.hovered = geometry.hover(state.pointer);
-        options.onHover?.(event.type !== "pointerleave" && (!!state.hovered || geometry.overTextOrMarker(state.pointer)));
+        const inside = event.type !== "pointerleave" && event.target instanceof Node && view.dom.contains(event.target);
+        state.pointer = { x: event.clientX, y: event.clientY, pressed, target: event.target, inside };
+        needWindow();
+        state.hovered = hoverTarget();
+        if (!scrolling) options.onHover?.(pointerHovered());
         inspect(state.hovered ? "pointer" : state.priority);
     }
     function modifiers(event: KeyboardEvent): void {
@@ -174,6 +218,7 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         }
         event.preventDefault();
         event.stopPropagation();
+        endScroll();
         // Seeking acts on the inspected target, so it shows inspection at once instead of ending it as a chord.
         state.chorded = false;
         const changed = hold(true);
@@ -183,6 +228,8 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     }
     function down(event: PointerEvent): void {
         state.activation = null;
+        // Explicit clicks inspect their current location immediately, even before scroll-idle.
+        endScroll();
         move(event);
         if (event.button !== 0 || !state.held || !state.pointer) return;
         // A missed audio link must also keep the selection and the viewport where they are.
@@ -207,12 +254,14 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         if (item?.seekStart != null && item.key === activation.key) options.onSeek(item.seekStart);
     }
     function reset(): void {
+        endScroll();
         settleFocus(null);
         clearTimeout(controlTimer);
         controlTimer = undefined;
         state.held = false;
         state.chorded = false;
         state.control = false;
+        state.tooltipPending = false;
         if (state.pointer) {
             state.pointer.pressed = false;
             state.pointer.target = null;
@@ -221,10 +270,11 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         state.keyboard = null;
         state.activation = null;
         inspect();
+        setNeeded(false);
     }
     function focus(event: FocusEvent): void {
         settleFocus(event.target);
-        state.keyboard = geometry.keyboard(state.control, event.target);
+        state.keyboard = keyboardTarget(event.target);
         inspect("keyboard");
     }
     function blur(event: FocusEvent): void {
@@ -237,11 +287,40 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
     function refresh(): void {
         // A transaction closes obsolete menu targets before update() refreshes this state.
         if (view.isDestroyed || rendered !== view.state) return;
+        cancelAnimationFrame(scrollFrame);
+        scrollFrame = 0;
         layout = transcriptLayoutVersion(view);
         settleFocus(document.activeElement);
-        state.hovered = geometry.hover(state.pointer);
-        state.keyboard = geometry.keyboard(state.control);
+        needWindow();
+        state.hovered = hoverTarget();
+        state.keyboard = keyboardTarget();
         inspect();
+    }
+    function schedule(): void {
+        if (!scrollFrame) scrollFrame = requestAnimationFrame(() => {
+            scrollFrame = 0;
+            refresh();
+        });
+    }
+    function scrolled(user: boolean): void {
+        if (!user) return schedule();
+        if (!scrolling) {
+            scrolling = true;
+            if (!menuTarget && !menuPending) {
+                state.hovered = state.keyboard = null;
+                options.onHover?.("paused");
+                inspect();
+            }
+            else needWindow();
+        }
+        // A pinned menu keeps following its target even during user scrolling.
+        if (menuTarget) schedule();
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+            endScroll();
+            refresh();
+            options.onHover?.(pointerHovered());
+        }, transcriptScrollIdleDelay);
     }
     function update(previous: EditorState): void {
         rendered = view.state;
@@ -263,5 +342,5 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         menuPending = pending;
         refresh();
     }
-    return { move, leave, down, up, click, modifiers, reset, focus, blur, refresh, update, pinMenu };
+    return { move, leave, down, up, click, modifiers, reset, focus, blur, refresh, schedule, scrolled, update, pinMenu };
 }

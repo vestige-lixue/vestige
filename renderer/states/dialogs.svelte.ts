@@ -26,6 +26,7 @@ type VocabularyRuleDialog = {
     kind: "vocabulary-rule";
     rule?: VocabularyRule;
     source?: string;
+    replacement?: string;
 };
 
 type TranscriptionTasksDialog = {

@@ -9,6 +9,7 @@ import { pointerRectangle, type InspectionGeometry, type InspectionTarget } from
 import { compositionPending } from "./composition";
 import { projectionTransaction } from "./projectionStep";
 import { dispatchPreservingScroll } from "./scroll";
+import { transcriptPreviewOriginal, transcriptPreviewSelection } from "./selectionDOM";
 
 export type TranscriptMenuTarget = {
     kind: "deletion" | "gap" | "token" | "selection" | "text";
@@ -19,6 +20,7 @@ export type TranscriptMenuTarget = {
     information: InspectionInformation | null;
     selectionKind?: "original" | "mixed" | "added";
     expanded?: boolean;
+    previewSelection?: StaticRange;
 };
 export type TranscriptMenuRequest = {
     view: EditorView;
@@ -42,6 +44,7 @@ const controllers = new WeakMap<EditorView, MenuController>();
 const clipboardActions = ["cut", "copy", "paste"] as const;
 
 export function transcriptMenuClipboardActions(target: TranscriptMenuTarget): readonly EditAction[] {
+    if (target.previewSelection) return ["copy"];
     return target.kind === "selection" ? clipboardActions : target.kind === "token" || target.kind === "text" ? ["paste"] : [];
 }
 
@@ -58,6 +61,11 @@ export function restoreTranscriptMenuSelection(request: TranscriptMenuRequest): 
     if (view.isDestroyed || view.state.doc !== doc || view.composing || compositionPending(view.state)) return false;
     if (!view.state.selection.eq(selection)) view.dispatch(view.state.tr.setSelection(selection).setMeta("addToHistory", false));
     view.focus();
+    const preview = request.target.previewSelection;
+    if (preview) {
+        if (!view.dom.contains(preview.startContainer) || !view.dom.contains(preview.endContainer)) return false;
+        view.dom.ownerDocument.getSelection()?.setBaseAndExtent(preview.startContainer, preview.startOffset, preview.endContainer, preview.endOffset);
+    }
     return true;
 }
 
@@ -119,11 +127,15 @@ export function transcriptMenuController(
     }
 
     function resolve(event: MouseEvent, fromKeyboard: boolean): TranscriptMenuTarget | null {
-        const marker = eventMarker(view, fromKeyboard ? document.activeElement : event.target);
+        const preview = transcriptPreviewSelection(view);
+        const target = fromKeyboard && preview ? preview.startContainer.parentElement : fromKeyboard ? document.activeElement : event.target;
+        const marker = eventMarker(view, target);
         if (marker) {
             const information = events().get(marker.dataset.inspection!);
+            const previewSelection = preview && transcriptPreviewOriginal(view, preview.startContainer)
+                === transcriptPreviewOriginal(view, target) ? new StaticRange(preview) : undefined;
             if (information && information.kind !== "token") return { kind: information.kind, information, from: information.from + 1, to: information.to + 1,
-                position: information.from + 1, expanded: marker.getAttribute("aria-expanded") === "true" };
+                position: information.from + 1, expanded: marker.getAttribute("aria-expanded") === "true", previewSelection };
         }
         // Blink has already kept or collapsed the selection on right-button down; ProseMirror may still hold the old selection.
         // Read that result before the menu takes focus, without reinterpreting its visual boundaries.

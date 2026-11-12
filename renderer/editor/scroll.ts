@@ -1,12 +1,14 @@
 import { Plugin, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { type EditorView } from "@tiptap/pm/view";
 import { textRectangles } from "./geometry";
+import { anchorTranscriptViewport } from "./viewport";
+import { markAutomaticTranscriptScroll } from "./scrollInput";
 
 const topRatio = 0.2;
 const bottomRatio = 0.8;
 const navigationKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
-function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: number }): boolean {
+function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: number }, position?: number): boolean {
     const viewport = view.dom.closest<HTMLElement>(".transcript-scroll");
     if (!viewport || !viewport.clientHeight) return false;
     const origin = viewport.getBoundingClientRect().top + viewport.clientTop;
@@ -15,12 +17,17 @@ function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: num
     // When both edges cannot fit, keep the first line in the interval and let the last line overflow.
     const offset = rect.top < top || rect.bottom - rect.top > bottom - top ? rect.top - top : rect.bottom > bottom ? rect.bottom - bottom : 0;
     // Smooth scrolling restarts on every repeated key and can never catch up with the caret.
-    if (offset) viewport.scrollTo({ top: viewport.scrollTop + offset, behavior: "instant" });
+    if (offset) {
+        if (position !== undefined) anchorTranscriptViewport(view, position);
+        const top = viewport.scrollTop + offset;
+        markAutomaticTranscriptScroll(view, top);
+        viewport.scrollTo({ top, behavior: "instant" });
+    }
     return true;
 }
 
 export function scrollTranscriptSelectionHead(view: EditorView): void {
-    scrollTranscriptRect(view, view.coordsAtPos(view.state.selection.head));
+    scrollTranscriptRect(view, view.coordsAtPos(view.state.selection.head), view.state.selection.head);
 }
 
 export function dispatchPreservingScroll(view: EditorView, transaction: Transaction): void {
@@ -28,7 +35,10 @@ export function dispatchPreservingScroll(view: EditorView, transaction: Transact
     const top = viewport?.scrollTop ?? 0;
     view.dispatch(transaction);
     // Read after layout so an explicit write can undo just this transaction's anchor adjustment.
-    if (viewport && viewport.scrollTop !== top) viewport.scrollTo({ top, behavior: "instant" });
+    if (viewport && viewport.scrollTop !== top) {
+        markAutomaticTranscriptScroll(view, top);
+        viewport.scrollTo({ top, behavior: "instant" });
+    }
 }
 
 function transcriptRangeRect(view: EditorView, from: number, to: number): { top: number; bottom: number } {
@@ -50,6 +60,7 @@ function transcriptRangeRect(view: EditorView, from: number, to: number): { top:
 export function scrollTranscriptPlayback(view: EditorView, ranges: readonly number[], markers: readonly HTMLElement[]): boolean {
     let top = Infinity;
     let bottom = -Infinity;
+    let position: number | undefined;
     if (ranges.length) {
         let from = Infinity;
         let to = -Infinity;
@@ -58,11 +69,14 @@ export function scrollTranscriptPlayback(view: EditorView, ranges: readonly numb
             to = Math.max(to, ranges[i + 1]);
         }
         // Playback intervals are ordered by time, so their first entry need not be the first rendered line.
+        position = from;
         ({ top, bottom } = transcriptRangeRect(view, from, to));
     }
     for (const marker of markers) {
         const anchor = marker.closest(".transcript-event-anchor");
         if (!anchor) continue;
+        const markerPosition = view.posAtDOM(anchor, 0);
+        position = Math.min(position ?? Infinity, markerPosition);
         const rect = marker.getBoundingClientRect();
         const lineTop = anchor.getBoundingClientRect().top;
         const lineHeight = parseFloat(getComputedStyle(view.dom.firstElementChild ?? view.dom).lineHeight) || rect.height;
@@ -70,7 +84,7 @@ export function scrollTranscriptPlayback(view: EditorView, ranges: readonly numb
         top = Math.min(top, rect.top, lineTop);
         bottom = Math.max(bottom, rect.bottom, lineTop + lineHeight);
     }
-    return top <= bottom && scrollTranscriptRect(view, { top, bottom });
+    return top <= bottom && scrollTranscriptRect(view, { top, bottom }, position);
 }
 
 export function transcriptScrollPlugin(): Plugin {
@@ -101,7 +115,7 @@ export function transcriptScrollPlugin(): Plugin {
                     // Native navigation can move the DOM caret before ProseMirror receives selectionchange.
                     const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
                     if (before && before.doc === view.state.doc && before.selection.empty && before.selection.head === head) return;
-                    scrollTranscriptRect(view, view.coordsAtPos(head));
+                    scrollTranscriptRect(view, view.coordsAtPos(head), head);
                 });
             }
             function resize(): void {

@@ -4,6 +4,9 @@ import { type TextIndex, type TextProjection } from "../../shared/transcript/tex
 import { transcriptTokens, transcriptTokenGroup, transcriptSelection, type InspectionInformation, type SelectionInformation } from "./informationModel";
 import { compositionPending } from "./composition";
 import { transcriptLayoutVersion } from "./layout";
+import { lineBreakAt } from "./lineBreaks";
+import { transcriptViewport } from "./viewport";
+import { intersectTextWindow, type TextWindow } from "../../shared/transcript/find";
 
 // Read text fragments instead of enclosing element boxes, which may span multiple lines.
 export function textRectangles(root: HTMLElement, range: Range, includeBreaks = false): DOMRect[] {
@@ -97,6 +100,7 @@ export type InspectionGeometry = {
     caretAnchor: (rectangles: DOMRect[][], position: number) => DOMRect;
     scrolled: () => void;
     hover: (pointer: InspectionPointer | null, options?: { selection?: boolean }) => InspectionTarget | null;
+    drag: () => InspectionTarget | null;
     overTextOrMarker: (point: Point) => boolean;
     keyboard: (control: boolean, element?: EventTarget | null) => InspectionTarget | null;
 };
@@ -105,6 +109,7 @@ type ViewportGeometry = {
     layout: number;
     scroll: number;
     projection: TextProjection;
+    window: TextWindow;
     groups: Map<string, DOMRect[][]>;
     hit?: { from: number; to: number; boxes: DOMRect[] };
     spacing?: { from: number; value: Spacing | null };
@@ -125,9 +130,9 @@ export function inspectionGeometry(
     let cached: ViewportGeometry | undefined;
     const empty: DOMRect[][] = [];
     function viewport(): ViewportGeometry {
-        const layout = transcriptLayoutVersion(view), projection = projectionOf(view.state);
-        if (!cached || cached.layout !== layout || cached.scroll !== scroll || cached.projection !== projection) {
-            cached = { layout, scroll, projection, groups: new Map() };
+        const layout = transcriptLayoutVersion(view), projection = projectionOf(view.state), window = transcriptViewport(view);
+        if (!cached || cached.layout !== layout || cached.scroll !== scroll || cached.projection !== projection || cached.window !== window) {
+            cached = { layout, scroll, projection, window, groups: new Map() };
         }
         return cached;
     }
@@ -145,7 +150,8 @@ export function inspectionGeometry(
         const previous = cache.groups.get(key);
         if (previous) return previous;
         const fragments = information.kind === "selection" ? information.fragments : transcriptTokenGroup(index, cache.projection, duration, information);
-        const boxes = fragments.map(rectangles);
+        const visible = information.kind === "selection" ? fragments.flatMap(fragment => intersectTextWindow(fragment, cache.window) ?? []) : fragments;
+        const boxes = visible.map(rectangles);
         if (cache.groups.size === 8) cache.groups.delete(cache.groups.keys().next().value!);
         cache.groups.set(key, boxes);
         return boxes;
@@ -153,7 +159,8 @@ export function inspectionGeometry(
     function hitRectangles(target: { from: number; to: number }): DOMRect[] {
         const cache = viewport();
         if (cache.hit?.from !== target.from || cache.hit.to !== target.to) {
-            cache.hit = { from: target.from, to: target.to, boxes: rectangles(target) };
+            const clipped = intersectTextWindow(target, cache.window);
+            cache.hit = { from: target.from, to: target.to, boxes: clipped ? rectangles(clipped) : [] };
         }
         return cache.hit.boxes;
     }
@@ -196,6 +203,7 @@ export function inspectionGeometry(
         return selected;
     }
     function selectionAtCaret(keyboard: boolean): InspectionTarget | null {
+        if (blocked()) return null;
         const target = selectionGeometry();
         if (!target?.information) return null;
         const boxes = informationRectangles(target.information);
@@ -208,6 +216,7 @@ export function inspectionGeometry(
         scrolled() {
             scroll++;
         },
+        drag: () => selectionAtCaret(false),
         hover(pointer, { selection = true } = {}) {
             if (!pointer || blocked()) return null;
             const { x, y, pressed } = pointer;
@@ -253,7 +262,9 @@ export function inspectionGeometry(
             // Use native inline hit boxes at fractional boundaries and include text beneath transparent marker anchors.
             for (const element of document.elementsFromPoint(x, y)) {
                 if (!view.dom.contains(element)) break;
-                if (element.matches(".transcript-text, .transcript-event")) return true;
+                if (element.matches(".transcript-text, .transcript-event, .transcript-deletion-original")) return true;
+                // The break hint is drawn outside contenteditable and does not receive pointer events.
+                if (element === view.dom) return lineBreakAt(view, x, y) >= 0;
             }
             return false;
         },

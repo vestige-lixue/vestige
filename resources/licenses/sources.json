@@ -235,6 +235,18 @@
         ]
     },
     {
+        "name": "VS Code Codicons",
+        "license": "CC-BY-4.0",
+        "url": "https://github.com/microsoft/vscode-codicons",
+        "files": [
+            {
+                "file": "CC-BY-4.0.txt",
+                "source": "https://github.com/microsoft/vscode-codicons/blob/main/LICENSE",
+                "note": "Microsoft Corporation. Bundled case-sensitive, whole-word, arrow-up, arrow-down, replace, replace-all and preserve-case SVG icons from src/icons, unchanged except for whitespace."
+            }
+        ]
+    },
+    {
         "name": "Lucide Icons",
         "license": "ISC",
         "url": "https://lucide.dev/",

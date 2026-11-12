@@ -2,13 +2,32 @@ import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
     createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications,
-    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion, textReplacement, replaceText
+    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion, textReplacement, replaceText, editTextRanges
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary, textArbitrary } from "./support/generators";
 import { checkProperty } from "./support/properties";
 
 describe("text projection and editing", () => {
+    it("batches disjoint explicit writes exactly like reverse single writes, including existing additions and deletions", () => {
+        fc.assert(fc.property(patchesArbitrary, fc.array(fc.nat(), { minLength: 4, maxLength: 30 }), fc.array(textArbitrary, { minLength: 1, maxLength: 20 }), ({ spans, modifications }, points, replacements) => {
+            const index = createTextIndex(spans), before = projectText(index, modifications);
+            const endpoints = [...new Set([0, before.length, ...points.map(value => value % (before.length + 1))])].sort((a, b) => a - b);
+            const disjoint = endpoints.flatMap((from, i) => i % 2 === 0 && i + 1 < endpoints.length ? [{ from, to: endpoints[i + 1] }] : []);
+            const adjacent = Array.from({ length: before.length }, (_, from) => ({ from, to: from + 1 }));
+            for (const ranges of [disjoint, adjacent]) {
+                const edits = ranges.map((range, i) => ({ ...range, text: replacements[i % replacements.length] }));
+                let expected = before;
+                for (let i = edits.length - 1; i >= 0; i--) expected = editText(index, expected, edits[i].from, edits[i].to, edits[i].text, false);
+                const actual = editTextRanges(index, before, edits);
+                expect(actual.text).toBe(expected.text);
+                expect(actual.modifications).toEqual(expected.modifications);
+                expect(textPieces(index, actual)).toEqual(textPieces(index, expected));
+                expect(projectText(index, actual.modifications).text).toBe(actual.text);
+            }
+        }), { numRuns: 500 });
+    });
+
     it.each<{
         name: string; texts: string[]; edits: [number, number, string][]; tokens: number[];
         selection: [number, number]; position: number; candidate: string; expected: [number, number, string][];

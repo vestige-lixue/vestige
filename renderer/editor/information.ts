@@ -4,6 +4,8 @@ import { transcriptEvents, transcriptSelectionUnits, type TranscriptInformation 
 import { type TextIndex, type TextProjection } from "../../shared/transcript/text";
 import { inspectionGeometry } from "./geometry";
 import { subscribeTranscriptLayout } from "./layout";
+import { subscribeTranscriptViewport } from "./viewport";
+import { subscribeTranscriptScroll } from "./scrollInput";
 import { inspectionController, type InspectionCallbacks } from "./interaction";
 import { compositionPending } from "./composition";
 import { firstTrue } from "../../shared/util/search";
@@ -198,14 +200,16 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             }
             updatePlayback();
             const geometry = inspectionGeometry(view, index, projectionOf, () => informationKey.getState(view.state)!.byKey, options.duration);
-            const interaction = inspectionController(view, geometry, options);
+            const viewport = subscribeTranscriptViewport(view, () => interaction.schedule());
+            const interaction = inspectionController(view, geometry, options, viewport.setNeeded);
             const menu = options.menu ? transcriptMenuController(view, index, projectionOf, options.duration,
                 () => informationKey.getState(view.state)!.byKey, geometry, interaction.pinMenu, options.menu) : null;
-            const unsubscribe = subscribeTranscriptLayout(view, interaction.refresh);
+            const unsubscribe = subscribeTranscriptLayout(view, interaction.schedule);
             const listeners = new AbortController();
             const normal = { signal: listeners.signal };
             const capture = { ...normal, capture: true };
             view.dom.addEventListener("pointermove", interaction.move, normal);
+            view.dom.addEventListener("pointerenter", interaction.move, normal);
             view.dom.addEventListener("pointerleave", interaction.leave, normal);
             view.dom.addEventListener("pointerdown", interaction.down, capture);
             view.dom.addEventListener("pointerdown", event => {
@@ -244,10 +248,10 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
             window.addEventListener("blur", interaction.reset, normal);
             window.addEventListener("blur", release, normal);
             window.addEventListener("focus", interaction.refresh, normal);
-            window.addEventListener("scroll", () => {
+            const stopScroll = subscribeTranscriptScroll(view, user => {
                 geometry.scrolled();
-                interaction.refresh();
-            }, capture);
+                interaction.scrolled(user);
+            });
             return {
                 update(_view, previous) {
                     menu?.update();
@@ -259,7 +263,9 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                     release();
                     listeners.abort();
                     unsubscribe();
+                    stopScroll();
                     interaction.reset();
+                    viewport.unsubscribe();
                 }
             };
         }

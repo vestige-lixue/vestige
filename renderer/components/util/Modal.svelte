@@ -216,7 +216,7 @@
     const layerIndex = $derived(modal.getLayerIndex(layer));
 
     $effect.pre(() => {
-        if (visible) untrack(() => modal.openLayer(layer));
+        if (visible) untrack(() => modal.openLayer(layer, true));
     });
     $effect(() => {
         const requested = open;

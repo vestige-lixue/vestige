@@ -10,8 +10,9 @@ import * as player from "./states/player.svelte";
 import * as mediaSelection from "./states/mediaSelection.svelte";
 import * as transcript from "./states/transcript.svelte";
 import * as transcriptAPI from "./states/transcript";
+import * as transcriptFind from "./states/transcriptFind.svelte";
 
-type Binding = Shortcut & { command: Command | (() => Command) };
+type Binding = Shortcut & { command: Command | (() => Command); scope?: "find" | "query" | "replacement" };
 type MenuBindings = {
     keyboard: () => void;
     toggle: () => void;
@@ -20,6 +21,18 @@ type MenuBindings = {
 };
 
 const bindings: readonly Binding[] = [
+    { key: "f", mod: true, command: { kind: "openTranscriptFind" } },
+    { key: isMac() ? "f" : "h", mod: true, alt: isMac(), command: { kind: "openTranscriptReplace" } },
+    { key: "escape", scope: "find", command: { kind: "closeTranscriptFind" } },
+    { key: "c", mod: isMac(), alt: true, scope: "find", command: { kind: "toggleTranscriptFindCase" } },
+    { key: "w", mod: isMac(), alt: true, scope: "find", command: { kind: "toggleTranscriptFindWord" } },
+    { key: "p", mod: isMac(), alt: true, scope: "find", command: { kind: "toggleTranscriptFindPreserveCase" } },
+    { key: isMac() ? "g" : "f3", mod: isMac(), scope: "find", command: { kind: "findTranscriptMatch", direction: 1 } },
+    { key: isMac() ? "g" : "f3", mod: isMac(), shift: true, scope: "find", command: { kind: "findTranscriptMatch", direction: -1 } },
+    { key: "enter", scope: "query", command: { kind: "findTranscriptMatch", direction: 1 } },
+    { key: "enter", shift: true, scope: "query", command: { kind: "findTranscriptMatch", direction: -1 } },
+    { key: "enter", scope: "replacement", command: { kind: "replaceTranscriptMatch" } },
+    { key: "enter", mod: true, alt: true, scope: "replacement", command: { kind: "replaceAllTranscriptMatches" } },
     { key: "n", mod: true, command: { kind: "newProject" } },
     { key: "o", mod: true, command: { kind: "openProject" } },
     { key: "s", mod: true, command: { kind: "saveProject" } },
@@ -50,6 +63,7 @@ const bindings: readonly Binding[] = [
 
 const editKeys: Record<string, EditAction> = { a: "selectAll", z: "undo", y: "redo", x: "cut", c: "copy", v: "paste" };
 let menuBindings: MenuBindings | null = null;
+let transcriptTooltip: (() => boolean) | null = null;
 let mounted = false;
 let alt: "idle" | "pressed" = "idle";
 let wordNavigation: {
@@ -62,6 +76,14 @@ export function registerMenu(bindings: MenuBindings): () => void {
     menuBindings = bindings;
     return () => {
         if (menuBindings === bindings) menuBindings = null;
+    };
+}
+
+// Escape dismisses the editor's tooltip before running the scoped find binding.
+export function registerTranscriptTooltip(dismiss: () => boolean): () => void {
+    transcriptTooltip = dismiss;
+    return () => {
+        if (transcriptTooltip === dismiss) transcriptTooltip = null;
     };
 }
 
@@ -189,6 +211,13 @@ function preventSpaceActivation(event: KeyboardEvent): void {
     event.stopPropagation();
 }
 
+function inScope(binding: Binding, target: EventTarget | null): boolean {
+    if (!binding.scope) return true;
+    if (!transcriptFind.state.open || !(target instanceof HTMLElement)) return false;
+    if (binding.scope === "find") return !!target.closest(".transcript-find") || isTranscriptEditorTarget(target);
+    return target.closest(`[data-transcript-find="${binding.scope}"]`) !== null;
+}
+
 function keydown(event: KeyboardEvent): void {
     menuBindings?.keyboard();
     if (event.key === "Alt") {
@@ -208,11 +237,17 @@ function keydown(event: KeyboardEvent): void {
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.key.toLowerCase();
+    if (key === "escape" && transcriptTooltip?.()) {
+        cancel();
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+    }
     const binding = bindings.find(candidate => candidate.key === key && !!candidate.mod === mod && !!candidate.shift === event.shiftKey && !!candidate.alt === event.altKey
-        && (candidate.mod || !event.ctrlKey && !event.metaKey));
+        && (candidate.mod || !event.ctrlKey && !event.metaKey) && inScope(candidate, event.target));
     if (interfaceBlocked()) {
         wordNavigation = null;
-        rewindNavigation = null;
+        jumpNavigation = null;
         const command = binding ? boundCommand(binding) : null;
         if (command && canRunCommand(command)) {
             event.preventDefault();

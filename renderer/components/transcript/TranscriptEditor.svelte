@@ -8,12 +8,14 @@
             class="editor" spellcheck={false} style:--transcript-font-size={`${fontSize}px`}
             tabindex={-1} bind:this={element}
         ></div>
-        {#if hoveredLineBreak}
+        {#if visibleLineBreaks.length}
             <div class="line-breaks" aria-hidden="true">
-                <span
-                    class="line-break" class:added={hoveredLineBreak.added} style:left={`${hoveredLineBreak.left}px`} style:top={`${hoveredLineBreak.top}px`}
-                    style:height={`${hoveredLineBreak.height}px`} style:line-height={`${hoveredLineBreak.height}px`} style:font-size={`${hoveredLineBreak.fontSize}px`}
-                >&emsp;<svg class="line-break-glyph" viewBox="0 0 16 16"><path d="M13 3v7H3M6 7l-3 3 3 3" /></svg></span>
+                {#each visibleLineBreaks as box (box.pos)}
+                    <span
+                        class="line-break" class:added={box.added} style:left={`${box.left}px`} style:top={`${box.top}px`}
+                        style:height={`${box.height}px`} style:line-height={`${box.height}px`} style:font-size={`${box.fontSize}px`}
+                    >&emsp;<svg class="line-break-glyph" viewBox="0 0 16 16"><path d="M13 3v7H3M6 7l-3 3 3 3" /></svg></span>
+                {/each}
             </div>
         {/if}
         {#if inspection?.rectangles.length}
@@ -164,7 +166,21 @@
     .editor :global(.tiptap::selection), .editor :global(.tiptap *::selection) {
         background-color: transparent;
     }
+    .editor :global(::highlight(transcript-find)) {
+        background: var(--c-find);
+    }
+    .editor :global(::highlight(transcript-find-current)) {
+        background: var(--c-find-current);
+    }
     .editor :global(::highlight(transcript-selection)) {
+        background-color: var(--c-selection);
+    }
+    .editor :global(.transcript-deletion-original::highlight(transcript-selection)),
+    .editor :global(.transcript-deletion-original *::highlight(transcript-selection)) {
+        background-color: transparent;
+    }
+    .editor :global(.transcript-deletion-original::highlight(transcript-deletion-selection)),
+    .editor :global(.transcript-deletion-original *::highlight(transcript-deletion-selection)) {
         background-color: var(--c-selection);
     }
     .editor :global(.transcript-text) {
@@ -303,14 +319,18 @@
     import TranscriptInformation from "./TranscriptInformation.svelte";
     import TranscriptMenu from "./TranscriptMenu.svelte";
     import { type TranscriptMenuCallbacks } from "../../editor/menuTarget";
-    import { type Editor, type EditorEvents } from "@tiptap/core";
+    import { type Editor } from "@tiptap/core";
     import { Plugin } from "@tiptap/pm/state";
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
+    import { attachTranscriptFind } from "../../editor/find";
+    import { attachTranscriptSelection } from "../../editor/selection";
     import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
-    import { measureLineBreaks, sameLineBreaks, lineBreakAt, type LineBreakBox } from "../../editor/lineBreaks";
-    import { invalidateTranscriptLayout, subscribeTranscriptLayout, transcriptLayoutVersion } from "../../editor/layout";
+    import { measureLineBreaks, measureCaretLineBreak, lineBreakAt, type LineBreakBox } from "../../editor/lineBreaks";
+    import { invalidateTranscriptLayout, subscribeTranscriptLayout } from "../../editor/layout";
+    import { subscribeTranscriptViewport, transcriptScrollIdleDelay } from "../../editor/viewport";
+    import { subscribeTranscriptScroll } from "../../editor/scrollInput";
     import { firstTrue } from "../../../shared/util/search";
     import * as project from "../../states/project.svelte";
     import * as player from "../../states/player.svelte";
@@ -319,6 +339,7 @@
     import * as projectAPI from "../../states/project";
     import { runCommand } from "../../states/commands";
     import { notifyEditStateChanged } from "../../edit";
+    import { registerTranscriptTooltip } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
 
     let { vestige, run, onInspect }: { vestige: Vestige; run: Run; onInspect?: (information: InspectionInformation | null) => void } = $props();
@@ -332,15 +353,20 @@
     const endSelectedBreak = $derived(selectionBounds ? breakIndex(selectionBounds.to) : 0);
     const selectedBreaks = $derived(lineBreaks.slice(firstSelectedBreak, endSelectedBreak));
     let hoveredBreak = $state(-1);
+    let caretBreak = $state.raw<LineBreakBox | null>(null);
     const fontSize = $derived(settings.getEditing().fontSize);
-    // Index -1 means no hovered break and reads undefined.
-    const hoveredLineBreak = $derived<LineBreakBox | undefined>(lineBreaks[hoveredBreak]);
+    const visibleLineBreaks = $derived.by(() => {
+        const result: LineBreakBox[] = [];
+        const hovered = lineBreaks[hoveredBreak], caret = caretBreak;
+        if (hovered) result.push(hovered);
+        if (caret && caret.pos !== hovered?.pos) result.push(caret);
+        return result;
+    });
     let tooltipOpen = $state(false);
     let openTimer: ReturnType<typeof setTimeout> | undefined;
-    let skipDelayUntil = 0;
-    let hovering = false;
+    let hoverSession: { warm: boolean; dismissed: boolean } | null = null;
+    let hoverEndTimer: ReturnType<typeof setTimeout> | undefined;
     let controlDismissed = false;
-    let dismissedHover: "inside" | "outside" | null = null;
     let previousDisplay = "";
     const informationDisplay = $derived(settings.getEditing().informationDisplay);
     const anchor = $derived.by(() => {
@@ -348,7 +374,7 @@
         return rect ? { getBoundingClientRect: () => rect } : undefined;
     });
     const outlines = $derived.by(() => {
-        if (!inspection || !element) return [];
+        if (!inspection?.rectangles.length || !element) return [];
         const origin = element.getBoundingClientRect();
         return inspection.rectangles.flatMap(rectangles => rectangles.map((rect, index) => {
             const left = rect.left - origin.left - 1;
@@ -365,36 +391,62 @@
         return firstTrue(lineBreaks.length, i => lineBreaks[i].pos >= position);
     }
 
+    function endHover(): void {
+        if (!hoverSession || hoverEndTimer !== undefined) return;
+        hoverEndTimer = setTimeout(() => {
+            hoverEndTimer = undefined;
+            hoverSession = null;
+        }, 300);
+    }
+
+    function hover(hovered: boolean | "paused"): void {
+        if (hovered === false) return endHover();
+        clearTimeout(hoverEndTimer);
+        hoverEndTimer = undefined;
+        if (hovered === true) hoverSession ??= { warm: false, dismissed: false };
+    }
+
     function closeTooltip(): void {
         clearTimeout(openTimer);
         openTimer = undefined;
-        // Uninspectable text keeps the current hover session ready until the pointer leaves its hot zone.
-        if (tooltipOpen && !inspection?.control) skipDelayUntil = hovering ? Infinity : Date.now() + 300;
+        if (tooltipOpen && inspection && !inspection.control && !inspection.keyboard) {
+            if (hoverSession) hoverSession.warm = true;
+            else {
+                hoverSession = { warm: true, dismissed: false };
+                endHover();
+            }
+        }
         tooltipOpen = false;
     }
 
+    function dismissTooltip(): boolean {
+        if (!tooltipOpen) return false;
+        if (inspection?.control) controlDismissed = true;
+        closeTooltip();
+        if (!inspection?.control && hoverSession) {
+            hoverSession.warm = false;
+            if (!inspection?.keyboard) hoverSession.dismissed = true;
+        }
+        return true;
+    }
+
     function inspectionKeydown(event: KeyboardEvent): void {
+        if (event.defaultPrevented) return;
         if (event.key === inspectionKey() && !event.repeat) {
             const dismissed = controlDismissed;
             controlDismissed = false;
             if (dismissed && inspection?.control) inspect(inspection, true);
         }
-        if (event.key !== "Escape" || !tooltipOpen) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        if (inspection?.control) controlDismissed = true;
-        else if (!inspection?.keyboard) dismissedHover = "inside";
-        closeTooltip();
-        if (!inspection?.control) skipDelayUntil = 0;
     }
 
     function inspect(value: TranscriptInspection | null, force = false): void {
         const released = inspection?.control && !value?.control;
         const informationChanged = inspection?.information !== value?.information;
         const changed = force || informationChanged || inspection?.pressed !== value?.pressed
-            || inspection?.keyboard !== value?.keyboard || inspection?.control !== value?.control || inspection?.menu !== value?.menu;
-        if (changed || !value) closeTooltip();
-        if (value?.menu) skipDelayUntil = 0;
+            || inspection?.keyboard !== value?.keyboard || inspection?.control !== value?.control || inspection?.menu !== value?.menu
+            || !!inspection?.suspended !== !!value?.suspended || !!inspection?.tooltipPending !== !!value?.tooltipPending;
+        if (changed || !value || value.suspended) closeTooltip();
+        if (value?.menu && hoverSession) hoverSession.warm = false;
         inspection = value;
         if (informationChanged) {
             onInspect?.(value?.information ?? null);
@@ -403,9 +455,9 @@
                 mediaId: vestige.media.id, runId: run.id, range: information.range, playable: information.playable
             } : null);
         }
-        if (!value || value.menu || value.pressed || informationDisplay !== "tooltip" || !changed) return;
-        if (value.control ? controlDismissed : dismissedHover) return;
-        if (value.control || value.keyboard || !released && Date.now() < skipDelayUntil) tooltipOpen = true;
+        if (!value || value.suspended || value.menu || value.pressed || value.tooltipPending || informationDisplay !== "tooltip" || !changed) return;
+        if (value.control ? controlDismissed : hoverSession?.dismissed) return;
+        if (value.control || value.keyboard || !released && hoverSession?.warm) tooltipOpen = true;
         else openTimer = setTimeout(() => {
             openTimer = undefined;
             tooltipOpen = true;
@@ -416,20 +468,14 @@
         const current = vestige;
         const displayed = run;
         const duration = current.media.duration;
-        // Dismiss before inspection modifiers, editor shortcuts and the tooltip's Escape layer.
+        const stopTooltip = registerTranscriptTooltip(dismissTooltip);
         window.addEventListener("keydown", inspectionKeydown, true);
         const instance = untrack(() => createTranscriptEditor(element, displayed, $state.snapshot(current.modifications), modifications => {
             if (project.getVestige(current.media.id) === current) projectAPI.updateModifications(current.media.id, displayed.id, modifications);
         }, () => !project.projectState.locked, {
             duration, onChange: inspect,
             menu: { open: request => contextMenu.show(request), edit: action => contextMenu.edit(action) },
-            onHover: hovered => {
-                hovering = hovered;
-                if (!hovered && skipDelayUntil === Infinity) skipDelayUntil = Date.now() + 300;
-                // Crossing token boundaries stays dismissed; only leaving and reentering rearms hover.
-                if (!hovered && dismissedHover) dismissedHover = "outside";
-                else if (hovered && dismissedHover === "outside") dismissedHover = null;
-            },
+            onHover: hover,
             onSeek: time => runCommand({ kind: "seekWord", time })
         }));
         instance.registerPlugin(new Plugin({
@@ -444,15 +490,21 @@
             }
         }));
         editor = instance;
+        const stopFind = untrack(() => attachTranscriptFind(instance));
         instance.on("transaction", ({ transaction }) => {
             if (transaction.docChanged || transaction.selectionSet) notifyEditStateChanged();
         });
         notifyEditStateChanged();
         return () => {
             window.removeEventListener("keydown", inspectionKeydown, true);
+            stopTooltip();
+            stopFind();
             instance.destroy();
             notifyEditStateChanged();
             inspect(null);
+            clearTimeout(hoverEndTimer);
+            hoverEndTimer = undefined;
+            hoverSession = null;
         };
     });
 
@@ -468,48 +520,7 @@
     $effect(() => {
         const current = editor;
         if (!current) return;
-        const view = current.view;
-        const name = "transcript-selection";
-        const highlight = new Highlight();
-        CSS.highlights.set(name, highlight);
-        function paint(range: Range | null, from: number, to: number): void {
-            highlight.clear();
-            if (range) highlight.add(range);
-            selectionBounds = range ? { from, to } : null;
-        }
-        function fromState(): void {
-            const { from, to, empty } = view.state.selection;
-            if (empty) return paint(null, from, to);
-            // Decoration redraws can detach both native endpoints while focus is in the player or menu.
-            const start = view.domAtPos(from, 1), end = view.domAtPos(to, -1);
-            const range = document.createRange();
-            range.setStart(start.node, start.offset);
-            range.setEnd(end.node, end.offset);
-            paint(range, from, to);
-        }
-        function fromDOM(): void {
-            if (!view.hasFocus()) return fromState();
-            const selection = document.getSelection();
-            const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-            if (!range || !view.dom.contains(range.startContainer) || !view.dom.contains(range.endContainer)) return fromState();
-            if (range.collapsed) return paint(null, 0, 0);
-            // During a native drag Chromium moves first. Mirror its range in this same event.
-            paint(range.cloneRange(), view.posAtDOM(range.startContainer, range.startOffset, 1), view.posAtDOM(range.endContainer, range.endOffset, -1));
-        }
-        function update({ transaction, appendedTransactions }: EditorEvents["transaction"]): void {
-            if (transaction.selectionSet || appendedTransactions.some(tr => tr.selectionSet)) fromState();
-        }
-        const unsubscribe = subscribeTranscriptLayout(view, fromState);
-        current.on("transaction", update);
-        document.addEventListener("selectionchange", fromDOM);
-        fromState();
-        return () => {
-            unsubscribe();
-            current.off("transaction", update);
-            document.removeEventListener("selectionchange", fromDOM);
-            if (CSS.highlights.get(name) === highlight) CSS.highlights.delete(name);
-            selectionBounds = null;
-        };
+        return attachTranscriptSelection(current, bounds => selectionBounds = bounds);
     });
 
     $effect(() => {
@@ -517,25 +528,16 @@
         if (!current) return;
         const view = current.view;
         let frame = 0;
-        let measuredVersion = -1;
         let pointer: { x: number; y: number } | null = null;
+        let scrolling = false;
+        let scrollTimer: ReturnType<typeof setTimeout> | undefined;
         function refresh(): void {
             frame = 0;
             if (view.isDestroyed) return;
-            let origin: DOMRect | undefined;
-            const version = transcriptLayoutVersion(view);
-            if (measuredVersion !== version) {
-                measuredVersion = version;
-                origin = element.getBoundingClientRect();
-                const next = measureLineBreaks(view, origin);
-                if (!sameLineBreaks(next, lineBreaks)) lineBreaks = next;
-            }
-            if (!pointer || !lineBreaks.length) {
-                hoveredBreak = -1;
-                return;
-            }
-            origin ??= element.getBoundingClientRect();
-            hoveredBreak = lineBreakAt(lineBreaks, pointer.x - origin.left, pointer.y - origin.top);
+            if (!view.state.selection.empty || pointer && !scrolling) lineBreaks = measureLineBreaks(view);
+            else if (lineBreaks.length) lineBreaks = [];
+            hoveredBreak = pointer && !scrolling ? lineBreakAt(view, pointer.x, pointer.y) : -1;
+            caretBreak = measureCaretLineBreak(view);
         }
         function schedule(): void {
             if (!frame) frame = requestAnimationFrame(refresh);
@@ -544,18 +546,39 @@
             if (event.pointerType === "touch") return leave();
             if (pointer?.x === event.clientX && pointer.y === event.clientY) return;
             pointer = { x: event.clientX, y: event.clientY };
+            stopViewport.setNeeded(!scrolling);
             schedule();
         }
         function leave(): void {
             if (!pointer) return;
             pointer = null;
+            stopViewport.setNeeded(false);
+            schedule();
+        }
+        function scrolled(user: boolean): void {
+            if (!user) return schedule();
+            scrolling = true;
+            stopViewport.setNeeded(false);
+            hoveredBreak = -1;
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(() => {
+                scrolling = false;
+                stopViewport.setNeeded(pointer !== null);
+                schedule();
+            }, transcriptScrollIdleDelay);
+            // Only the known caret break needs geometry during scrolling without a selection.
             schedule();
         }
         const unsubscribe = subscribeTranscriptLayout(view, schedule);
+        const stopViewport = subscribeTranscriptViewport(view, schedule);
+        current.on("selectionUpdate", schedule);
+        current.on("focus", schedule);
+        current.on("blur", schedule);
         element.addEventListener("pointermove", move);
+        element.addEventListener("pointerenter", move);
         element.addEventListener("pointerleave", leave);
         // Scrolling moves text under a resting pointer without a pointer event.
-        window.addEventListener("scroll", schedule, true);
+        const stopScroll = subscribeTranscriptScroll(view, scrolled);
         $effect(() => {
             // A short transcript can change font size without resizing the editor.
             void fontSize;
@@ -564,11 +587,18 @@
         return () => {
             cancelAnimationFrame(frame);
             unsubscribe();
+            stopViewport.unsubscribe();
+            clearTimeout(scrollTimer);
+            current.off("selectionUpdate", schedule);
+            current.off("focus", schedule);
+            current.off("blur", schedule);
             element.removeEventListener("pointermove", move);
+            element.removeEventListener("pointerenter", move);
             element.removeEventListener("pointerleave", leave);
-            window.removeEventListener("scroll", schedule, true);
+            stopScroll();
             lineBreaks = [];
             hoveredBreak = -1;
+            caretBreak = null;
         };
     });
 

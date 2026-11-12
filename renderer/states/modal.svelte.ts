@@ -4,6 +4,8 @@ import { SvelteSet } from "svelte/reactivity";
 const layerBase = 12915;
 const layerStep = 2;
 const layers = new SvelteSet<symbol>();
+const blockingLayers = new SvelteSet<symbol>();
+const layerListeners = new SvelteSet<() => void>();
 let restoringFocus: HTMLElement | null = null;
 
 export function restoreFocus(target: Element | null, options?: FocusOptions): void {
@@ -26,13 +28,27 @@ export function isRestoringFocus(target: HTMLElement | null): boolean {
     return target !== null && target === restoringFocus;
 }
 
-export function openLayer(layer: symbol): void {
-    closeLayer(layer);
+export function openLayer(layer: symbol, blocking = false): void {
+    layers.delete(layer);
     layers.add(layer);
+    if (blocking) blockingLayers.add(layer);
+    else blockingLayers.delete(layer);
+    for (const listener of layerListeners) listener();
 }
 
 export function closeLayer(layer: symbol): void {
-    layers.delete(layer);
+    if (!layers.delete(layer)) return;
+    blockingLayers.delete(layer);
+    for (const listener of layerListeners) listener();
+}
+
+export function hasBlockingLayer(): boolean {
+    return blockingLayers.size > 0;
+}
+
+export function subscribeModalLayers(listener: () => void): () => void {
+    layerListeners.add(listener);
+    return () => layerListeners.delete(listener);
 }
 
 export function hasOpenLayer(): boolean {

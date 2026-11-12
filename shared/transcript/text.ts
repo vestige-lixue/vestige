@@ -361,6 +361,57 @@ export function commitText(index: TextIndex, saved: TextProjection, pending: Tex
     return editText(index, saved, before.from + first, before.from + oldEnd, inserted.slice(first, newEnd).join(""));
 }
 
+// Explicit disjoint writes share one projection update instead of normalizing a growing list per hit.
+// Ranges address displayed codepoints in the same immutable projection, in ascending order.
+export function editTextRanges(index: TextIndex, projection: TextProjection, ranges: readonly { from: number; to: number; text: string }[]): TextProjection {
+    if (!ranges.length) return projection;
+    let previous = 0;
+    for (const { from, to } of ranges) {
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < previous || to <= from || to > projection.length) {
+            throw new RangeError("Invalid rendered text ranges.");
+        }
+        previous = to;
+    }
+    if (ranges.length === 1) return editText(index, projection, ranges[0].from, ranges[0].to, ranges[0].text, false);
+    const pieces = textPieces(index, projection, ranges[0].from, ranges[ranges.length - 1].to);
+    const touched = new Set(pieces.flatMap(piece => piece.source.kind === "modification"
+        && projection.modifications[piece.source.index].type === "insert" ? [piece.source.index] : []));
+    const modifications = projection.modifications.filter((_, position) => !touched.has(position));
+    let first = 0;
+    for (const piece of pieces) {
+        if (piece.source.kind === "modification" && projection.modifications[piece.source.index].type === "delete") continue;
+        while (first < ranges.length && ranges[first].to <= piece.from) first++;
+        const added = piece.source.kind === "modification";
+        const characters = added ? Array.from(piece.text) : [];
+        const fragments: string[] = [];
+        let cursor = 0;
+        for (let i = first; i < ranges.length && ranges[i].from < piece.to; i++) {
+            const { from, to, text } = ranges[i];
+            const start = Math.max(from, piece.from), end = Math.min(to, piece.to);
+            if (added) fragments.push(characters.slice(cursor, start - piece.from).join(""));
+            if (from >= piece.from) {
+                if (added) fragments.push(text);
+                else if (text) modifications.push(insertionOf(index, piece.sourceFrom + from - piece.from, text));
+            }
+            if (!added && start < end) modifications.push(deletionOf(index, piece.sourceFrom + start - piece.from, piece.sourceFrom + end - piece.from));
+            cursor = end - piece.from;
+        }
+        if (added) {
+            fragments.push(characters.slice(cursor).join(""));
+            const value = fragments.join("");
+            if (value) modifications.push(insertionOf(index, piece.sourceFrom, value));
+        }
+    }
+    const fragments: string[] = [];
+    let offset = 0;
+    for (const { from, to, text } of ranges) {
+        fragments.push(projection.text.slice(offset, projectionOffset(projection, from, true)), text);
+        offset = projectionOffset(projection, to, true);
+    }
+    fragments.push(projection.text.slice(offset));
+    return modifiedProjection(index, projection, modifications, fragments.join(""));
+}
+
 // from/to address displayed codepoints. IME updates defer restoration until their final commit.
 export function editText(index: TextIndex, projection: TextProjection, from: number, to: number, text: string, restore = true): TextProjection {
     if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < from || to > projection.length) {

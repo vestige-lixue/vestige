@@ -44,13 +44,13 @@
     import Modal from "../util/Modal.svelte";
     import TextButton from "../util/TextButton.svelte";
 
-    let { open = $bindable(), dialogId, rule, source = "", onClosed }: {
-        open: boolean; dialogId: string; rule?: VocabularyRule; source?: string; onClosed: () => void;
+    let { open = $bindable(), dialogId, rule, source = "", initialReplacement = "", onClosed }: {
+        open: boolean; dialogId: string; rule?: VocabularyRule; source?: string; initialReplacement?: string; onClosed: () => void;
     } = $props();
     const id = untrack(() => rule?.id ?? crypto.randomUUID());
     const initialSource = untrack(() => rule?.source ?? source);
     let sourceText = $state(initialSource);
-    let replacement = $state(untrack(() => rule?.replacement ?? ""));
+    let replacement = $state(untrack(() => rule?.replacement ?? initialReplacement));
     let pending = $state(false);
     let failure = $state<FailureInfo | ReturnType<typeof vocabularyRuleIssue>>(null);
     const message = $derived(typeof failure === "string" ? i18n.t(`transcription.vocabulary.errors.${failure}`) : failure && describeFailure(failure));

@@ -5,11 +5,11 @@
             style={`z-index: ${layerIndex + 1};`} onOpenAutoFocus={focusMenu} onCloseAutoFocus={returnFocus}
             onkeydown={keydown}>
             {#if restoreCommand}
-                <DropdownMenu.Item class="activable focusable" disabled={project.projectState.locked} onSelect={() => deletionAction(true)}>
-                    <div>{commandLabel(restoreCommand)}</div>
-                </DropdownMenu.Item>
                 <DropdownMenu.Item class="activable focusable" onSelect={() => deletionAction(false)}>
                     <div>{i18n.t(request?.target.expanded ? "transcript.information.collapse" : "transcript.information.expand")}</div>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item class="activable focusable" disabled={project.projectState.locked} onSelect={() => deletionAction(true)}>
+                    <div>{commandLabel(restoreCommand)}</div>
                 </DropdownMenu.Item>
             {/if}
             {#if references.length}
@@ -342,6 +342,7 @@
 
     function disabled(action: EditAction): boolean {
         if (!request || request.view.isDestroyed || request.view.state.doc !== request.doc) return true;
+        if (action === "copy" && request.target.previewSelection) return false;
         if (action !== "copy" && action !== "selectAll" && (project.projectState.locked || !request.view.editable)) return true;
         if (action === "copy" || action === "cut") return request.selection.empty
             || !request.doc.textBetween(request.selection.from, request.selection.to, "\n", "\n");

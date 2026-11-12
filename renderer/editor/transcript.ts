@@ -5,7 +5,9 @@ import { dropPoint } from "@tiptap/pm/transform";
 import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
+import { transcriptPreviewOriginal, transcriptPreviewSelection } from "./selectionDOM";
 import { transcriptLayoutPlugin } from "./layout";
+import { trackTranscriptViewport } from "./viewport";
 import { type VocabularyGroup } from "../../shared/vocabulary/match";
 import { transcriptScrollPlugin, scrollTranscriptPlayback, scrollTranscriptSelectionHead, dispatchPreservingScroll } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
@@ -19,7 +21,7 @@ import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDel
 import { type Range } from "../../shared/util/range";
 import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
-    createTextIndex, projectText, editText, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
+    createTextIndex, projectText, editText, editTextRanges, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
     alignText, canAlignText, textReplacement, replaceText, type TextReplacement, type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
@@ -287,7 +289,8 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             // ProseMirror owns the composition DOM until the final input has been consumed.
             if (compositionActive(newState)) return null;
             const transaction = newState.tr.setMeta(bridgeKey, true);
-            if (projection !== saved) transaction.step(new ProjectionStep(saved.modifications, projection.modifications, saved, projection));
+            if (projection !== saved) transaction.step(new ProjectionStep(saved.modifications, projection.modifications, saved, projection,
+                transactions.some(transaction => transaction.getMeta("uiEvent") === "drop")));
             synchronizeMarks(index, transaction, projection, dirty);
             return transaction.steps.length || dirty.length ? transaction : null;
         },
@@ -311,6 +314,17 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                 return target >= from && target <= to;
             },
             handleDOMEvents: {
+                copy(view) {
+                    // Let Chromium copy the read-only original, even if the editor still had a text selection.
+                    return !!transcriptPreviewSelection(view);
+                },
+                dragstart(view, event) {
+                    const selection = view.dom.ownerDocument.getSelection();
+                    if (!transcriptPreviewOriginal(view, event.target) && !transcriptPreviewOriginal(view, selection?.anchorNode)
+                        && !transcriptPreviewOriginal(view, selection?.focusNode)) return false;
+                    event.preventDefault();
+                    return true;
+                },
                 beforeinput(view, event) {
                     if (view.editable && ["insertText", "insertCompositionText", "insertReplacementText"].includes(event.inputType) && event.data !== null) {
                         const range = event.getTargetRanges()[0];
@@ -467,8 +481,10 @@ export function createTranscriptEditor(element: HTMLElement, run: Run, modificat
     });
     if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state)?.time ?? -1, inspection));
     const target = editor.view.dom;
+    const stopViewport = trackTranscriptViewport(editor);
     editors.set(target, editor);
     editor.on("destroy", () => {
+        stopViewport();
         editors.delete(target);
     });
     return editor;
@@ -576,20 +592,36 @@ export function applyTranscriptReference(request: TranscriptMenuRequest, text: s
 export function applyTranscriptVocabulary(request: TranscriptMenuRequest, { rule, ranges }: VocabularyGroup): boolean {
     const { view } = request;
     if (view.isDestroyed || !view.editable || view.state.doc !== request.doc || view.composing || compositionPending(view.state)) return false;
-    const { index, projection } = bridgeKey.getState(view.state)!;
+    const { projection } = bridgeKey.getState(view.state)!;
     if (!rule.enabled || !ranges.length || !rule.source || rule.source === rule.replacement) return false;
     // Validate against the same immutable document used for matching, then work backwards so offsets stay valid.
     const { empty, from: start, to: end } = request.selection;
     if (empty && (ranges.length !== 1 || ranges[0].from > start - 1 || ranges[0].to < start - 1)) return false;
     const lower = empty ? 0 : Math.max(0, start - 1);
-    let next = projection, right = empty ? projection.text.length : Math.min(end - 1, projection.text.length);
+    let right = empty ? projection.text.length : Math.min(end - 1, projection.text.length);
     for (let i = ranges.length - 1; i >= 0; i--) {
         const { from, to } = ranges[i];
         if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < lower || to > right || from >= to
             || projection.text.slice(from, to) !== rule.source || splitsCodepoint(projection.text, from) || splitsCodepoint(projection.text, to)) return false;
-        next = editText(index, next, projectionOffset(projection, from, false), projectionOffset(projection, to, false), rule.replacement, false);
         right = from;
     }
+    return replaceTranscriptRanges(view, ranges.map(range => ({ ...range, text: rule.replacement })));
+}
+
+// Both vocabulary and find write displayed ranges explicitly, with one isolated history entry.
+export function replaceTranscriptRanges(view: EditorView, ranges: readonly { from: number; to: number; text: string }[]): boolean {
+    if (view.isDestroyed || !view.editable || view.composing || compositionPending(view.state) || !ranges.length) return false;
+    const { index, projection } = bridgeKey.getState(view.state)!;
+    let right = projection.text.length;
+    for (let i = ranges.length - 1; i >= 0; i--) {
+        const { from, to } = ranges[i];
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to > right || from >= to
+            || splitsCodepoint(projection.text, from) || splitsCodepoint(projection.text, to)) return false;
+        right = from;
+    }
+    const next = editTextRanges(index, projection, ranges.map(({ from, to, text }) => ({
+        from: projectionOffset(projection, from, false), to: projectionOffset(projection, to, false), text
+    })));
     // Supply the final marks in the same replace step. Re-marking every intervening token individually
     // creates thousands of steps and mappings for one selection-wide replacement.
     let replacement;
@@ -621,6 +653,7 @@ export function transcriptEditAvailable(element: HTMLElement | null, action: Edi
     if (action === "selectAll") return true;
     if (action === "paste") return editor.isEditable;
     if (action === "cut" || action === "copy") {
+        if (action === "copy" && transcriptPreviewSelection(editor.view)) return true;
         const { from, to } = editor.state.selection;
         return (action === "copy" || editor.isEditable) && !!editor.state.doc.textBetween(from, to, "\n", "\n");
     }
@@ -641,7 +674,7 @@ export function handleTranscriptEdit(element: HTMLElement | null, action: EditAc
     }
     else {
         // Restore the editor's stored selection before selecting or using the native clipboard.
-        editor.view.focus();
+        if (action !== "copy" || !transcriptPreviewSelection(editor.view)) editor.view.focus();
         if (action === "selectAll") editor.commands.selectAll();
         else window.api.edit(action);
     }

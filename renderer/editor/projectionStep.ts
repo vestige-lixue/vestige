@@ -38,7 +38,8 @@ export class ProjectionStep extends Step {
         readonly before: Modification[],
         readonly after: Modification[],
         readonly beforeProjection?: TextProjection,
-        readonly afterProjection?: TextProjection
+        readonly afterProjection?: TextProjection,
+        readonly restoreSelection = false
     ) {
         super();
     }
@@ -47,16 +48,16 @@ export class ProjectionStep extends Step {
         return StepResult.ok(doc);
     }
     invert(): ProjectionStep {
-        return new ProjectionStep(this.after, this.before, this.afterProjection, this.beforeProjection);
+        return new ProjectionStep(this.after, this.before, this.afterProjection, this.beforeProjection, this.restoreSelection);
     }
     map(): ProjectionStep {
         return this;
     }
     toJSON(): object {
-        return { stepType: "vestigeProjection", before: this.before, after: this.after };
+        return { stepType: "vestigeProjection", before: this.before, after: this.after, restoreSelection: this.restoreSelection };
     }
-    static fromJSON(_schema: Schema, json: { before: Modification[]; after: Modification[] }): ProjectionStep {
-        return new ProjectionStep(json.before, json.after);
+    static fromJSON(_schema: Schema, json: { before: Modification[]; after: Modification[]; restoreSelection?: boolean }): ProjectionStep {
+        return new ProjectionStep(json.before, json.after, undefined, undefined, json.restoreSelection);
     }
 }
 

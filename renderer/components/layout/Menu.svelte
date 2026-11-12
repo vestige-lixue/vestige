@@ -328,7 +328,7 @@
 
     function runMenuCommand(action: Command): void {
         if (interfaceBlocked() || commandDisabled(action)) return;
-        focusingControl = menu.get() !== "" && action.kind === "focus";
+        focusingControl = menu.get() !== "" && (action.kind === "focus" || action.kind === "openTranscriptFind" || action.kind === "openTranscriptReplace");
         menu.set("");
         runCommand(action);
     }

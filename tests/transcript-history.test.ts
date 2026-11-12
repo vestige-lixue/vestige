@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { getSchema } from "@tiptap/core";
 import { AllSelection, EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { closeHistory, undo, redo, undoDepth, redoDepth } from "@tiptap/pm/history";
-import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText, applyTranscriptVocabulary } from "../renderer/editor/transcript";
+import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText, applyTranscriptVocabulary, replaceTranscriptRanges } from "../renderer/editor/transcript";
+import { findOccurrences, preserveReplacementCase } from "../shared/transcript/find";
 import { projectionTransaction } from "../renderer/editor/projectionStep";
 import { createTextIndex, editText, alignText, restoreTextDeletion, textReplacement, replaceText } from "../shared/transcript/text";
 import { vocabularyRuleIssue } from "../shared/vocabulary/Vocabulary";
 import { transcript } from "./support/fixtures";
 import { rule } from "./support/vocabulary";
 import { VocabularyIndex } from "../shared/vocabulary/match";
+import { transcriptSelectionUnits } from "../renderer/editor/informationModel";
 
 function editor(text: string | string[]): {
     state: () => EditorState;
@@ -43,6 +45,90 @@ function vocabularyRequest(value: ReturnType<typeof editor>): Parameters<typeof 
 }
 
 describe("transcript history selection", () => {
+    it("restores the moved range beside an existing deletion through undo and redo", () => {
+        const value = editor("暖かく感じました。"), index = createTextIndex(transcript(["暖かく感じました。"]));
+        value.apply(value.state().tr.delete(9, 10));
+        value.select(3, 7);
+        const state = value.state(), slice = state.selection.content(), transaction = closeHistory(state.tr).deleteSelection();
+        const position = transaction.mapping.map(9);
+        transaction.replaceRange(position, position, slice).setSelection(TextSelection.create(transaction.doc, position, position + 4));
+        value.apply(transaction.setMeta("uiEvent", "drop"));
+        const units = (): ReturnType<typeof transcriptSelectionUnits> => {
+            const state = value.state();
+            return transcriptSelectionUnits(index, transcriptProjection(state), 1, state.selection.from - 1, state.selection.to - 1);
+        };
+        expect(documentText(value.state().doc)).toBe("暖かしたく感じま");
+        expect(units().deletions.map(item => item.original)).toEqual(["。"]);
+        value.history("undo");
+        expect(value.state().selection).toMatchObject({ anchor: 3, head: 7 });
+        expect(units().deletions).toEqual([]);
+        value.history("redo");
+        expect(units().deletions.map(item => item.original)).toEqual(["。"]);
+        value.select(1, value.state().doc.content.size - 1);
+        expect(units().deletions.map(item => item.original)).toEqual(["く感じま", "。"]);
+    });
+
+    it.each([[2, 6, 8], [6, 2, 8], [8, 12, 1]])("restores moved text and its selection after a bridged drop from %i/%i to %i", (anchor, head, target) => {
+        const value = editor("暖かく感じました。\n今日は暖かい");
+        value.select(anchor + 1, head + 1);
+        const before = value.state(), from = Math.min(anchor, head), to = Math.max(anchor, head);
+        const text = documentText(before.doc).slice(from, to), slice = before.selection.content();
+        const transaction = before.tr.deleteSelection(), position = transaction.mapping.map(target + 1);
+        transaction.replaceRange(position, position, slice);
+        transaction.setSelection(TextSelection.create(transaction.doc, position, position + to - from));
+        value.apply(transaction.setMeta("uiEvent", "drop"));
+        const after = value.state(), modifications = transcriptModifications(after);
+        expect(documentText(after.doc).slice(after.selection.from - 1, after.selection.to - 1)).toBe(text);
+        expect(undoDepth(after)).toBe(1);
+        expect(value.history("undo")).toBe(true);
+        expect(value.state().doc.eq(before.doc)).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual([]);
+        expect(value.state().selection.eq(before.selection)).toBe(true);
+        expect(documentText(value.state().doc).slice(value.state().selection.from - 1, value.state().selection.to - 1)).toBe(text);
+        expect(value.history("redo")).toBe(true);
+        expect(value.state().doc.eq(after.doc)).toBe(true);
+        expect(value.state().selection.eq(after.selection)).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(modifications);
+    });
+
+    it("undoes different case-preserved replacement lengths together with their exact source marks", () => {
+        const value = editor(["CAT", " cat", " Cat"]);
+        const before = value.state().doc;
+        const text = documentText(before);
+        const ranges = findOccurrences(text, "cat").map(range => ({ ...range, text: preserveReplacementCase(text.slice(range.from, range.to), "ß") }));
+        expect(replaceTranscriptRanges(vocabularyRequest(value).view, ranges)).toBe(true);
+        expect(documentText(value.state().doc)).toBe("SS ß SS");
+        expect(undoDepth(value.state())).toBe(1);
+        const after = value.state().doc, modifications = transcriptModifications(value.state());
+        value.history("undo");
+        expect(value.state().doc.eq(before)).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual([]);
+        value.history("redo");
+        expect(value.state().doc.eq(after)).toBe(true);
+        expect(transcriptModifications(value.state())).toEqual(modifications);
+    });
+
+    it("replaces case-insensitive find hits as one explicit write and preserves provenance when the text stays equal", () => {
+        const value = editor("Cat 😀cat cat.");
+        value.apply(value.state().tr.insertText("前", 1));
+        const before = transcriptProjection(value.state());
+        const ranges = findOccurrences(before.text, "cat");
+        expect(replaceTranscriptRanges(vocabularyRequest(value).view, ranges.map(range => ({ ...range, text: "cat" })))).toBe(true);
+        expect(documentText(value.state().doc)).toBe("前cat 😀cat cat.");
+        expect(undoDepth(value.state())).toBe(2);
+        const written = transcriptModifications(value.state());
+        expect(written.filter(item => item.type === "delete")).toHaveLength(3);
+        value.apply(value.state().tr.insertText("后", value.state().doc.content.size - 1));
+        expect(undoDepth(value.state())).toBe(3);
+        value.history("undo");
+        expect(transcriptModifications(value.state())).toEqual(written);
+        value.history("undo");
+        expect(transcriptProjection(value.state()).text).toBe(before.text);
+        expect(transcriptModifications(value.state())).toEqual(before.modifications);
+        value.history("redo");
+        expect(transcriptModifications(value.state())).toEqual(written);
+    });
+
     it.each([["新词", "甲新词丙丁"], ["", "甲丙丁"]])("applies vocabulary replacement %j across added text and Unicode as an isolated undo entry", (replacement, expected) => {
         const value = editor("甲乙😀丙丁");
         value.apply(value.state().tr.insertText("新增", 2));

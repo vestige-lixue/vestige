@@ -43,7 +43,7 @@ const registry: { [Kind in DialogKind]: Presenter<Kind> } = {
     "transcription-models": define("transcription-models", TranscriptionModels, dialog => ({ dialogId: dialog.id })),
     vocabulary: define("vocabulary", Vocabulary, dialog => ({ dialogId: dialog.id })),
     "vocabulary-rule": define("vocabulary-rule", VocabularyRule, dialog => ({
-        dialogId: dialog.id, rule: dialog.rule, source: dialog.source
+        dialogId: dialog.id, rule: dialog.rule, source: dialog.source, initialReplacement: dialog.replacement
     })),
     settings: define("settings", Settings, dialog => ({ dialogId: dialog.id })),
     guide: define("guide", UserGuide, () => ({})),
