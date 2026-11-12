@@ -5,7 +5,6 @@ export type VocabularyMatch = { from: number; to: number; rule: VocabularyRule }
 export type VocabularyGroup = { rule: VocabularyRule; ranges: { from: number; to: number }[] };
 type Trie = { children: Map<string, Trie>; rules: VocabularyRule[] };
 const trie = (): Trie => ({ children: new Map(), rules: [] });
-const wordCharacter = (value: string): boolean => /[\p{Script=Latin}\p{Number}\p{Mark}_]/u.test(value);
 const splitCharacter = (text: string, offset: number): boolean =>
     offset > 0 && offset < text.length && /[\uD800-\uDBFF]/u.test(text[offset - 1]) && /[\uDC00-\uDFFF]/u.test(text[offset]);
 
@@ -47,8 +46,6 @@ export class VocabularyIndex {
         const lower = selected ? from : Math.max(0, from - this.maximumLength);
         const upper = selected ? to : Math.min(text.length, to + this.maximumLength);
         const matches: VocabularyMatch[] = [];
-        // Selection boundaries also delimit the matching context. No outside character influences a selection.
-        const contextStart = selected ? from : 0, contextEnd = selected ? to : text.length;
         for (let start = lower + (splitCharacter(text, lower) ? 1 : 0); start < upper;) {
             if (!selected && start > from) break;
             let node = this.root, end = start;
@@ -59,12 +56,7 @@ export class VocabularyIndex {
                 node = child;
                 end += character.length;
                 // A collapsed caret includes every occurrence touching either adjacent character.
-                if (!node.rules.length || !selected && end < from) continue;
-                const first = String.fromCodePoint(text.codePointAt(start)!);
-                const last = character;
-                const previous = start > contextStart ? Array.from(text.slice(Math.max(contextStart, start - 2), start)).at(-1)! : "";
-                const next = end < contextEnd ? String.fromCodePoint(text.codePointAt(end)!) : "";
-                if (wordCharacter(first) && wordCharacter(previous) || wordCharacter(last) && wordCharacter(next)) continue;
+                if (!selected && end < from) continue;
                 for (const rule of node.rules) matches.push({ from: start, to: end, rule });
             }
             start += String.fromCodePoint(text.codePointAt(start)!).length;

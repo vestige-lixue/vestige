@@ -13,25 +13,28 @@ describe("vocabulary matching", () => {
         ]);
     });
 
-    it("uses the selection as its entire matching context", () => {
-        const cat = rule("cat"), index = new VocabularyIndex([cat, rule("ncat"), rule("cate")]);
-        for (const text of ["concatenate", "...cat.", "汉字猫cat日"]) {
-            const from = text.indexOf("cat");
-            expect(index.find(text, from, from + 3)).toEqual([{ rule: cat, from, to: from + 3 }]);
-        }
-        expect(index.find("cat cat", 1, 6)).toEqual([]);
+    it("only returns occurrences fully contained in the selection", () => {
+        const cat = rule("cat"), index = new VocabularyIndex([cat]);
+        expect(index.find("catcatcat", 1, 8)).toEqual([{ rule: cat, from: 3, to: 6 }]);
+        expect(index.find("catcatcat", 3, 6)).toEqual([{ rule: cat, from: 3, to: 6 }]);
     });
 
-    it("checks Latin and numeric edges while permitting adjoining Chinese and Japanese characters", () => {
-        const cat = rule("cat"), ten = rule("10"), han = rule("中文"), kana = rule("かな");
-        const index = new VocabularyIndex([cat, ten, han, kana]);
-        expect(index.find("concatenate", 5)).toEqual([]);
-        expect(index.find("a cat.", 4)).toEqual([{ rule: cat, from: 2, to: 5 }]);
-        expect(index.find("a 100.", 4)).toEqual([]);
-        expect(index.find("a 10.", 4)).toEqual([{ rule: ten, from: 2, to: 4 }]);
-        expect(index.find("中cat文", 2)).toEqual([{ rule: cat, from: 1, to: 4 }]);
-        expect(index.find("甲中文乙", 2)).toEqual([{ rule: han, from: 1, to: 3 }]);
-        expect(index.find("仮かな名", 2)).toEqual([{ rule: kana, from: 1, to: 3 }]);
+    it("matches substrings inside words and numbers", () => {
+        const cat = rule("cat"), ten = rule("10"), a = rule("a", "b");
+        const index = new VocabularyIndex([cat, ten]);
+        const text = "concatenate";
+        expect(index.find(text, 5)).toEqual([{ rule: cat, from: 3, to: 6 }]);
+        expect(index.find(text, 0, text.length)).toEqual([{ rule: cat, from: 3, to: 6 }]);
+        expect(index.find("100", 1)).toEqual([{ rule: ten, from: 0, to: 2 }]);
+        expect(new VocabularyIndex([a]).replacements("banana", 0, 6)).toEqual([{ rule: a, ranges: [
+            { from: 1, to: 2 }, { from: 3, to: 4 }, { from: 5, to: 6 }
+        ] }]);
+    });
+
+    it("matches spaces on both sides when they are part of the rule", () => {
+        const padded = rule(" a ", " b "), index = new VocabularyIndex([padded]);
+        const text = "x a banana y";
+        expect(index.find(text, 0, text.length)).toEqual([{ rule: padded, from: 1, to: 4 }]);
     });
 
     it("returns UTF-16 offsets and rejects endpoints splitting a surrogate pair", () => {
