@@ -9,11 +9,13 @@ export function mount(): () => void {
             const available = player.getURL() !== null;
             session.setActionHandler("play", available ? () => runCommand({ kind: "playSelectedMedia", playing: true }) : null);
             session.setActionHandler("pause", available ? () => runCommand({ kind: "playSelectedMedia", playing: false }) : null);
-            session.setActionHandler("previoustrack", available ? () => runCommand({ kind: "rewindSelectedMedia" }) : null);
+            session.setActionHandler("previoustrack", available ? () => runCommand({ kind: "jumpSelectedMedia", direction: -1 }) : null);
+            session.setActionHandler("nexttrack", available ? () => runCommand({ kind: "jumpSelectedMedia", direction: 1 }) : null);
             return () => {
                 session.setActionHandler("play", null);
                 session.setActionHandler("pause", null);
                 session.setActionHandler("previoustrack", null);
+                session.setActionHandler("nexttrack", null);
             };
         });
         $effect(() => {

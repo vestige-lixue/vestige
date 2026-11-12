@@ -67,6 +67,7 @@
             "play": "播放",
             "pause": "暂停",
             "rewind": "后退",
+            "forward": "前进",
             "cycleMode": "切换播放模式",
             "enableStabilization": "开启音量稳定",
             "disableStabilization": "关闭音量稳定",
@@ -78,7 +79,7 @@
             "nextWord": "下一个词"
         },
         "modes": {
-            "single": "播完停止",
+            "single": "播完当前停止",
             "sequential": "顺序播放",
             "repeat-all": "列表循环",
             "repeat-one": "单个循环"
@@ -450,8 +451,8 @@
         "playback": {
             "title": "播放",
             "rewindStep": {
-                "label": "F7 后退时长",
-                "description": "每按一次 F7 后退的时长，不会暂停或继续播放。",
+                "label": "F7/F9 跳转时长",
+                "description": "每按一次 F7 后退或 F9 前进的时长，不会暂停或继续播放。",
                 "invalid": "请输入 {{min}} 到 {{max}} 之间的整数（毫秒）。"
             },
             "startRewind": {
@@ -476,7 +477,7 @@
                 "label": "切换媒体后的播放状态"
             },
             "wordSwitchPlayback": {
-                "label": "跳转到字词后的播放状态"
+                "label": "跳转字词后的播放状态"
             },
             "rememberPlaybackPosition": {
                 "label": "记住播放进度",

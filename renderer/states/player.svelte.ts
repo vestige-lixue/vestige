@@ -9,7 +9,7 @@ export const minSpeed = minPlaybackSpeed;
 export const maxSpeed = maxPlaybackSpeed;
 export const speedStep = 0.05;
 
-export const state = $state({ url: null as string | null, playing: false, playVersion: 0, currentTime: 0, seekVersion: 0, seekMode: "commit" as SeekMode });
+export const state = $state({ url: null as string | null, playing: false, playVersion: 0, currentTime: 0, seekVersion: 0, navigationVersion: 0, seekMode: "commit" as SeekMode });
 
 export function getURL(): string | null {
     return state.url;
@@ -29,6 +29,10 @@ export function getCurrentTime(): number {
 
 export function getSeekVersion(): number {
     return state.seekVersion;
+}
+
+export function getNavigationVersion(): number {
+    return state.navigationVersion;
 }
 
 export function getSeekMode(): SeekMode {

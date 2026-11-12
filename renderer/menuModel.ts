@@ -24,10 +24,11 @@ const transcriptionActions: readonly (Command | null)[] = [
 ];
 export const editActions: readonly (EditAction | null)[] = ["undo", "redo", null, "cut", "copy", "paste", null, "selectAll"];
 const playActions: readonly (Command | null)[] = [
-    { kind: "playSelectedMedia" }, { kind: "cyclePlaybackMode" }, null,
+    { kind: "playSelectedMedia" },
+    { kind: "jumpSelectedMedia", direction: -1 }, { kind: "jumpSelectedMedia", direction: 1 }, null,
+    { kind: "seekAdjacentWord", direction: -1 }, { kind: "seekAdjacentWord", direction: 1 }, null,
     { kind: "selectAdjacentMedia", direction: -1 }, { kind: "selectAdjacentMedia", direction: 1 }, null,
-    { kind: "rewindSelectedMedia" }, { kind: "seekAdjacentWord", direction: -1 }, { kind: "seekAdjacentWord", direction: 1 }, null,
-    { kind: "toggleVolumeStabilization" }, { kind: "restorePlaybackSpeed" }
+    { kind: "cyclePlaybackMode" }, { kind: "toggleVolumeStabilization" }, { kind: "restorePlaybackSpeed" }
 ];
 const settings: Command = { kind: "openPanel", panel: "settings" };
 const about: Command = { kind: "openPanel", panel: "about" };

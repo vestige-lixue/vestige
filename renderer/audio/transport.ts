@@ -280,8 +280,11 @@ function settle(transport: Transport): void {
     }
     transport.seeking = false;
     transport.seekedToEnd = transport.position >= duration(transport);
-    publish(transport, true);
-    begin(transport);
+    if (transport.seekedToEnd && transport.mode === "commit" && transport.playing) finish(transport);
+    else {
+        publish(transport, true);
+        begin(transport);
+    }
 }
 
 function begin(transport: Transport): void {
@@ -327,6 +330,14 @@ function publish(transport: Transport, remember = false): void {
     if (!transport.disposed && !transport.seeking && transport.mode !== "preview") transport.options.onTime(getTime(transport), remember);
 }
 
+function finish(transport: Transport): void {
+    transport.position = duration(transport);
+    freeze(transport);
+    transport.playing = false;
+    publish(transport, true);
+    transport.options.onEnded();
+}
+
 function update(transport: Transport): void {
     if (transport.disposed || !transport.playing) return;
     getTime(transport);
@@ -339,11 +350,7 @@ function update(transport: Transport): void {
             });
         }
         else {
-            transport.position = duration(transport);
-            freeze(transport);
-            transport.playing = false;
-            publish(transport, true);
-            transport.options.onEnded();
+            finish(transport);
             return;
         }
     }

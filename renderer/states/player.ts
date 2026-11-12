@@ -41,6 +41,7 @@ export function updatePlaybackTime(time: number, seek: player.SeekMode | null): 
     if (seek !== null) {
         player.state.seekMode = seek;
         player.state.seekVersion++;
+        player.state.navigationVersion++;
     }
 }
 
@@ -68,6 +69,8 @@ export function cycleMode(): void {
 
 export function finishPlayback(): void {
     if (!player.isPlaying() || !player.getURL()) return;
+    // Completion breaks held-key navigation even when this media stops or repeats.
+    player.state.navigationVersion++;
     const mode = player.getMode();
     if (mode === "single") {
         setPlaying(false);

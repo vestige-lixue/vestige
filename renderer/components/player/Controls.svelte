@@ -216,7 +216,7 @@
             <span class="value">{player.getSpeed().toFixed(2).replace(/0$/, "")}×</span>
         </div>
     </div>
-    {#if mediaSelection.get() !== null && settings.getPlayback().showLevelMeter}
+    {#if settings.getPlayback().showLevelMeter}
         <LevelMeter {levels} />
     {/if}
 </div>
@@ -350,9 +350,9 @@
     }
     .inspection-tick {
         position: absolute;
-        top: -5px;
+        top: -7px;
         width: 1px;
-        height: 14px;
+        height: 18px;
         background: var(--c-accent);
         transform: translateX(-50%);
         pointer-events: none;

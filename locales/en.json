@@ -67,6 +67,7 @@
             "play": "Play",
             "pause": "Pause",
             "rewind": "Rewind",
+            "forward": "Forward",
             "cycleMode": "Change mode",
             "enableStabilization": "Enable volume stabilization",
             "disableStabilization": "Disable volume stabilization",
@@ -450,8 +451,8 @@
         "playback": {
             "title": "Playback",
             "rewindStep": {
-                "label": "F7 rewind amount",
-                "description": "How far F7 goes back on each press, without pausing or resuming playback.",
+                "label": "F7/F9 jump amount",
+                "description": "How far F7 goes back and F9 goes forward on each press, without pausing or resuming playback.",
                 "invalid": "Enter a whole number from {{min}} to {{max}} milliseconds."
             },
             "startRewind": {

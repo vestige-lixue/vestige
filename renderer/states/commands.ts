@@ -95,8 +95,9 @@ type SeekWordCommand = {
     time: number;
 };
 
-type RewindSelectedMediaCommand = {
-    kind: "rewindSelectedMedia";
+type JumpSelectedMediaCommand = {
+    kind: "jumpSelectedMedia";
+    direction: -1 | 1;
     from?: number;
 };
 
@@ -131,10 +132,11 @@ export type Command = (
     AdjacentCommand |
     SeekSelectedMediaCommand |
     SeekWordCommand |
-    RewindSelectedMediaCommand |
+    JumpSelectedMediaCommand |
     SetPlaybackSpeedCommand |
     SetPlaybackVolumeCommand |
-    RestoreTranscriptDeletionCommand
+    RestoreTranscriptDeletionCommand |
+    { kind: "findTranscriptMatch"; direction: -1 | 1 }
 );
 
 export function interfaceBlocked(): boolean {
@@ -302,9 +304,9 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         label: () => i18n.t(player.isVolumeStabilizationEnabled() ? "player.actions.disableStabilization" : "player.actions.enableStabilization")
     },
     seekSelectedMedia: { run: command => projectAPI.seekPlayback(command.time, command.mode), enabled: hasPlayback, label: label("player.actions.focusSlider") },
-    rewindSelectedMedia: {
-        run: command => projectAPI.seekPlayback(Math.max(0, (command.from ?? player.getCurrentTime()) - settings.getPlayback().rewindStepMs / 1000)),
-        enabled: hasPlayback, label: label("player.actions.rewind")
+    jumpSelectedMedia: {
+        run: command => projectAPI.seekPlayback((command.from ?? player.getCurrentTime()) + command.direction * settings.getPlayback().rewindStepMs / 1000),
+        enabled: hasPlayback, label: command => i18n.t(command.direction === -1 ? "player.actions.rewind" : "player.actions.forward")
     },
     selectAdjacentMedia: {
         run: command => projectAPI.selectMedia(mediaSelection.adjacent(command.direction, true)),

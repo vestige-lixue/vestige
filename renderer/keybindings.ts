@@ -44,7 +44,8 @@ const bindings: readonly Binding[] = [
     { key: "arrowdown", mod: isMac(), alt: true, command: { kind: "selectAdjacentMedia", direction: 1 } },
     { key: " ", command: { kind: "playSelectedMedia" } },
     { key: "f8", command: { kind: "playSelectedMedia" } },
-    { key: "f7", command: { kind: "rewindSelectedMedia" } }
+    { key: "f7", command: { kind: "jumpSelectedMedia", direction: -1 } },
+    { key: "f9", command: { kind: "jumpSelectedMedia", direction: 1 } }
 ];
 
 const editKeys: Record<string, EditAction> = { a: "selectAll", z: "undo", y: "redo", x: "cut", c: "copy", v: "paste" };
@@ -52,10 +53,10 @@ let menuBindings: MenuBindings | null = null;
 let mounted = false;
 let alt: "idle" | "pressed" = "idle";
 let wordNavigation: {
-    direction: -1 | 1; mediaId: string | null; starts: readonly number[]; index: number; seekVersion: number;
+    direction: -1 | 1; mediaId: string | null; starts: readonly number[]; index: number; navigationVersion: number;
 } | null = null;
-let progressNavigation: { direction: -1 | 1; mediaId: string | null; time: number; seekVersion: number } | null = null;
-let rewindNavigation: { mediaId: string | null; time: number; seekVersion: number } | null = null;
+let progressNavigation: { direction: -1 | 1; mediaId: string | null; time: number; navigationVersion: number } | null = null;
+let jumpNavigation: { direction: -1 | 1; mediaId: string | null; time: number; navigationVersion: number } | null = null;
 
 export function registerMenu(bindings: MenuBindings): () => void {
     menuBindings = bindings;
@@ -107,7 +108,7 @@ export function cancelProgressNavigation(): void {
 function cancel(): void {
     alt = "idle";
     wordNavigation = null;
-    rewindNavigation = null;
+    jumpNavigation = null;
     cancelProgressNavigation();
 }
 
@@ -131,31 +132,34 @@ function runWord(direction: -1 | 1, repeat: boolean): void {
     }
     const mediaId = mediaSelection.get();
     const starts = transcript.getWordStarts();
-    const seekVersion = player.getSeekVersion();
+    const navigationVersion = player.getNavigationVersion();
     // Repeats advance from this key's prior word, only while its own seeks remain current.
     if (!repeat || !wordNavigation || wordNavigation.direction !== direction || wordNavigation.mediaId !== mediaId
-        || wordNavigation.starts !== starts || wordNavigation.seekVersion !== seekVersion) {
-        wordNavigation = { direction, mediaId, starts, index: transcriptAPI.getWordIndex(player.getCurrentTime()), seekVersion };
+        || wordNavigation.starts !== starts || wordNavigation.navigationVersion !== navigationVersion) {
+        wordNavigation = { direction, mediaId, starts, index: transcriptAPI.getWordIndex(player.getCurrentTime()), navigationVersion };
     }
     const navigation = wordNavigation;
     run({ kind: "seekAdjacentWord", direction, fromWordIndex: navigation.index });
-    const nextVersion = player.getSeekVersion();
+    const nextVersion = player.getNavigationVersion();
     // This synchronous command can also seek for rewind-on-start; retain its logical word index.
-    if (nextVersion > seekVersion && mediaSelection.get() === mediaId && transcript.getWordStarts() === starts) {
+    if (nextVersion > navigationVersion && mediaSelection.get() === mediaId && transcript.getWordStarts() === starts) {
         navigation.index += direction;
-        navigation.seekVersion = nextVersion;
+        navigation.navigationVersion = nextVersion;
     }
-    else if (nextVersion !== seekVersion) wordNavigation = null;
+    else if (nextVersion !== navigationVersion) wordNavigation = null;
 }
 
-function runRewind(repeat: boolean): void {
+function runJump(direction: -1 | 1, repeat: boolean): void {
     const mediaId = mediaSelection.get();
-    const seekVersion = player.getSeekVersion();
-    const from = repeat && rewindNavigation?.mediaId === mediaId && rewindNavigation.seekVersion === seekVersion
-        ? rewindNavigation.time : player.getCurrentTime();
-    run({ kind: "rewindSelectedMedia", from });
-    rewindNavigation = player.getSeekVersion() === seekVersion + 1
-        ? { mediaId, time: player.getCurrentTime(), seekVersion: player.getSeekVersion() } : null;
+    const navigationVersion = player.getNavigationVersion();
+    if (repeat && (jumpNavigation?.direction !== direction || jumpNavigation.mediaId !== mediaId || jumpNavigation.navigationVersion !== navigationVersion)) {
+        jumpNavigation = null;
+        return;
+    }
+    const from = repeat ? jumpNavigation!.time : player.getCurrentTime();
+    run({ kind: "jumpSelectedMedia", direction, from });
+    jumpNavigation = mediaSelection.get() === mediaId && player.getNavigationVersion() === navigationVersion + 1
+        ? { direction, mediaId, time: player.getCurrentTime(), navigationVersion: player.getNavigationVersion() } : null;
 }
 
 export function seekProgress(event: KeyboardEvent): void {
@@ -167,12 +171,15 @@ export function seekProgress(event: KeyboardEvent): void {
     event.preventDefault();
     const direction = event.key === "ArrowRight" ? 1 : -1;
     const mediaId = mediaSelection.get();
-    const seekVersion = player.getSeekVersion();
-    const time = event.repeat && progressNavigation?.direction === direction && progressNavigation.mediaId === mediaId
-        && progressNavigation.seekVersion === seekVersion ? progressNavigation.time : player.getCurrentTime();
+    const navigationVersion = player.getNavigationVersion();
+    if (event.repeat && (progressNavigation?.direction !== direction || progressNavigation.mediaId !== mediaId || progressNavigation.navigationVersion !== navigationVersion)) {
+        cancelProgressNavigation();
+        return;
+    }
+    const time = event.repeat ? progressNavigation!.time : player.getCurrentTime();
     runCommand({ kind: "seekSelectedMedia", time: direction === 1 ? Math.floor(time) + 1 : Math.ceil(time) - 1 });
-    progressNavigation = player.getSeekVersion() === seekVersion + 1
-        ? { direction, mediaId, time: player.getCurrentTime(), seekVersion: player.getSeekVersion() } : null;
+    progressNavigation = mediaSelection.get() === mediaId && player.getNavigationVersion() === navigationVersion + 1
+        ? { direction, mediaId, time: player.getCurrentTime(), navigationVersion: player.getNavigationVersion() } : null;
 }
 
 function preventSpaceActivation(event: KeyboardEvent): void {
@@ -193,10 +200,10 @@ function keydown(event: KeyboardEvent): void {
         return;
     }
     alt = "idle";
-    if (event.defaultPrevented || event.isComposing || event.getModifierState("AltGraph")
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.getModifierState("AltGraph")
         || event.altKey && event.target instanceof HTMLElement && event.target.closest("select")) {
         wordNavigation = null;
-        rewindNavigation = null;
+        jumpNavigation = null;
         return;
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
@@ -227,12 +234,12 @@ function keydown(event: KeyboardEvent): void {
     }
     const action = binding && !(editing && key === " ") ? boundCommand(binding) : undefined;
     if (action?.kind !== "seekAdjacentWord") wordNavigation = null;
-    if (action?.kind !== "rewindSelectedMedia") rewindNavigation = null;
+    if (action?.kind !== "jumpSelectedMedia") jumpNavigation = null;
     if (action) {
         event.preventDefault();
         event.stopPropagation();
         if (action.kind === "seekAdjacentWord") runWord(action.direction, event.repeat);
-        else if (action.kind === "rewindSelectedMedia") runRewind(event.repeat);
+        else if (action.kind === "jumpSelectedMedia") runJump(action.direction, event.repeat);
         else if (!event.repeat) run(action);
     }
     // Space cannot also activate the focused button on keydown or keyup.
@@ -240,7 +247,7 @@ function keydown(event: KeyboardEvent): void {
 }
 
 function keyup(event: KeyboardEvent): void {
-    if (event.key === "F7") rewindNavigation = null;
+    if (jumpNavigation && event.key === (jumpNavigation.direction === -1 ? "F7" : "F9")) jumpNavigation = null;
     if (wordNavigation && (event.key === (wordNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")
         || event.key === "Alt" || isMac() && event.key === "Meta")) wordNavigation = null;
     if (progressNavigation && event.key === (progressNavigation.direction === -1 ? "ArrowLeft" : "ArrowRight")) cancelProgressNavigation();
