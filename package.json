@@ -27,7 +27,7 @@
         "test": "vitest run --config configs/vitest.config.ts"
     },
     "engines": {
-        "node": "^22.12.0 || >=24.0.0"
+        "node": ">=24.0.0"
     },
     "build": {
         "extends": "./configs/electron-builder.yml"
@@ -50,7 +50,7 @@
         "@resvg/resvg-js": "2.6.2",
         "@stylistic/eslint-plugin": "^5.10.0",
         "@sveltejs/vite-plugin-svelte": "^7.3.1",
-        "@types/node": "22.20.2",
+        "@types/node": "24.19.2",
         "@typia/unplugin": "12.1.1",
         "electron": "45.0.0",
         "electron-builder": "26.15.3",
