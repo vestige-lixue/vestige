@@ -1,5 +1,15 @@
 button, input, select, textarea {
+    color: inherit;
     font: inherit;
+
+    &:where(:disabled) {
+        color: var(--c-text-80p);
+    }
+}
+
+::placeholder, [data-select-value][data-placeholder] {
+    color: var(--c-text-80p);
+    opacity: 1;
 }
 
 button {
@@ -42,7 +52,7 @@ kbd, code:not(pre code) {
     height: 1.5em;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     padding: .1em .4em;
-    border: .0625em solid var(--c-border-120p);
+    border: .0625em solid var(--c-border-strong);
     color: var(--c-text-80p);
     border-radius: .25em;
     font-size: .9em;

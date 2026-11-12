@@ -544,11 +544,8 @@
             },
             "colors": {
                 "--c-accent": "强调色",
-                "--c-background": "主背景色",
-                "--c-surface": "次背景色",
-                "--c-text": "主文字色",
-                "--c-text-80p": "次文字色",
-                "--c-audio-level": "电平表颜色"
+                "--c-background": "背景色",
+                "--c-text": "文字色"
             }
         },
         "advanced": {

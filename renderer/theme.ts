@@ -1,6 +1,6 @@
 import * as settings from "./states/settings.svelte";
 import { defaultSettings } from "../shared/settings/defaults";
-import { resolveTheme, resolveThemeScheme, themeColorKeys } from "../shared/theme";
+import { deriveThemeColors, resolveTheme, resolveThemeScheme, themeColorKeys, type ThemeColors } from "../shared/theme";
 import * as settingsAPI from "./states/settings";
 
 export async function initialize(): Promise<() => void> {
@@ -9,13 +9,17 @@ export async function initialize(): Promise<() => void> {
         return false;
     });
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    let previousColors: ThemeColors | undefined;
     const apply = (): void => {
         const theme = settings.getConfirmed()?.theme ?? defaultSettings.theme;
         const scheme = resolveThemeScheme(theme.mode, systemTheme.matches);
         const colors = resolveTheme(scheme, theme[scheme]);
         const root = document.documentElement;
-        for (const key of themeColorKeys) {
-            if (root.style.getPropertyValue(key) !== colors[key]) root.style.setProperty(key, colors[key]);
+        if (themeColorKeys.some(key => previousColors?.[key] !== colors[key])) {
+            for (const [key, value] of Object.entries({ ...colors, ...deriveThemeColors(colors) })) {
+                root.style.setProperty(key, value);
+            }
+            previousColors = colors;
         }
         root.style.colorScheme = scheme;
         root.dataset.theme = scheme;

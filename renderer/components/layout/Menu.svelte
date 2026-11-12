@@ -188,7 +188,7 @@
     :global([data-menubar-separator]) {
         height: 1px;
         margin: 4px 0;
-        background: var(--c-border-110p);
+        background: var(--c-border);
     }
     :global([data-menubar-item]) {
         font-size: 14px;

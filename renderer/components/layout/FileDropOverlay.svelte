@@ -40,7 +40,7 @@
         content: "";
         position: absolute;
         inset: 0 12px 12px;
-        border: 2px dashed var(--c-border-200p);
+        border: 2px dashed var(--c-text-80p);
         border-radius: 12px;
     }
     .file-drop-overlay::after {

@@ -13,18 +13,12 @@ export const defaultSettings = {
         light: {
             "--c-accent": "#1e90ff",
             "--c-background": "#ffffff",
-            "--c-surface": "#eef0f3",
-            "--c-text": "#252a30",
-            "--c-text-80p": "#686e75",
-            "--c-audio-level": "#1eb961"
+            "--c-text": "#252a30"
         },
         dark: {
             "--c-accent": "#58a6ff",
             "--c-background": "#161b22",
-            "--c-surface": "#21262d",
-            "--c-text": "#e6edf3",
-            "--c-text-80p": "#919ba6",
-            "--c-audio-level": "#219653"
+            "--c-text": "#e6edf3"
         }
     },
     transcription: { concurrency: 2, presets: {}, lastConfig: null },

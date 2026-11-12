@@ -544,11 +544,8 @@
             },
             "colors": {
                 "--c-accent": "Accent color",
-                "--c-background": "Primary background",
-                "--c-surface": "Secondary background",
-                "--c-text": "Primary text",
-                "--c-text-80p": "Secondary text",
-                "--c-audio-level": "Level meter"
+                "--c-background": "Background color",
+                "--c-text": "Text color"
             }
         },
         "advanced": {

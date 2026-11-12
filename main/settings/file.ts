@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type Settings } from "../../shared/settings/Settings";
 import { defaultSettings } from "../../shared/settings/defaults";
+import { themeSchemes } from "../../shared/theme";
 import { validSettings } from "./validate";
 import { writeFileAtomic } from "../util/fs";
 
@@ -21,6 +22,17 @@ export function readSettings(path: string): { settings: Settings; savedText: str
     if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
         && "spellcheck" in value.editing) {
         delete value.editing.spellcheck;
+    }
+    // These colors are derived now. Discard only their legacy overrides before strict validation.
+    if (value && typeof value === "object" && "theme" in value && value.theme && typeof value.theme === "object") {
+        for (const scheme of themeSchemes) {
+            const palette: unknown = (value.theme as Record<string, unknown>)[scheme];
+            if (palette && typeof palette === "object") {
+                if ("--c-surface" in palette) delete palette["--c-surface"];
+                if ("--c-text-80p" in palette) delete palette["--c-text-80p"];
+                if ("--c-audio-level" in palette) delete palette["--c-audio-level"];
+            }
+        }
     }
     // Older settings predate playback following; retain their other preferences.
     if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"

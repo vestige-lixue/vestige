@@ -12,7 +12,7 @@
                     open = false;
                 }} />
         {:else}
-            <div>{i18n.t("transcription.tasks.empty")}</div>
+            <div class="empty">{i18n.t("transcription.tasks.empty")}</div>
         {/each}
     </Accordion.Root>
 </Modal>
@@ -23,6 +23,11 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+    }
+    .empty {
+        padding: 32px 8px;
+        text-align: center;
+        color: var(--c-text-80p);
     }
 </style>
 

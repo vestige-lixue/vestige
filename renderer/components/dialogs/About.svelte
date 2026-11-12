@@ -112,7 +112,7 @@
     .quote {
         color: var(--c-text-80p);
         margin-bottom: 25px;
-        border-left: solid 3px var(--c-border-120p);
+        border-left: solid 3px var(--c-border-strong);
         padding-left: 16px;
         width: 100%;
         text-align: left;

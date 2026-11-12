@@ -149,7 +149,7 @@
     :global(.modal-content .actions .text-button) {
         padding: 8px 14px;
         background: var(--bg);
-        border-color: var(--c-border-120p);
+        border-color: var(--c-border-strong);
         font-size: inherit;
     }
     :global(.modal-content .actions .primary) {

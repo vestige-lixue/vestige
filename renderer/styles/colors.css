@@ -5,37 +5,25 @@
 }
 
 :root {
-    --interaction-rgb: 0 0 0;
     --c-link: #2170bf;
+    --c-text-80p: color-mix(in oklab, var(--c-text) 64.8%, var(--c-background));
     --c-selection: color-mix(in srgb, var(--c-accent) 22%, var(--c-background));
+    --c-find: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 25%, var(--c-background));
+    --c-find-current: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 52%, var(--c-background));
     --c-selection-bg: color-mix(in srgb, var(--c-accent) 25%, var(--c-background));
-    --c-scrollbar: #808080;
-    --c-border: #e1e4e8;
-    --c-border-110p: #d1d6dd;
-    --c-border-120p: #c9cfd7;
-    --c-border-200p: #5e6063;
     --c-overlay: #0005;
     --c-danger: #e55353;
-    --c-shadow-1: rgba(37, 42, 48, 0.06);
-    --c-shadow-2: rgba(37, 42, 48, 0.08);
-    --c-shadow-3: rgba(37, 42, 48, 0.12);
 }
 
 :root[data-theme="dark"] {
-    --interaction-rgb: 255 255 255;
     --c-link: #79b8ff;
+    --c-text-80p: color-mix(in oklab, var(--c-text) 64.3%, var(--c-background));
     --c-selection: color-mix(in srgb, var(--c-accent) 30%, var(--c-background));
+    --c-find: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 28%, var(--c-background));
+    --c-find-current: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 58%, var(--c-background));
     --c-selection-bg: color-mix(in srgb, var(--c-accent) 22%, var(--c-background));
-    --c-scrollbar: #7b8592;
-    --c-border: #303944;
-    --c-border-110p: #303741;
-    --c-border-120p: #485566;
-    --c-border-200p: #8794a5;
     --c-overlay: #0009;
     --c-danger: #ff7b72;
-    --c-shadow-1: rgba(0, 0, 0, 0.18);
-    --c-shadow-2: rgba(0, 0, 0, 0.28);
-    --c-shadow-3: rgba(0, 0, 0, 0.4);
     --hover-opacity: 0.08;
     --active-opacity: 0.04;
 }
