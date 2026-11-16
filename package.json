@@ -1,7 +1,7 @@
 {
     "name": "vestige",
-    "version": "0.8.1",
-    "description": "A workspace for media transcription and records.",
+    "version": "1.0.0",
+    "description": "A local workspace for media transcription and proofreading.",
     "author": "LJM12914",
     "homepage": "https://github.com/vestige-lixue/vestige",
     "desktopName": "vestige.lixue",
