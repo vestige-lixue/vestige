@@ -3,9 +3,10 @@ import { basename, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { type ExecutionContext } from "../execute";
 import { runProcess } from "../../util/process";
-import { parseResult, type RunDraft } from "../result";
+import { type RunDraft } from "../result";
 import { nativeArguments } from "./parameters";
 import { toRun } from "./result";
+import { parseWhisperResult } from "./bytes";
 import { VestigeErrors } from "../../../shared/failure";
 import { isSystemError } from "../../util/file";
 import { whisperProgress } from "./progress";
@@ -24,15 +25,15 @@ export async function execute(context: ExecutionContext): Promise<RunDraft> {
         if (stream === "stderr") report(text);
     });
     const elapsed = (performance.now() - start) / 1000;
-    let raw: string;
+    let raw: Buffer;
     try {
-        raw = await readFile(outputFile + ".json", "utf8");
+        raw = await readFile(outputFile + ".json");
     }
     catch (error) {
         if (!isSystemError(error)) throw error;
         // Some native failures exit with 0 without creating their output file.
         throw new VestigeErrors({ kind: "transcription-invalid-result", reason: "read", cause: String(error), diagnostic: output.stderr || output.stdout }, { cause: error });
     }
-    feedback?.record?.("Whisper result.json", raw);
-    return toRun(id, request, parseResult(raw, output.stderr), duration, elapsed);
+    feedback?.record?.("Whisper result.json", raw.toString("utf8"));
+    return toRun(id, request, parseWhisperResult(raw, output.stderr), duration, elapsed);
 }
