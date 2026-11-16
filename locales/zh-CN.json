@@ -359,7 +359,7 @@
             "align": "与原文对齐",
             "expand": "展开已删除的文字",
             "collapse": "收起已删除的文字",
-            "toggleSelectionDeletions": "展开/收起选区内已删除的文字"
+            "toggleSelectionDeletions": "展开/收起光标处或选区内已删除的文字"
         },
         "runs": {
             "title": "转写列表",

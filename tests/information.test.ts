@@ -166,21 +166,48 @@ describe("information previews", () => {
 });
 
 describe("selection information", () => {
-    it("excludes document-edge deletions and keeps interior endpoints strict", () => {
+    it("includes document-edge deletions and keeps interior endpoints strict", () => {
         const spans = transcript(["削AB除CD消"]), index = createTextIndex(spans);
         const projection = projectText(index, [
             ...modification(spans, 0, 1, ""), ...modification(spans, 3, 4, ""), ...modification(spans, 6, 7, "")
         ]);
         expect(projection.text).toBe("ABCD");
         const selected = (from: number, to: number): string[] => transcriptSelectionUnits(index, projection, 2, from, to).deletions.map(item => item.original!);
-        expect(selected(0, projection.text.length)).toEqual(["除"]);
-        expect(selected(-1, projection.text.length + 1)).toEqual(["除"]);
-        expect(selected(0, 2)).toEqual([]);
+        expect(selected(0, projection.text.length)).toEqual(["削", "除", "消"]);
+        expect(selected(-1, projection.text.length + 1)).toEqual(["削", "除", "消"]);
+        expect(selected(0, 2)).toEqual(["削"]);
         expect(selected(2, 3)).toEqual([]);
-        expect(selected(2, projection.text.length)).toEqual([]);
+        expect(selected(2, projection.text.length)).toEqual(["消"]);
+        expect(selected(1, 3)).toEqual(["除"]);
+        expect(selected(1, 2)).toEqual([]);
+        expect(selected(0, 0)).toEqual([]);
+        expect(selected(projection.text.length, projection.text.length)).toEqual([]);
         const empty = projectText(index, modification(spans, 0, 7, ""));
         expect(transcriptSelectionUnits(index, empty, 2, 0, 0).deletions).toEqual([]);
         expect(transcriptSelectionUnits(index, empty, 2, -1, 1).deletions).toEqual([]);
+    });
+
+    it.each(["B", "😀"])("includes deleted edge tokens in the audio and comparison around %s", text => {
+        const spans = transcript(["A", text, "C", "D", "E"]), index = createTextIndex(spans);
+        const projection = projectText(index, [
+            ...modification(spans, 0, 1, ""), ...modification(spans, 2, 3, ""), ...modification(spans, 4, 5, "")
+        ]);
+        expect(projection.text).toBe(text + "D");
+        expect(transcriptSelection(index, projection, 10, 0, text.length)).toMatchObject({
+            range: { start: 0, end: 3 }, seekStart: 0, tokens: [1], deletions: [{ original: "A" }],
+            comparison: [{ kind: "deleted", text: "A" }, { kind: "original", text }]
+        });
+        expect(transcriptSelection(index, projection, 10, text.length, projection.text.length)).toMatchObject({
+            range: { start: 6, end: 9 }, seekStart: 6, tokens: [3], deletions: [{ original: "E" }],
+            comparison: [{ kind: "original", text: "D" }, { kind: "deleted", text: "E" }]
+        });
+        expect(transcriptSelection(index, projection, 10, 0, projection.text.length)).toMatchObject({
+            range: { start: 0, end: 9 }, seekStart: 0, tokens: [1, 3], deletions: [{ original: "A" }, { original: "C" }, { original: "E" }],
+            comparison: [
+                { kind: "deleted", text: "A" }, { kind: "original", text }, { kind: "deleted", text: "C" },
+                { kind: "original", text: "D" }, { kind: "deleted", text: "E" }
+            ]
+        });
     });
 
     it("marks each displayed timestamp and its tick using the same inclusive media bounds", () => {
@@ -231,7 +258,7 @@ describe("selection information", () => {
         expect(transcriptSelection(index, projection, 5, 0, 3)).toMatchObject({ tokens: [0, 1], range: { start: 0, end: 3 } });
     });
 
-    it("includes boundary deletions only when their replacement text is selected", () => {
+    it("includes interior boundary deletions only when their replacement text is selected", () => {
         const spans = transcript(["O", "u", "tro"]);
         const index = createTextIndex(spans);
         const replacement = projectText(index, modification(spans, 1, 2, "h"));
@@ -421,7 +448,10 @@ describe("selection comparison", () => {
         ]);
         expect(transcriptSelection(index, projection, 3, 4, 6)?.comparison).toEqual([]);
         const removed = projectText(index, modification(spans, 0, 3, ""));
-        expect(transcriptSelection(index, removed, 3, 0, 2)?.comparison).toEqual([]);
+        expect(transcriptSelection(index, removed, 3, 0, 2)?.comparison).toEqual([
+            { kind: "deleted", text: "a😀b" }, { kind: "original", text: "other" }
+        ]);
+        expect(transcriptSelection(index, removed, 3, 1, 2)?.comparison).toEqual([]);
     });
 
     it("keeps two context tokens on each side of changes and folds longer unchanged runs", () => {

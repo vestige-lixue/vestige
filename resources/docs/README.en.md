@@ -51,7 +51,7 @@ Edits keep their timing: original characters you keep still point to their place
 
 ### Deleted text and gaps
 
-Deleting original text leaves a ▼ marker in its place. Click the marker to show the deleted text inline, and click it again to hide it. To show or hide all deleted text inside a selection, press Ctrl+Shift+D (⇧⌘D on macOS). Shown deleted text cannot be edited. A selection inside it copies only the deleted text, and a selection in the surrounding text never includes it.
+Deleting original text leaves a ▼ marker in its place. Click the marker to show the deleted text inline, and click it again to hide it. Place the caret below a deletion marker and press Ctrl+Shift+D (⇧⌘D on macOS) to show or hide the deleted text there. With text selected, the shortcut toggles deletions within the selection, including deletions at the start or end of the document when the selection reaches that edge. After deleting all text, the shortcut works with either Select All or a collapsed caret. Shown deleted text cannot be edited. A selection inside it copies only the deleted text, and a selection in the surrounding text never includes it.
 
 To bring deleted text back, right-click the marker or the shown text and choose Restore deleted text. Text you typed next to the marker stays.
 
@@ -176,7 +176,7 @@ When the macOS top row is set to media controls, the rewind, play/pause and fast
 | --- | --- | --- |
 | Undo / Redo | Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z | ⌘Z / ⇧⌘Z |
 | Inspect and play from the inspected text | Hold Ctrl, then click or press Enter | Hold ⌘, then click or press Enter |
-| Show or hide deleted text in the selection | Ctrl+Shift+D | ⇧⌘D |
+| Show or hide deleted text at the caret or in the selection | Ctrl+Shift+D | ⇧⌘D |
 | Open the right-click menu from the keyboard | Menu key or Shift+F10 | — |
 
 ### Find and replace

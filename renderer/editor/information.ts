@@ -35,8 +35,22 @@ export function refreshTranscriptInformation(view: EditorView, labels: Inspectio
 }
 
 export function toggleSelectionDeletions(view: EditorView): boolean {
-    if (!informationKey.getState(view.state) || view.state.selection.empty || view.composing || compositionPending(view.state)) return false;
-    view.dispatch(view.state.tr.setMeta(informationKey, { selection: true } satisfies InformationAction).setMeta("addToHistory", false));
+    const state = informationKey.getState(view.state);
+    if (!state || view.composing || compositionPending(view.state)) return false;
+    // A caret targets its marker; an empty document's AllSelection targets the same position.
+    const deletions = view.state.selection.empty || !state.projection.text.length
+        ? state.information.filter(item => item.kind === "deletion" && item.from === Math.max(0, view.state.selection.from - 1))
+        : null;
+    if (deletions && !deletions.length) return false;
+    const action: InformationAction = deletions
+        ? { ranges: deletions.map(item => ({ from: item.sourceFrom, to: item.sourceTo })) }
+        : { selection: true };
+    view.dispatch(view.state.tr.setMeta(informationKey, action).setMeta("addToHistory", false));
+    // Collapsing a preview can remove the focused element. Keep the next shortcut at the same marker.
+    if (deletions) {
+        if (view.editable) view.focus();
+        else view.dom.querySelector<HTMLElement>(`[data-inspection="${CSS.escape(deletions[0].key)}"]`)?.focus({ preventScroll: true });
+    }
     return true;
 }
 
@@ -158,7 +172,7 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                 let expanded = model.information.filter(item => item.kind === "deletion" && isExpanded(previous.expanded, item))
                     .map(item => ({ from: item.sourceFrom, to: item.sourceTo }));
                 const ranges = action?.selection
-                    ? transcriptSelectionUnits(index, projection, options.duration, state.selection.from - 1, state.selection.to - 1).deletions.map(item => ({ from: item.sourceFrom, to: item.sourceTo }))
+                    ? transcriptSelectionUnits(index, projection, options.duration, state.selection.from - 1, state.selection.to - 1, true).deletions.map(item => ({ from: item.sourceFrom, to: item.sourceTo }))
                     : action?.ranges;
                 if (ranges?.length) {
                     const contains = (range: SourceRange, values: SourceRange[]): boolean => values.some(item => item.from === range.from && item.to === range.to);

@@ -1,5 +1,6 @@
 import { type Range } from "../../shared/util/range";
 import { textPosition, textPieces, sourceTextPieces, projectedOffset, type TextPiece, type TextIndex, type TextProjection } from "../../shared/transcript/text";
+import { gapsOf } from "../../shared/transcript/timing";
 import { selectionComparison, type ComparisonPart } from "./comparison";
 
 export type TranscriptInformation = {
@@ -22,22 +23,6 @@ export type TranscriptInformation = {
 
 export function unplayableTimestamp(time: number, duration: number, playable: boolean | undefined): boolean {
     return playable !== undefined && (!playable || time < 0 || time > duration);
-}
-
-type SpeechInterval = { start: number; end: number; offset: number };
-const speechIntervals = new WeakMap<TextIndex, { duration: number; intervals: SpeechInterval[] }>();
-
-function intervalsOf(index: TextIndex, duration: number): SpeechInterval[] {
-    const previous = speechIntervals.get(index);
-    if (previous?.duration === duration) return previous.intervals;
-    // A TextIndex describes one immutable Run; text edits only change its projection.
-    const intervals = index.transcript.flatMap((segment, segmentIdx) => {
-        const start = Math.max(0, segment.range.start);
-        const end = Math.min(duration, segment.range.end);
-        return segment.token.text && start < end ? [{ start, end, offset: index.starts[segmentIdx] }] : [];
-    }).sort((a, b) => a.start - b.start || a.end - b.end);
-    speechIntervals.set(index, { duration, intervals });
-    return intervals;
 }
 
 function inspectionAudio(
@@ -110,24 +95,6 @@ export function transcriptTokenGroup(index: TextIndex, projection: TextProjectio
         .filter(piece => piece.source.kind === "segment" && piece.source.index === segmentIdx));
 }
 
-type Gap = { start: number; end: number; offset: number };
-const gaps = new WeakMap<TextIndex, { duration: number; values: Gap[] }>();
-function gapsOf(index: TextIndex, duration: number): Gap[] {
-    const previous = gaps.get(index);
-    if (previous?.duration === duration) return previous.values;
-    const values: Gap[] = [];
-    if (Number.isFinite(duration) && duration > 0) {
-        let end = 0;
-        for (const interval of intervalsOf(index, duration)) {
-            if (interval.start > end) values.push({ start: end, end: interval.start, offset: interval.offset });
-            end = Math.max(end, interval.end);
-        }
-        if (end < duration) values.push({ start: end, end: duration, offset: index.characters.length });
-    }
-    gaps.set(index, { duration, values });
-    return values;
-}
-
 function gapInformation(index: TextIndex, projection: TextProjection, duration: number): TranscriptInformation[] {
     return gapsOf(index, duration).map(gap => {
         const from = projectedOffset(projection, gap.offset);
@@ -181,7 +148,7 @@ export type SelectionInformation = Omit<TranscriptInformation, "kind"> & {
 };
 
 // View commands share inclusion rules even when the selected units have no playable audio.
-export function transcriptSelectionUnits(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): { tokens: Set<number>; deletions: TranscriptInformation[] } {
+export function transcriptSelectionUnits(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number, includeEdges = false): { tokens: Set<number>; deletions: TranscriptInformation[] } {
     from = Math.max(0, from);
     to = Math.min(projection.text.length, to);
     if (from >= to) return { tokens: new Set(), deletions: [] };
@@ -194,8 +161,9 @@ export function transcriptSelectionUnits(index: TextIndex, projection: TextProje
         if (piece.source.kind === "segment") tokenIndices.add(piece.source.index);
         else replacements.add(piece.sourceFrom);
     }
+    // Deletion toggles include both selection edges; inspection includes only document edges.
     const deletions = transcriptEvents(index, projection, duration).filter(item => item.kind === "deletion"
-        && (from < item.from && item.from < to || replacements.has(item.sourceTo)));
+        && ((includeEdges ? from <= item.from && item.from <= to : (from < item.from || from === 0) && (item.from < to || to === projection.text.length)) || replacements.has(item.sourceTo)));
     return { tokens: tokenIndices, deletions };
 }
 

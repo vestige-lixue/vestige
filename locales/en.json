@@ -359,7 +359,7 @@
             "align": "Align with original",
             "expand": "Expand deleted text",
             "collapse": "Collapse deleted text",
-            "toggleSelectionDeletions": "Expand/collapse deleted text in selection"
+            "toggleSelectionDeletions": "Expand/collapse deleted text at caret or in selection"
         },
         "runs": {
             "title": "Transcriptions",
