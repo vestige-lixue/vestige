@@ -1,7 +1,7 @@
 import { Editor, Extension, Mark, Node, type Extensions, type JSONContent } from "@tiptap/core";
 import { Fragment, Slice, type Node as PMNode, type Mark as PMMark, type Schema } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction, type EditorState, type Selection } from "@tiptap/pm/state";
-import { dropPoint } from "@tiptap/pm/transform";
+import { handleTranscriptDrop } from "./drop";
 import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
@@ -307,15 +307,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             clipboardTextSerializer(slice) {
                 return slice.content.textBetween(0, slice.content.size, "\n", "\n");
             },
-            handleDrop(view, event, slice, moved) {
-                if (!moved) return false;
-                const position = view.posAtCoords({ left: event.clientX, top: event.clientY });
-                if (!position) return false;
-                const target = dropPoint(view.state.doc, position.pos, slice) ?? position.pos;
-                const { from, to } = view.state.selection;
-                // Moving onto the selection, including its edges, must not delete and reinsert its source history.
-                return target >= from && target <= to;
-            },
+            handleDrop: handleTranscriptDrop,
             handleDOMEvents: {
                 copy(view) {
                     // Let Chromium copy the read-only original, even if the editor still had a text selection.

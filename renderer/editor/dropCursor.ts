@@ -1,49 +1,66 @@
 import { Plugin } from "@tiptap/pm/state";
-import { dropCursor } from "@tiptap/pm/dropcursor";
-import { dropPoint } from "@tiptap/pm/transform";
-
-type DropPointer = { left: number; top: number };
+import { transcriptDropPosition, type DropPointer } from "./drop";
+import { attachDropScroll } from "./dropScroll";
 
 export function dropCursorPlugin(): Plugin {
-    const cursor = dropCursor({ color: "var(--c-accent)", width: 2, class: "transcript-dropcursor" });
     return new Plugin({
         view(view) {
-            const overlay = cursor.spec.view!(view);
             let pointer: DropPointer | undefined;
+            let moving = false;
+            let element: HTMLElement | undefined;
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const scrolling = attachDropScroll(view, () => {
+                if (pointer) refresh(pointer);
+            });
+
+            function removeCursor(): void {
+                element?.remove();
+                element = undefined;
+            }
 
             function refresh(point: DropPointer): void {
-                const element = view.dom.offsetParent?.querySelector<HTMLElement>(".transcript-dropcursor");
-                if (!element) return;
-                const position = view.posAtCoords(point);
-                const target = position && (view.dragging?.slice ? dropPoint(view.state.doc, position.pos, view.dragging.slice) : position.pos);
+                const target = transcriptDropPosition(view, point);
                 const { from, to } = view.state.selection;
-                // The transcript has one text block. Its outer boundaries cannot accept another block.
                 // Keep both selection edges available, hiding only the interior of an internal drag.
-                element.hidden = !view.editable || target == null || !view.state.doc.resolve(target).parent.inlineContent
-                    || !!view.dragging && target > from && target < to;
-                if (element.hidden || target !== view.state.doc.content.size - 1) return;
+                if (!view.editable || target === null || moving && target > from && target < to) return removeCursor();
+                const parent = view.dom.offsetParent as HTMLElement | null;
+                if (!parent) return removeCursor();
+                const rect = view.coordsAtPos(target);
                 // At EOF, coordsAtPos can measure the marker widget instead of the text line.
-                const trailing = view.dom.querySelector<HTMLElement>("br.ProseMirror-trailingBreak");
-                const parent = element.offsetParent as HTMLElement | null;
-                if (trailing && parent) {
-                    const rect = trailing.getBoundingClientRect();
-                    const origin = parent.getBoundingClientRect();
-                    const scale = origin.height / parent.offsetHeight;
-                    element.style.top = `${(rect.top - origin.top) / scale + parent.scrollTop - parent.clientTop}px`;
-                    element.style.height = `${rect.height / scale}px`;
+                const trailing = target === view.state.doc.content.size - 1
+                    ? view.dom.querySelector<HTMLElement>("br.ProseMirror-trailingBreak")?.getBoundingClientRect() : undefined;
+                const origin = parent.getBoundingClientRect();
+                const scaleX = origin.width / parent.offsetWidth || 1, scaleY = origin.height / parent.offsetHeight || 1;
+                if (!element) {
+                    element = parent.appendChild(view.dom.ownerDocument.createElement("div"));
+                    element.className = "transcript-dropcursor prosemirror-dropcursor-inline";
+                    element.style.cssText = "position: absolute; z-index: 50; pointer-events: none; width: 2px; background-color: var(--c-accent);";
                 }
+                element.style.left = `${(rect.left - origin.left) / scaleX + parent.scrollLeft - parent.clientLeft - 1}px`;
+                element.style.top = `${((trailing?.top ?? rect.top) - origin.top) / scaleY + parent.scrollTop - parent.clientTop}px`;
+                element.style.height = `${((trailing?.bottom ?? rect.bottom) - (trailing?.top ?? rect.top)) / scaleY}px`;
             }
 
             function dragover(event: DragEvent): void {
+                if (!view.editable || event.dataTransfer?.types.includes("Files")) return clearPointer();
+                let copy: boolean | undefined;
+                view.someProp("dragCopies", test => copy = copy || test(event));
+                const mac = /Mac/.test(view.dom.ownerDocument.defaultView!.navigator.platform);
+                moving = !!view.dragging && !(copy ?? (mac ? event.altKey : event.ctrlKey));
                 pointer = { left: event.clientX, top: event.clientY };
                 refresh(pointer);
+                scrolling.update(pointer);
+                clearTimeout(timer);
+                timer = setTimeout(clearPointer, 5000);
             }
 
             function clearPointer(): void {
                 pointer = undefined;
+                scrolling.update();
+                clearTimeout(timer);
+                removeCursor();
             }
 
-            // Run after the upstream listener has created or repositioned its overlay.
             const listeners = new AbortController();
             const options = { signal: listeners.signal };
             view.dom.addEventListener("dragover", dragover, options);
@@ -52,14 +69,17 @@ export function dropCursorPlugin(): Plugin {
             }, options);
             view.dom.addEventListener("drop", clearPointer, options);
             view.dom.addEventListener("dragend", clearPointer, options);
+            view.dom.ownerDocument.defaultView!.addEventListener("blur", clearPointer, options);
+            view.dom.ownerDocument.addEventListener("dragend", clearPointer, options);
+            view.dom.ownerDocument.addEventListener("drop", clearPointer, options);
             return {
-                update(view, previous) {
-                    overlay.update?.(view, previous);
+                update() {
                     if (pointer) refresh(pointer);
                 },
                 destroy() {
                     listeners.abort();
-                    overlay.destroy?.();
+                    clearPointer();
+                    scrolling.destroy();
                 }
             };
         }
