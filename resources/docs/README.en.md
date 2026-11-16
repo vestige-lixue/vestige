@@ -5,7 +5,7 @@ For help with transcription parameters, see the [parameter reference](params.en.
 ## Getting started
 
 1. In the Transcription menu, open Manage backends and Manage models, and download a backend and a model that work together.
-2. Create a project, then choose Import from the Media menu, or drag audio or video files into the window.
+2. Create a project, then choose Import… from the Media menu, or drag audio or video files into the window.
 3. Select a media item in the sidebar and open its transcription configuration. Apply a preset, check the executor, backend folder, model folder and parameters, then choose Start transcription.
 4. Follow progress in Transcription tasks. When the task finishes, the transcript appears in the editor.
 5. Play the recording and correct the transcript as you listen.
@@ -15,13 +15,13 @@ For help with transcription parameters, see the [parameter reference](params.en.
 
 Use the Project menu to create, open, save or close a project. A .vestige project file stores references to media files, transcription results and proofreading edits. It does not contain the audio or video itself.
 
-To add media, choose Import from the Media menu, or drag media files or folders into the window. Dragging a single .vestige file opens that project instead. Imported media appear in the sidebar; select one to show its player and transcript.
+To add media, choose Import… from the Media menu, or drag media files or folders into the window. Dragging a single .vestige file opens that project instead. Imported media appear in the sidebar; select one to show its player and transcript.
 
 - Double-click a media name to rename it. The file on disk keeps its name.
 - Use Move earlier and Move later in the Media menu to reorder media.
 - Remove from project removes the media, its transcripts and its edits from the project. The media file itself is not deleted.
 
-When a media file is missing, has changed or cannot be read, its row shows the problem. Choose Locate file to point the project at the file again, or Ignore to dismiss the notice. Vestige compares the file size and an XXH3-64 hash of the full contents, so changing only the modification time does not affect the check. The selected media keeps its transcript even while its file is unavailable.
+When a media file is missing, has changed or cannot be read, its row shows the problem. Choose Locate file… to point the project at the file again, or Ignore to dismiss the notice. Vestige compares the file size and an XXH3-64 hash of the full contents, so changing only the modification time does not affect the check. The selected media keeps its transcript even while its file is unavailable.
 
 ## Prepare a backend and model
 
@@ -69,7 +69,7 @@ Right-click a ▼ marker, a gap marker, a selection, a word or your own added te
 
 - **Restore deleted text** and **Expand/Collapse deleted text** on deletion markers and shown deleted text.
 - **Replace with** lists text that other transcriptions of the same media recognized at the same time. Choosing an entry replaces the selection with it. On a gap marker, the same list appears as **Insert**. The Reference overlap threshold setting decides how closely the times must overlap.
-- **Vocabulary replacements** applies matching vocabulary rules, and **Add to vocabulary** creates a rule from a single-line selection.
+- **Vocabulary replacements** applies matching vocabulary rules, and **Add to vocabulary…** creates a rule from a single-line selection.
 - **Align with original** appears when text you typed contains characters that were deleted from the original. It marks those characters as original again, so they regain their timing. The displayed text does not change.
 - Cut, Copy and Paste.
 
@@ -80,12 +80,12 @@ Actions that change the text are unavailable while the project is busy, for exam
 Press Ctrl+F (⌘F on macOS) to find text in the displayed transcript, or Ctrl+H (⌥⌘F on macOS) to show the replace field as well. Selected single-line text becomes the search text.
 
 - Enter and Shift+Enter in the search field, or F3 and Shift+F3 (⌘G and ⇧⌘G on macOS), move to the next and previous match.
-- Match Case, Match Whole Word and Preserve Case can be toggled with Alt+C, Alt+W and Alt+P (⌥⌘C, ⌥⌘W and ⌥⌘P on macOS).
+- Match case, Match whole word and Preserve case can be toggled with Alt+C, Alt+W and Alt+P (⌥⌘C, ⌥⌘W and ⌥⌘P on macOS).
 - Enter in the replace field replaces the current match. Replace All (Ctrl+Alt+Enter, or ⌥⌘Enter on macOS) replaces every match as one undo step.
-- Add to Vocabulary opens a new vocabulary rule filled with the search and replacement text.
+- Add to vocabulary… opens a new vocabulary rule filled with the search and replacement text.
 - Escape closes the find bar.
 
-Find searches only the displayed text, not hidden or shown deleted text. Match Whole Word treats letters, digits and combining marks as word characters. Chinese and Japanese have no spaces between words, so with this option a match there must be bounded by punctuation, spaces or the start or end of the text. Preserve Case applies the case pattern of each match (all uppercase, all lowercase or a capitalized first letter) to the replacement.
+Find searches only the displayed text, not hidden or shown deleted text. Match whole word treats letters, digits and combining marks as word characters. Chinese and Japanese have no spaces between words, so with this option a match there must be bounded by punctuation, spaces or the start or end of the text. Preserve case applies the case pattern of each match (all uppercase, all lowercase or a capitalized first letter) to the replacement.
 
 ### Vocabulary
 
@@ -120,9 +120,19 @@ Open the Transcriptions button on a media row to see all of its results, each wi
 
 Edits belong to the displayed result. Switching to another result discards all edits, so Vestige asks for confirmation first. Deleting the displayed result also deletes its edits.
 
+## Exporting transcripts
+
+Choose **Export transcript…** from the **Media** menu, or press Ctrl+Alt+E (macOS: ⌥⌘E), to open the export dialog with the selected media’s **Proofread** text selected. **Export current transcript…** in the **Transcription** menu also defaults to the proofread text of the currently displayed result. The **Export this transcript…** button beside a result in the media’s transcription list preselects that original Run. You can still switch the content and choose plain text or SRT in the dialog. Export keeps the project intact and defaults to the media’s folder and original filename.
+
+Plain text preserves all text, whitespace and line breaks. SRT settings appear as vertical rows under **Each subtitle**, **Start a new subtitle** and **Display**. Each subtitle controls maximum duration (unlimited by default), maximum lines and maximum line width, in that order. Start a new subtitle controls line breaks, sentence-ending punctuation and pauses; any enabled condition can start a new subtitle. Display controls minimum display duration, extending it without going past the next subtitle’s start or the end of the media. CJK characters usually count as 2 columns and Latin letters as 1. These options are remembered for next time; **Restore defaults** returns them to their default values. Each subtitle line has its leading and trailing whitespace removed.
+
+Subtitles break only between dictionary words; a word is never split. Pauses inside a dictionary word do not start a new subtitle. Sentence, clause and closing punctuation stay with the preceding word; opening quotes and brackets stay with the following word. When a subtitle cannot fit, export looks back for suitable sentence-ending or clause punctuation. With splitting at line breaks disabled, text line breaks are retained inside the subtitle.
+
+SRT timing is interpolated character by character from the original transcription, in proportion to character width. Whitespace and punctuation take no time when sharing a timing group with spoken characters; a group containing only whitespace or punctuation retains its original interval. Consecutive tokens with identical positive time ranges share one timing group. Deleted characters retain their share of the original time; replacements divide the deleted characters’ time envelope by width, and insertions at a silence marker divide that gap. Other insertions use the preceding character’s end, or the following character’s start at the beginning or after a line break. If no following timed character exists, they use the preceding character’s end; the dialog reports their count. The estimated timing notice appears only when a subtitle boundary cuts inside a shared timing group; point-timed characters are ignored when checking this. Export normalizes start times and clips overlaps at the next distinct start. Check the exported subtitles against the recording.
+
 ## Save and resume work
 
-The first time you save, choose a name and location for the project. After that, the project is saved automatically about every 10 seconds. Use Save as to save another copy. The Compress project files setting removes whitespace from the JSON to make the file smaller.
+The first time you save, choose a name and location for the project. After that, the project is saved automatically about every 10 seconds. Use Save as… to save another copy. The Compress project files setting removes whitespace from the JSON to make the file smaller.
 
 The Media path storage mode setting decides how media locations are written:
 
@@ -148,6 +158,7 @@ When you close a project, open another one or quit, Vestige asks what to do with
 | Close project | Ctrl+W | ⌘W |
 | Import media | Ctrl+I | ⌘I |
 | Open transcription configuration | Ctrl+B | ⌘B |
+| Export transcript | Ctrl+Alt+E | ⌥⌘E |
 | Transcription tasks | Ctrl+T | ⌘T |
 | Vocabulary | Ctrl+L | ⌘L |
 | Settings | Ctrl+, | ⌘, |
@@ -186,12 +197,16 @@ When the macOS top row is set to media controls, the rewind, play/pause and fast
 | Find / Replace | Ctrl+F / Ctrl+H | ⌘F / ⌥⌘F |
 | Next / previous match | Enter / Shift+Enter, F3 / Shift+F3 | Enter / ⇧Enter, ⌘G / ⇧⌘G |
 | Replace / Replace all (in the replace field) | Enter / Ctrl+Alt+Enter | Enter / ⌥⌘Enter |
-| Match Case / Match Whole Word / Preserve Case | Alt+C / Alt+W / Alt+P | ⌥⌘C / ⌥⌘W / ⌥⌘P |
+| Match case / Match whole word / Preserve case | Alt+C / Alt+W / Alt+P | ⌥⌘C / ⌥⌘W / ⌥⌘P |
 | Close the find bar | Escape | Escape |
 
 ## Settings and documentation
 
-Settings cover the interface language, project files, transcription concurrency, editing, playback, theme and volume stabilization. A theme has three colors for each of light and dark: accent, background and text. Surfaces, borders and other colors are derived from these three. Drag the divider below the video to change its height.
+Settings cover the interface language, project files, transcription concurrency, editing, playback, theme and volume stabilization. A theme has three colors for each of light and dark: accent, background and text. Surfaces, borders and other colors are derived from these three. On first launch, the interface is in Chinese on Chinese systems and in English elsewhere. Drag the divider below the video to change its height.
+
+Under **General**, **Export settings…** saves all settings to a JSON file. **Import settings…** replaces all settings, including transcription presets, with those in a settings file after you confirm; the window size stays the same. **Restore default settings** returns the options shown in Settings to their default values; the interface language, transcription presets and export options are not affected. Settings data does not include the vocabulary; import or export it in the **Vocabulary** window.
+
+If the settings file cannot be read at startup, Vestige tells you and leaves the file unchanged. Fix the file and choose Retry, or choose Back up and reset… to save a copy of the original file before restoring the default settings.
 
 This guide shows its file location at the top, followed by a table of contents generated from its headings. Links to other local documents open in the same window, and Back returns to your previous reading position. Web links open in your browser.
 
@@ -277,8 +292,8 @@ For more parameter help, example values and backend notes, see the [parameter re
 - **Model fails to load:** check that the executor, the offline model format, the versions of its files and the token list all match. Renaming a file only helps Vestige find it; it does not convert the model.
 - **Download failed or cancelled:** retry it. Check the console output, your network connection and whether the models folder can be written to. Do not use partly downloaded files for transcription.
 - **A task seems stuck:** when total progress is unknown, the progress bar keeps moving without a percentage, and stages such as model loading can be silent for a while. Check the console output, which can be copied.
-- **Media missing or changed:** choose Locate file on the media row. If the file contents changed, the original transcript may no longer match the recording.
-- **The vocabulary cannot be read:** choose Retry after fixing the file, or Back up and reset… to keep a copy and start over.
+- **Media missing or changed:** choose Locate file… on the media row. If the file contents changed, the original transcript may no longer match the recording.
+- **A project, settings or vocabulary file cannot be read:** the message names the location of the problem, such as settings.playback.speed. An unsupported version means a newer version of Vestige wrote the file; open it with that version. For the settings and vocabulary files, fix the file and choose Retry, or choose Back up and reset… to keep a copy and start over.
 - **Highlighted text is out of sync with the sound:** run the audio synchronization offset test in Playback settings.
 
 ## Parameter documentation and more help
