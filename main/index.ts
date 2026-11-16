@@ -115,6 +115,7 @@ function startApplication(): void {
             runtimeCacheDirectory: paths.runtimeCacheDirectory
         }, tasks, taskAdmission);
         registerFileIPCs(mainWindow, {
+            dataDirectory: paths.dataDirectory,
             runtimeDirectory: paths.runtimeDirectory,
             modelDirectory: paths.modelDirectory,
             backendDirectory: paths.backendDirectory

@@ -26,6 +26,11 @@
     </TextButton>
 </div>
 <div class="transcriptionActions">
+    <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("user-data")}>
+        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+        {@html externalLinkIcon}
+        <span>{i18n.t("settings.general.openUserDataDirectory")}</span>
+    </TextButton>
     <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("backend")}>
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html externalLinkIcon}
@@ -644,12 +649,12 @@
         }
     }
 
-    async function openDirectory(kind: DownloadKind): Promise<void> {
+    async function openDirectory(kind: DownloadKind | "user-data"): Promise<void> {
         if (openingDirectory) return;
         openingDirectory = true;
         directoryFailure = "";
         try {
-            const result = await window.api.downloads.openDirectory(kind);
+            const result = await (kind === "user-data" ? window.api.file.openUserDataDirectory() : window.api.downloads.openDirectory(kind));
             if (!result.success) directoryFailure = describeFailure(result.error);
         }
         catch (error) {

@@ -16,8 +16,8 @@ import { readMedia } from "./media";
 import { getMediaURL, releaseMediaURL, releaseMediaURLs } from "./source";
 import { listDirectories } from "./directories";
 
-export function registerFileIPCs(window: BrowserWindow, paths: Pick<AppPaths, "runtimeDirectory" | "modelDirectory" | "backendDirectory">): void {
-    const { runtimeDirectory, modelDirectory, backendDirectory } = paths;
+export function registerFileIPCs(window: BrowserWindow, paths: Pick<AppPaths, "dataDirectory" | "runtimeDirectory" | "modelDirectory" | "backendDirectory">): void {
+    const { dataDirectory, runtimeDirectory, modelDirectory, backendDirectory } = paths;
     const contents = window.webContents;
     const directoryRoots = { backend: backendDirectory, model: modelDirectory };
     const checks = new Map<string, AbortController>();
@@ -86,6 +86,15 @@ export function registerFileIPCs(window: BrowserWindow, paths: Pick<AppPaths, "r
             if (isExpectedFailure(error)) return { success: false, error: error.failure };
             if (isSystemError(error)) return { success: false, error: fileOperationFailure(error, "inspect", error.path ?? null) };
             throw error;
+        }
+    });
+    handle(contents, fileChannels.openUserDataDirectory, async (): Promise<OperationResult> => {
+        try {
+            const diagnostic = await shell.openPath(dataDirectory);
+            return diagnostic ? { success: false, error: { kind: "file-operation-failed", operation: "open-directory", path: dataDirectory, diagnostic } } : { success: true };
+        }
+        catch (error) {
+            return { success: false, error: { kind: "file-operation-failed", operation: "open-directory", path: dataDirectory, diagnostic: error instanceof Error ? error.message : String(error) } };
         }
     });
     handle(contents, fileChannels.openFFmpegDirectory, async (): Promise<OperationResult> => {

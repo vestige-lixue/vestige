@@ -398,6 +398,7 @@
         },
         "general": {
             "title": "General",
+            "openUserDataDirectory": "Open user data folder",
             "language": {
                 "label": "Interface language",
                 "options": {

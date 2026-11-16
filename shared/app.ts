@@ -58,6 +58,7 @@ export type AppAPI = {
         selectMediaPaths(): Promise<AbsolutePath[]>;
         selectDirectory(kind: DownloadKind): Promise<AbsolutePath | null>;
         listDirectories(kind: DownloadKind): Promise<DirectoryListResult>;
+        openUserDataDirectory(): Promise<OperationResult>;
         openFFmpegDirectory(): Promise<OperationResult>;
     };
     transcription: {

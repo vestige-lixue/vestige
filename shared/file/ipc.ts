@@ -10,5 +10,6 @@ export const fileChannels = {
     selectMediaPaths: "file:select-media-paths",
     selectDirectory: "file:select-directory",
     listDirectories: "file:list-directories",
+    openUserDataDirectory: "file:open-user-data-directory",
     openFFmpegDirectory: "file:open-ffmpeg-directory"
 } as const;

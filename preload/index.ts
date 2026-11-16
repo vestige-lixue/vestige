@@ -96,6 +96,7 @@ const api: AppAPI = {
         selectMediaPaths: () => ipcRenderer.invoke(fileChannels.selectMediaPaths),
         selectDirectory: kind => ipcRenderer.invoke(fileChannels.selectDirectory, kind),
         listDirectories: kind => ipcRenderer.invoke(fileChannels.listDirectories, kind),
+        openUserDataDirectory: () => ipcRenderer.invoke(fileChannels.openUserDataDirectory),
         openFFmpegDirectory: () => ipcRenderer.invoke(fileChannels.openFFmpegDirectory)
     },
     transcription: {
