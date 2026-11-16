@@ -196,9 +196,9 @@
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
     import NiceLabel from "../util/NiceLabel.svelte";
     import Tooltip from "../util/Tooltip.svelte";
-    import newIcon from "../../../resources/icons/carbon--add-large.svg?raw";
-    import copyIcon from "../../../resources/icons/carbon--copy.svg?raw";
-    import checkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+    import newIcon from "../../../resources/icons/lucide--plus.svg?raw";
+    import copyIcon from "../../../resources/icons/lucide--copy.svg?raw";
+    import checkIcon from "../../../resources/icons/lucide--check.svg?raw";
     import * as settingsAPI from "../../states/settings";
 
     type Draft = { name: string; config: Config; deletable: boolean };

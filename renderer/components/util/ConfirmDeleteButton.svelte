@@ -26,8 +26,8 @@
     import { untrack } from "svelte";
     import * as i18n from "../../i18n.svelte";
     import Tooltip from "./Tooltip.svelte";
-    import removeIcon from "../../../resources/icons/carbon--trash-can.svg?raw";
-    import checkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+    import removeIcon from "../../../resources/icons/lucide--trash-2.svg?raw";
+    import checkIcon from "../../../resources/icons/lucide--check.svg?raw";
 
     type Props = {
         text: string;

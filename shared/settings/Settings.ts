@@ -1,5 +1,5 @@
 import { type tags } from "typia";
-import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits, type minRewindStepMs, type maxRewindStepMs, type minStartRewindMs, type maxStartRewindMs } from "../constants";
+import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits, type minRewindStepMs, type maxRewindStepMs, type minStartRewindMs, type maxStartRewindMs, type srtLimits } from "../constants";
 import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
@@ -33,6 +33,18 @@ export type Settings = {
             readonly config: Config;
             readonly presetName: string;
         } | null;
+    };
+    readonly export: {
+        readonly format: "txt" | "srt";
+        readonly srt: {
+            readonly maxLineWidth: (number & tags.Type<"uint32"> & tags.Minimum<typeof srtLimits.maxLineWidth.min> & tags.Maximum<typeof srtLimits.maxLineWidth.max>) | null;
+            readonly maxLines: number & tags.Type<"uint32"> & tags.Minimum<typeof srtLimits.maxLines.min> & tags.Maximum<typeof srtLimits.maxLines.max>;
+            readonly pauseSeconds: (number & tags.Minimum<typeof srtLimits.pauseSeconds.min> & tags.Maximum<typeof srtLimits.pauseSeconds.max>) | null;
+            readonly maxDurationSeconds: (number & tags.Minimum<typeof srtLimits.maxDurationSeconds.min> & tags.Maximum<typeof srtLimits.maxDurationSeconds.max>) | null;
+            readonly minDurationSeconds: number & tags.Minimum<typeof srtLimits.minDurationSeconds.min> & tags.Maximum<typeof srtLimits.minDurationSeconds.max>;
+            readonly splitAtLineBreaks: boolean;
+            readonly splitAtSentenceEnds: boolean;
+        };
     };
     readonly editing: {
         readonly followPlayback: boolean;
@@ -90,6 +102,7 @@ export type SettingsSnapshot = {
     readonly dirty: boolean;
     readonly saving: boolean;
     readonly error: FailureInfo | null;
+    readonly loadError: FailureInfo | null;
 };
 
 export type SettingsResult = ({
@@ -100,3 +113,14 @@ export type SettingsResult = ({
     snapshot: SettingsSnapshot;
     error: FailureInfo;
 });
+
+export type SettingsRecoveryResult = { success: true; canceled: boolean; snapshot: SettingsSnapshot } | { success: false; error: FailureInfo };
+
+export type SettingsFileResult = { success: true; canceled: boolean } | { success: false; error: FailureInfo };
+
+export type SettingsImportResult = { success: true; canceled: true } | {
+    success: true;
+    canceled: false;
+    name: string;
+    settings: Settings;
+} | { success: false; error: FailureInfo };

@@ -77,7 +77,7 @@
     import { mergePresets } from "../../../shared/transcription/presets";
     import { validTranscriptionConfig } from "../../../shared/settings/validate";
     import { describeFailure } from "../../failures";
-    import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
+    import settingsIcon from "../../../resources/icons/lucide--sliders-horizontal.svg?raw";
     import * as dialogsAPI from "../../states/dialogs";
     import * as settingsAPI from "../../states/settings";
     import * as transcriptionAPI from "../../states/transcription";

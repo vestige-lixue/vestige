@@ -217,8 +217,8 @@
 <script lang="ts">
     import { onDestroy, tick, untrack } from "svelte";
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
-    import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
-    import arrowRight from "../../../resources/icons/carbon--arrow-right.svg?raw";
+    import chevronRight from "../../../resources/icons/lucide--chevron-right.svg?raw";
+    import arrowRight from "../../../resources/icons/lucide--arrow-right.svg?raw";
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuFocus, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
     import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection, transcriptReferenceTarget, applyTranscriptReference } from "../../editor/transcript";

@@ -137,7 +137,7 @@ export class VocabularyStore {
                 // A backup pointing at the live file (including a link) would be lost during the reset.
                 const destination = await statOrNull(backup);
                 if (destination && source.dev === destination.dev && source.ino === destination.ino) {
-                    return { success: false, error: { kind: "vocabulary-backup-path" } };
+                    return { success: false, error: { kind: "backup-same-file" } };
                 }
                 try {
                     await copyFile(this.path, backup);

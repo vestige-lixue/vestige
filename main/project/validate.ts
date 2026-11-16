@@ -8,6 +8,7 @@ import { createTextIndex, normalizeModifications, type TextIndex } from "../../s
 import { projectVersion } from "../../shared/project/constants";
 import { type AbsolutePath } from "../../shared/util/path";
 import { resolveMediaPath } from "./path";
+import { checkVersion, structureError } from "../util/data";
 
 // JSON stores plain strings; establish the path brand after structural validation.
 type SerializedProject = Omit<Project, "version" | "selectedMediaId" | "vestiges"> & {
@@ -42,7 +43,7 @@ function timeRange(range: Range, path: string, maximum?: number): void {
 function execution(run: Run, path: string): void {
     const { request, plan, deviations, log } = run.execution;
     const invalid = (field: string, expected: string): never => {
-        throw new VestigeErrors({ kind: "project-invalid-structure", path: `${path}.${field}`, expected });
+        throw new VestigeErrors({ kind: "invalid-structure", path: `${path}.${field}`, expected });
     };
     if (!configsEqual(run.config, request) || plan.executor !== request.executor) invalid("request", "the Run's requested configuration and matching executor");
     if (log && log.taskId !== run.id) invalid("log.taskId", "the Run's task id");
@@ -85,6 +86,7 @@ function execution(run: Run, path: string): void {
 }
 
 export function parseProject(value: unknown, directory?: AbsolutePath): Project {
+    checkVersion("project", value, projectVersion);
     const checked = typia.assertEquals<SerializedProject>(value, props => {
         const path = props.path?.replace(/^\$input/, "project") ?? "project";
         // Classify generated scalar failures without repeating their validation rules.
@@ -94,9 +96,8 @@ export function parseProject(value: unknown, directory?: AbsolutePath): Project 
         if (typeof props.value === "string" && (path.endsWith(".media.id") || path === "project.selectedMediaId")) {
             return new VestigeErrors({ kind: "project-invalid-uuid", path }, { cause: props });
         }
-        return new VestigeErrors({ kind: "project-invalid-structure", path, expected: props.expected }, { cause: props });
+        return structureError("project", props);
     });
-    if (checked.version !== projectVersion) throw new VestigeErrors({ kind: "project-version", version: checked.version });
     // Own every nested object before resolving paths or normalizing modifications.
     const project = structuredClone(checked);
     const mediaIds = new Set<string>();
@@ -146,7 +147,7 @@ export function parseProject(value: unknown, directory?: AbsolutePath): Project 
                 modifications = normalizeModifications(textIndex, vestige.modifications);
             }
             catch (cause) {
-                throw new VestigeErrors({ kind: "project-invalid-structure", path: `${path}.modifications`, expected: "non-overlapping source deletions and valid insertions" }, { cause });
+                throw new VestigeErrors({ kind: "invalid-structure", path: `${path}.modifications`, expected: "non-overlapping source deletions and valid insertions" }, { cause });
             }
             return { ...vestige, media: { ...media, path: resolvedPath }, modifications };
         })

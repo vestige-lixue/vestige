@@ -75,9 +75,9 @@
     import * as transcription from "../../states/transcription.svelte";
     import Tooltip from "../util/Tooltip.svelte";
     import { runCommand } from "../../states/commands";
-    import bookIcon from "../../../resources/icons/carbon--book.svg?raw";
-    import taskBlankIcon from "../../../resources/icons/carbon--task-blank.svg?raw";
-    import settingsIcon from "../../../resources/icons/carbon--settings.svg?raw";
+    import bookIcon from "../../../resources/icons/lucide--book-a.svg?raw";
+    import taskBlankIcon from "../../../resources/icons/lucide--list-todo.svg?raw";
+    import settingsIcon from "../../../resources/icons/lucide--settings.svg?raw";
 
     let { firstButton = $bindable(null) }: { firstButton?: HTMLButtonElement | null } = $props();
 

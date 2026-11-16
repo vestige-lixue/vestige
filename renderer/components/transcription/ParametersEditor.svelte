@@ -121,7 +121,7 @@
     import { flushSync, untrack } from "svelte";
     import * as i18n from "../../i18n.svelte";
     import Tooltip from "../util/Tooltip.svelte";
-    import closeIcon from "../../../resources/icons/carbon--close.svg?raw";
+    import closeIcon from "../../../resources/icons/lucide--x.svg?raw";
     import * as dialogsAPI from "../../states/dialogs";
 
     type Row = { key: string; value: string };

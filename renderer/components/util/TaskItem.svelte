@@ -137,7 +137,7 @@
     import { Accordion } from "bits-ui";
     import ProgressBar from "./ProgressBar.svelte";
     import ConsoleOutput from "./ConsoleOutput.svelte";
-    import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
+    import chevronRight from "../../../resources/icons/lucide--chevron-right.svg?raw";
 
     type Props = {
         value: string;

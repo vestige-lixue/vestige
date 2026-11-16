@@ -62,6 +62,17 @@
                                     {@html checkmarkIcon}
                                 </span>
                             {/if}
+                            <Tooltip text={i18n.t("transcript.export.runAction")} disabled={disabled || hasDialog} onclick={event => {
+                                event.stopPropagation();
+                                runCommand({ kind: "exportTranscript", mediaId, runId: run.id });
+                            }}>
+                                {#snippet child({ props })}
+                                    <button {...props} class="exportButton icon-button hoverable activable focusable">
+                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                        {@html exportIcon}
+                                    </button>
+                                {/snippet}
+                            </Tooltip>
                             <ConfirmDeleteButton text={i18n.t(displayed ? "transcript.runs.actions.removeWithEdits" : "transcript.runs.actions.remove")}
                                 disabled={disabled || hasDialog} resetKey={displayed} onconfirm={() => removeRun(run.id)} />
                         </div>
@@ -85,6 +96,9 @@
     :global(.runsTrigger:disabled) {
         opacity: 0.4;
     }
+    .exportButton, .option-checkmark { box-sizing: border-box; width: 26px; height: 26px; flex-shrink: 0; }
+    .option-checkmark { padding: 4px; }
+    .exportButton:disabled { opacity: 0.4; }
     .runCount {
         position: absolute;
         right: 1px;
@@ -112,8 +126,8 @@
     .runRow {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 4px 8px;
+        gap: 4px;
+        padding: 4px 2px 4px 8px;
         border-radius: 4px;
         flex-shrink: 0;
         cursor: pointer;
@@ -165,8 +179,9 @@
     import Tooltip from "../util/Tooltip.svelte";
     import PopoverContent from "../util/PopoverContent.svelte";
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
+    import exportIcon from "../../../resources/icons/lucide--file-down.svg?raw";
     import filesIcon from "../../../resources/icons/lucide--files.svg?raw";
-    import checkmarkIcon from "../../../resources/icons/carbon--checkmark.svg?raw";
+    import checkmarkIcon from "../../../resources/icons/lucide--check.svg?raw";
     import * as projectAPI from "../../states/project";
 
     type Props = {

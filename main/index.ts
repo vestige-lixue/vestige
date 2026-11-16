@@ -3,6 +3,7 @@ import { app, BrowserWindow, nativeTheme, screen } from "electron";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { registerTranscriptionIPCs } from "./transcription/ipc";
+import { registerExportIPCs } from "./export/ipc";
 import { registerProjectIPCs } from "./project/ipc";
 import { registerWindowLifecycle } from "./lifecycle";
 import { appChannels } from "../shared/ipc";
@@ -58,7 +59,7 @@ function startApplication(): void {
         restoreConsole();
         applicationLog?.close(`exit ${code}`);
     });
-    settings.initialize(paths.dataDirectory);
+    settings.initialize(paths.dataDirectory, app.getPreferredSystemLanguages());
     const vocabulary = new VocabularyStore(paths.vocabularyPath);
     setLocale(settings.get().settings.language);
     settings.subscribe(snapshot => setLocale(snapshot.settings.language));
@@ -123,6 +124,7 @@ function startApplication(): void {
         registerAppIPCs(mainWindow, logs);
         if (process.platform === "darwin") registerMenuIPCs(mainWindow);
         registerProjectIPCs(mainWindow);
+        registerExportIPCs(mainWindow);
         registerVocabularyIPCs(mainWindow, vocabulary);
         const rememberWindow = registerSettingsIPCs(mainWindow);
         registerWindowTheme(mainWindow);

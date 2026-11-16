@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import typia from "typia";
-import { VestigeErrors } from "../../shared/failure";
+import { VestigeErrors, isExpectedFailure } from "../../shared/failure";
 import { type VocabularyFile, type VocabularyRule, vocabularyRuleIssue } from "../../shared/vocabulary/Vocabulary";
 import { fileOperationFailure, writeFileAtomic } from "../util/fs";
+import { checkVersion, decodeUTF8, parseJSON, structureError } from "../util/data";
 
 async function readText(path: string): Promise<string> {
     let bytes: Buffer;
@@ -13,30 +14,31 @@ async function readText(path: string): Promise<string> {
     catch (error) {
         throw new VestigeErrors(fileOperationFailure(error as NodeJS.ErrnoException, "read", path), { cause: error });
     }
-    try {
-        // TextDecoder consumes the optional UTF-8 BOM and preserves every subsequent character.
-        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    }
-    catch {
-        throw new VestigeErrors({ kind: "vocabulary-invalid-file" });
-    }
+    return decodeUTF8(bytes);
 }
 
-function parseJSON(text: string): unknown {
-    try {
-        return JSON.parse(text);
-    }
-    catch {
-        return undefined;
-    }
-}
+const ruleExpectations = {
+    emptySource: { field: "source", expected: "a nonempty string" },
+    multilineSource: { field: "source", expected: "a single line" },
+    multilineReplacement: { field: "replacement", expected: "a single line" },
+    unchanged: { field: "replacement", expected: "text different from the source" }
+} as const;
 
 function validatedVocabulary(value: unknown): VocabularyFile {
-    if (!typia.equals<VocabularyFile>(value) || value.rules.some(vocabularyRuleIssue)
-        || new Set(value.rules.map(rule => rule.id.toLowerCase())).size !== value.rules.length) {
-        throw new VestigeErrors({ kind: "vocabulary-invalid-file" });
-    }
-    return value;
+    checkVersion("vocabulary", value, 1 satisfies VocabularyFile["version"]);
+    const checked = typia.assertEquals<VocabularyFile>(value, props => structureError("vocabulary", props));
+    const ids = new Set<string>();
+    checked.rules.forEach((rule, index) => {
+        const issue = vocabularyRuleIssue(rule);
+        if (issue) {
+            const { field, expected } = ruleExpectations[issue];
+            throw new VestigeErrors({ kind: "invalid-structure", path: `vocabulary.rules[${index}].${field}`, expected });
+        }
+        const id = rule.id.toLowerCase();
+        if (ids.has(id)) throw new VestigeErrors({ kind: "invalid-structure", path: `vocabulary.rules[${index}].id`, expected: "an id unique within the vocabulary" });
+        ids.add(id);
+    });
+    return checked;
 }
 
 export async function readVocabulary(path: string): Promise<VocabularyFile> {
@@ -56,10 +58,14 @@ export async function readVocabularyImport(path: string): Promise<{ rules: Omit<
     const text = await readText(path);
     const extension = extname(path).toLowerCase();
     if (extension === ".json" || /^\s*(?:\{|\[)/u.test(text)) {
-        const json = parseJSON(text);
         // A JSON export can have any confirmed filename. A literal TSV source can also begin with a brace.
         const tabular = extension === ".tsv" || extension === ".txt" || /^[^\r\n]*\t/u.test(text);
-        if (json !== undefined || extension === ".json" || !tabular) return { rules: validatedVocabulary(json).rules, skipped: 0 };
+        try {
+            return { rules: validatedVocabulary(parseJSON(text)).rules, skipped: 0 };
+        }
+        catch (error) {
+            if (!isExpectedFailure(error) || error.failure.kind !== "invalid-json" || extension === ".json" || !tabular) throw error;
+        }
     }
     const rules: Omit<VocabularyRule, "id">[] = [];
     let skipped = 0;

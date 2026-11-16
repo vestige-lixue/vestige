@@ -82,7 +82,7 @@
     import { isProjectFile } from "../../../shared/project/file";
     import { onDestroy } from "svelte";
     import { Portal } from "bits-ui";
-    import downloadIcon from "../../../resources/icons/carbon--download.svg?raw";
+    import downloadIcon from "../../../resources/icons/lucide--import.svg?raw";
     import { interfaceBlocked } from "../../states/commands";
     import * as mediaImport from "../../states/mediaImport.svelte";
     import * as modal from "../../states/modal.svelte";

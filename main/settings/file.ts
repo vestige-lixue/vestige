@@ -4,20 +4,37 @@ import { dirname } from "node:path";
 import { type Settings } from "../../shared/settings/Settings";
 import { defaultSettings } from "../../shared/settings/defaults";
 import { themeSchemes } from "../../shared/theme";
-import { validSettings } from "./validate";
-import { writeFileAtomic } from "../util/fs";
+import { parseSettings } from "./validate";
+import { decodeUTF8, parseJSON } from "../util/data";
+import { errorCode, fileOperationFailure, writeFileAtomic } from "../util/fs";
+import { type FailureInfo, isExpectedFailure } from "../../shared/failure";
 
-export function readSettings(path: string): { settings: Settings; savedText: string | null } {
-    let value: unknown;
-    let savedText: string | null = null;
+export function readSettings(path: string, preferredLanguages: readonly string[] = []): { settings: Settings; savedText: string | null; loadError: FailureInfo | null } {
+    const fallback = (loadError: FailureInfo | null): ReturnType<typeof readSettings> => {
+        const language = preferredLanguages.map(language => language.split("-")[0]?.toLowerCase())
+            .find(language => language === "zh" || language === "en");
+        return { settings: { ...structuredClone(defaultSettings), language: language === "zh" ? "zh-CN" : "en" }, savedText: null, loadError };
+    };
+    // Reading never writes or creates backups.
+    let bytes: Buffer;
     try {
-        value = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
-        savedText = JSON.stringify(value);
+        bytes = readFileSync(path);
     }
-    catch {
-        // Reading never writes, creates backups or reports recovery warnings.
-        value = null;
+    catch (error) {
+        return fallback(errorCode(error) === "ENOENT" ? null : fileOperationFailure(error as NodeJS.ErrnoException, "read", path));
     }
+    try {
+        const value = parseJSON(decodeUTF8(bytes));
+        const savedText = JSON.stringify(value);
+        return { settings: parseSettings(normalizeSettings(value)), savedText, loadError: null };
+    }
+    catch (error) {
+        if (!isExpectedFailure(error)) throw error;
+        return fallback(error.failure);
+    }
+}
+
+export function normalizeSettings(value: unknown): unknown {
     // Spell checking was removed; discard its legacy field before strict validation.
     if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
         && "spellcheck" in value.editing) {
@@ -52,8 +69,20 @@ export function readSettings(path: string): { settings: Settings; savedText: str
         const { rewindStepMs, startRewindMs } = defaultSettings.playback;
         value.playback = { rewindStepMs, startRewindMs, ...value.playback };
     }
-    if (validSettings(value)) return { settings: value, savedText };
-    return { settings: structuredClone(defaultSettings), savedText: null };
+    if (value && typeof value === "object" && !("export" in value)) {
+        value = { ...value, export: structuredClone(defaultSettings.export) };
+    }
+    if (value && typeof value === "object" && "export" in value && value.export && typeof value.export === "object"
+        && "srt" in value.export && value.export.srt && typeof value.export.srt === "object" && !("splitAtSentenceEnds" in value.export.srt)) {
+        value.export.srt = { ...value.export.srt, splitAtSentenceEnds: defaultSettings.export.srt.splitAtSentenceEnds };
+    }
+    // Discard removed SRT controls before strict validation, preserving other preferences.
+    if (value && typeof value === "object" && "export" in value && value.export && typeof value.export === "object"
+        && "srt" in value.export && value.export.srt && typeof value.export.srt === "object") {
+        if ("tokenBasis" in value.export.srt) delete value.export.srt.tokenBasis;
+        if ("maxTokens" in value.export.srt) delete value.export.srt.maxTokens;
+    }
+    return value;
 }
 
 export async function writeSettings(path: string, text: string): Promise<void> {

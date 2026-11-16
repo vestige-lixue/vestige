@@ -197,64 +197,15 @@
         ]
     },
     {
-        "name": "Carbon Icons",
-        "license": "Apache-2.0",
-        "url": "https://github.com/carbon-design-system/carbon",
-        "files": [
-            {
-                "file": "carbon-icons.txt",
-                "source": "https://raw.githubusercontent.com/carbon-design-system/carbon/main/LICENSE"
-            }
-        ]
-    },
-    {
-        "name": "Remix Icon",
-        "license": "Apache-2.0",
-        "url": "https://github.com/Remix-Design/RemixIcon/tree/v4.3.0",
-        "files": [
-            {
-                "file": "remix-icons.txt",
-                "source": "https://unpkg.com/remixicon@4.3.0/License",
-                "version": "4.3.0"
-            }
-        ]
-    },
-    {
-        "name": "CoreUI Icons Free",
-        "license": "CC-BY-4.0",
-        "url": "https://github.com/coreui/coreui-icons",
-        "files": [
-            {
-                "file": "coreui-icons.txt",
-                "source": "https://raw.githubusercontent.com/coreui/coreui-icons/main/LICENSE"
-            },
-            {
-                "file": "CC-BY-4.0.txt",
-                "source": "https://creativecommons.org/licenses/by/4.0/legalcode.txt"
-            }
-        ]
-    },
-    {
-        "name": "VS Code Codicons",
-        "license": "CC-BY-4.0",
-        "url": "https://github.com/microsoft/vscode-codicons",
-        "files": [
-            {
-                "file": "CC-BY-4.0.txt",
-                "source": "https://github.com/microsoft/vscode-codicons/blob/main/LICENSE",
-                "note": "Microsoft Corporation. Bundled case-sensitive, whole-word, arrow-up, arrow-down, replace, replace-all and preserve-case SVG icons from src/icons, unchanged except for whitespace."
-            }
-        ]
-    },
-    {
         "name": "Lucide Icons",
-        "license": "ISC",
+        "license": "ISC AND MIT",
         "url": "https://lucide.dev/",
         "files": [
             {
                 "file": "lucide.txt",
-                "source": "https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE",
-                "note": "ISC section for the bundled files, folder-open, languages, and square-pen icons. The upstream file also lists Feather-derived icons under MIT."
+                "source": "lucide-static@0.460.0/LICENSE",
+                "note": "Bundled icons from lucide-static@0.460.0: arrow-down, arrow-right, arrow-right-to-line, arrow-up, book-a, book-plus, captions, case-sensitive, case-upper, check, chevron-right, circle-alert, circle-chevron-left, circle-chevron-right, contrast, copy, external-link, file-down, files, folder-open, folder-symlink, gauge, import, languages, list-end, list-todo, menu, moon, pause, play, plus, repeat, repeat-1, replace, replace-all, settings, skip-back, skip-forward, sliders-horizontal, square-pen, sun, trash-2, volume-2, whole-word, x. Root license comment, class, width and height removed; stroke-width changed to 1.75; all other SVG attributes and child elements unchanged. lucide--volume-auto.svg is a custom adaptation of volume-1. The full package ISC license is retained, together with the full Feather MIT section from https://raw.githubusercontent.com/lucide-icons/lucide/main/LICENSE.",
+                "version": "0.460.0"
             }
         ]
     }

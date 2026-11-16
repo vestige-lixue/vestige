@@ -419,19 +419,19 @@
     import * as transcript from "../../states/transcript.svelte";
 
     import { commandDisabled, runCommand } from "../../states/commands";
-    import skipBackIcon from "../../../resources/icons/carbon--skip-back.svg?raw";
-    import playIcon from "../../../resources/icons/carbon--play.svg?raw";
-    import pauseIcon from "../../../resources/icons/carbon--pause.svg?raw";
-    import skipForwardIcon from "../../../resources/icons/carbon--skip-forward.svg?raw";
-    import volumeUpIcon from "../../../resources/icons/carbon--volume-up.svg?raw";
-    import volumeAutoIcon from "../../../resources/icons/volume-auto.svg?raw";
-    import meterAltIcon from "../../../resources/icons/carbon--meter-alt.svg?raw";
-    import previousOutlineIcon from "../../../resources/icons/carbon--previous-outline.svg?raw";
-    import nextOutlineIcon from "../../../resources/icons/carbon--next-outline.svg?raw";
-    import playOnceIcon from "../../../resources/icons/play-once.svg?raw";
-    import orderPlayIcon from "../../../resources/icons/ri--order-play-line.svg?raw";
-    import repeatIcon from "../../../resources/icons/carbon--repeat.svg?raw";
-    import repeatOneIcon from "../../../resources/icons/carbon--repeat-one.svg?raw";
+    import skipBackIcon from "../../../resources/icons/lucide--skip-back.svg?raw";
+    import playIcon from "../../../resources/icons/lucide--play.svg?raw";
+    import pauseIcon from "../../../resources/icons/lucide--pause.svg?raw";
+    import skipForwardIcon from "../../../resources/icons/lucide--skip-forward.svg?raw";
+    import volumeUpIcon from "../../../resources/icons/lucide--volume-2.svg?raw";
+    import volumeAutoIcon from "../../../resources/icons/lucide--volume-auto.svg?raw";
+    import meterAltIcon from "../../../resources/icons/lucide--gauge.svg?raw";
+    import previousOutlineIcon from "../../../resources/icons/lucide--circle-chevron-left.svg?raw";
+    import nextOutlineIcon from "../../../resources/icons/lucide--circle-chevron-right.svg?raw";
+    import playOnceIcon from "../../../resources/icons/lucide--arrow-right-to-line.svg?raw";
+    import orderPlayIcon from "../../../resources/icons/lucide--list-end.svg?raw";
+    import repeatIcon from "../../../resources/icons/lucide--repeat.svg?raw";
+    import repeatOneIcon from "../../../resources/icons/lucide--repeat-1.svg?raw";
     import * as playerAPI from "../../states/player";
 
     const { levels }: { levels: AudioLevels | null } = $props();

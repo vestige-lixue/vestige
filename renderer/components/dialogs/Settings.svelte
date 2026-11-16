@@ -4,7 +4,9 @@
     <Dialog.Title class="modal-title">{i18n.t("settings.title")}</Dialog.Title>
     {#if mounted}
         <svelte:boundary>
-            <SettingsContent {dialogId} bind:beforeClose />
+            {#key contentVersion}
+                <SettingsContent {dialogId} bind:beforeClose onDataReplaced={() => contentVersion++} />
+            {/key}
             {#snippet pending()}
                 <div>{i18n.t("settings.loading")}</div>
             {/snippet}
@@ -41,6 +43,7 @@
     let { open = $bindable(), dialogId, onClosed }: { open: boolean; dialogId: string; onClosed: () => void } = $props();
     let beforeClose = $state<() => Promise<boolean>>();
     let mounted = $state(false);
+    let contentVersion = $state(0);
 
     onMount(() => {
         // Let Bits UI commit its dialog refs before starting the async boundary.

@@ -1,3 +1,4 @@
+export { exportChannels } from "./export/ipc";
 export { appChannels } from "./app/ipc";
 export { menuChannels } from "./menu/ipc";
 export { fileChannels } from "./file/ipc";

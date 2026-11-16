@@ -215,9 +215,9 @@
     import { flushSync, onDestroy, onMount, tick, untrack } from "svelte";
     import { IsUsingKeyboard, Menubar } from "bits-ui";
     import ProjectStatus from "./ProjectStatus.svelte";
-    import menuIcon from "../../../resources/icons/carbon--menu.svg?raw";
-    import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
-    import externalLinkIcon from "../../../resources/icons/cil--external-link.svg?raw";
+    import menuIcon from "../../../resources/icons/lucide--menu.svg?raw";
+    import chevronRight from "../../../resources/icons/lucide--chevron-right.svg?raw";
+    import externalLinkIcon from "../../../resources/icons/lucide--external-link.svg?raw";
     import { commandDisabled, commandLabel, runCommand, interfaceBlocked, type Command } from "../../states/commands";
     import { type EditAction } from "../../../shared/app";
     import { editAvailable, runEdit as performEdit } from "../../edit";

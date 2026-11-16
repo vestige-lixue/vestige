@@ -112,8 +112,8 @@
     import * as i18n from "../../i18n.svelte";
     import * as modal from "../../states/modal.svelte";
     import { observeFontSize } from "../../dom";
-    import checkmark from "../../../resources/icons/carbon--checkmark.svg?raw";
-    import closeIcon from "../../../resources/icons/carbon--close.svg?raw";
+    import checkmark from "../../../resources/icons/lucide--check.svg?raw";
+    import closeIcon from "../../../resources/icons/lucide--x.svg?raw";
 
     type Props = {
         items: { value: string; label: string; disabled?: boolean }[];

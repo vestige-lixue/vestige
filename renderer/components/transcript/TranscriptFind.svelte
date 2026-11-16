@@ -126,16 +126,16 @@
     import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { shortcut } from "../../keybindings";
     import Tooltip from "../util/Tooltip.svelte";
-    import chevronIcon from "../../../resources/icons/carbon--chevron-right.svg?raw";
-    import closeIcon from "../../../resources/icons/carbon--close.svg?raw";
-    import bookIcon from "../../../resources/icons/carbon--book.svg?raw";
-    import caseIcon from "../../../resources/icons/codicon--case-sensitive.svg?raw";
-    import wordIcon from "../../../resources/icons/codicon--whole-word.svg?raw";
-    import upIcon from "../../../resources/icons/codicon--arrow-up.svg?raw";
-    import downIcon from "../../../resources/icons/codicon--arrow-down.svg?raw";
-    import replaceIcon from "../../../resources/icons/codicon--replace.svg?raw";
-    import replaceAllIcon from "../../../resources/icons/codicon--replace-all.svg?raw";
-    import preserveIcon from "../../../resources/icons/codicon--preserve-case.svg?raw";
+    import chevronIcon from "../../../resources/icons/lucide--chevron-right.svg?raw";
+    import closeIcon from "../../../resources/icons/lucide--x.svg?raw";
+    import bookIcon from "../../../resources/icons/lucide--book-plus.svg?raw";
+    import caseIcon from "../../../resources/icons/lucide--case-sensitive.svg?raw";
+    import wordIcon from "../../../resources/icons/lucide--whole-word.svg?raw";
+    import upIcon from "../../../resources/icons/lucide--arrow-up.svg?raw";
+    import downIcon from "../../../resources/icons/lucide--arrow-down.svg?raw";
+    import replaceIcon from "../../../resources/icons/lucide--replace.svg?raw";
+    import replaceAllIcon from "../../../resources/icons/lucide--replace-all.svg?raw";
+    import preserveIcon from "../../../resources/icons/lucide--case-upper.svg?raw";
 
     let queryInput: HTMLInputElement;
     let replacementInput = $state<HTMLInputElement>();

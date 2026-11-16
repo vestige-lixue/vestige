@@ -17,12 +17,12 @@
         "project": {
             "title": "Project",
             "new": "New",
-            "open": "Open",
-            "saveAs": "Save as"
+            "open": "Open…",
+            "saveAs": "Save as…"
         },
         "media": {
             "title": "Media",
-            "import": "Import"
+            "import": "Import…"
         },
         "transcription": {
             "title": "Transcription"
@@ -73,8 +73,8 @@
             "disableStabilization": "Disable volume stabilization",
             "restoreSpeed": "Restore playback speed",
             "focusSlider": "Focus slider",
-            "previousMedia": "Previous file",
-            "nextMedia": "Next file",
+            "previousMedia": "Previous media file",
+            "nextMedia": "Next media file",
             "previousWord": "Previous word",
             "nextWord": "Next word"
         },
@@ -91,7 +91,7 @@
             "checking": "Checking media",
             "actions": {
                 "ignore": "Ignore",
-                "relocate": "Locate file"
+                "relocate": "Locate file…"
             },
             "status": {
                 "missing": "Media missing",
@@ -254,7 +254,7 @@
             }
         },
         "actions": {
-            "new": "New transcription",
+            "new": "New transcription…",
             "reviewFailure": "View error details",
             "cancelQueued": "Cancel transcription",
             "stop": "Stop transcription"
@@ -295,14 +295,17 @@
         },
         "vocabulary": {
             "title": "Vocabulary",
-            "add": "Add to vocabulary",
-            "addRule": "Add",
+            "add": "Add to vocabulary…",
+            "addTitle": "Add to vocabulary",
+            "addRule": "Add rule…",
             "backupAndReset": "Back up and reset…",
             "import": "Import…",
             "export": "Export…",
             "importTitle": "Import vocabulary rules",
             "exportTitle": "Export vocabulary rules",
-            "importSummary": "Imported {{imported}} and skipped {{skipped}}.",
+            "importSummary": "Imported: {{imported}}. Skipped: {{skipped}}.",
+            "importFailure": "Could not import vocabulary rules: {{error}}",
+            "loadFailure": "Cannot read the vocabulary file: {{error}}",
             "backupTitle": "Save vocabulary backup",
             "editRule": "Edit rule",
             "source": "Replace",
@@ -313,38 +316,70 @@
             "search": "Search source or replacement text",
             "enableRule": "Enable rule: {{source}}",
             "actions": "Actions",
-            "edit": "Edit rule",
+            "edit": "Edit rule…",
             "remove": "Delete rule",
             "empty": "No rules yet.",
             "noResults": "No matching rules.",
-            "errors": {
-                "backupPath": "Choose a different file for the backup.",
+            "validation": {
                 "emptySource": "Enter the text you want to replace.",
                 "multilineSource": "Multiline text is not supported. Remove the line breaks from the original text.",
                 "multilineReplacement": "Multiline text is not supported. Remove the line breaks from the replacement text.",
-                "unchanged": "The replacement is the same as the original text.",
-                "invalidFile": "The vocabulary file is invalid or uses an unsupported version. The original file has not been changed.",
-                "invalidRule": "Invalid vocabulary rule.",
-                "duplicate": "This rule already exists.",
-                "conflict": "The vocabulary changed and the list was refreshed. Review it and try again."
+                "unchanged": "The replacement is the same as the original text."
             }
         }
     },
     "transcript": {
+        "export": {
+            "title": "Export",
+            "action": "Export transcript…",
+            "currentAction": "Export current transcript…",
+            "runAction": "Export this transcript…",
+            "submit": "Export…",
+            "content": "Content",
+            "proofread": "Proofread",
+            "original": "Original result:",
+            "run": "Transcription",
+            "format": "Format",
+            "txt": "Plain text (.txt)",
+            "srt": "Subtitle file (.srt)",
+            "eachSubtitle": "Each subtitle",
+            "eachSubtitleDescription": "When text does not fit, a new subtitle starts at the nearest earlier sentence or clause punctuation.",
+            "newSubtitle": "Start a new subtitle",
+            "newSubtitleDescription": "A new subtitle starts when any enabled condition below is met.",
+            "lineWidth": "Maximum line width",
+            "lineWidthDescription": "CJK characters usually count as 2 columns; Latin letters usually count as 1.",
+            "maxLines": "Maximum lines",
+            "lines": "lines",
+            "pause": "At pauses",
+            "pauseDescription": "Where the silence between two words reaches this length.",
+            "seconds": "seconds",
+            "longest": "Maximum duration",
+            "display": "Display",
+            "shortest": "Minimum display duration",
+            "shortestDescription": "Extend display without going past the next subtitle’s start or the end of the media.",
+            "splitAtLineBreaks": "At line breaks",
+            "splitAtSentenceEnds": "At sentence-ending punctuation",
+            "unlimited": "Unlimited",
+            "noPauseSplit": "Disabled",
+            "estimated": "This transcription lacks sufficient timing information. Some subtitle times will be estimated from text width.",
+            "unanchored_one": "1 piece of added text has no audio time anchor. It will follow the adjacent text.",
+            "unanchored_other": "{{count}} pieces of added text have no audio time anchor. They will follow the adjacent text.",
+            "reset": "Restore defaults"
+        },
         "find": {
             "title": "Find",
             "replacement": "Replace",
             "replace": "Replace",
-            "replaceAll": "Replace All",
-            "previous": "Previous Match",
-            "next": "Next Match",
-            "close": "Close Find",
-            "caseSensitive": "Match Case",
-            "preserveCase": "Preserve Case",
-            "wholeWord": "Match Whole Word",
-            "expand": "Show Replace",
-            "collapse": "Hide Replace",
-            "addToVocabulary": "Add to Vocabulary"
+            "replaceAll": "Replace all",
+            "previous": "Previous match",
+            "next": "Next match",
+            "close": "Close find",
+            "caseSensitive": "Match case",
+            "preserveCase": "Preserve case",
+            "wholeWord": "Match whole word",
+            "expand": "Show replace",
+            "collapse": "Hide replace",
+            "addToVocabulary": "Add to vocabulary…"
         },
         "reference": {
             "replace": "Replace with",
@@ -355,7 +390,7 @@
             "blankProbability": "No speech",
             "noPlayableAudio": "No playable audio",
             "gap": "No-speech gaps",
-            "gaps": "{{count}} ({{duration}}s)",
+            "gaps": "{{count}} ({{duration}} s)",
             "restore": "Restore deleted text",
             "align": "Align with original",
             "expand": "Expand deleted text",
@@ -371,17 +406,23 @@
             }
         },
         "switchRun": {
-            "title": "Switch displayed result",
+            "title": "Switch displayed transcription",
             "description": "Switching will discard all your edits.",
             "confirm": "Discard edits and switch"
         },
-        "emptyMedia": "This media has no transcript yet.",
+        "emptyMedia": "This media file has no transcriptions yet.",
         "empty": "Your transcript will appear here."
     },
     "settings": {
+        "loadFailure": {
+            "title": "Cannot read the settings file",
+            "description": "Fix the file and retry, or back up the original file and restore the default settings.",
+            "backupAndReset": "Back up and reset…",
+            "backupTitle": "Save settings backup"
+        },
         "closeFailure": {
             "title": "Settings could not be saved",
-            "description": "Your changes are active, but could not be written to disk: {{error}}\nYou can retry or close Settings. Unsaved changes will be checked again when you quit.",
+            "description": "Your changes are active, but could not be written to disk: {{error}}",
             "continue": "Close Settings"
         },
         "quitFailure": {
@@ -427,6 +468,20 @@
             "clearLogs": {
                 "label": "Clear logs",
                 "error": "Could not clear logs: {{error}}"
+            },
+            "data": {
+                "label": "Settings data",
+                "description": "Does not include vocabulary data. Import or export it in <vocabulary/>.",
+                "import": "Import settings…",
+                "export": "Export settings…",
+                "reset": "Restore default settings",
+                "resetTitle": "Restore default settings?",
+                "resetDescription": "Options in Settings will be restored to their default values. The interface language, transcription presets and export options are not affected.",
+                "resetConfirm": "Restore",
+                "importTitle": "Import settings?",
+                "importDescription": "“{{name}}” will replace all current settings, including transcription presets.",
+                "importConfirm": "Import",
+                "importFailure": "Could not import settings: {{error}}"
             }
         },
         "transcription": {
@@ -502,7 +557,7 @@
             },
             "pauseOnOutputDeviceChange": {
                 "label": "Pause when the audio output device changes",
-                "description": "Pause playback when the system default audio output device changes or disconnects.\nPlayback will be paused regardless, if audio output device is taken by another device."
+                "description": "Pause playback when the system default audio output device changes or disconnects.\nPlayback always pauses when another device takes over the current output device."
             },
             "switchPlayback": {
                 "options": {
@@ -558,7 +613,7 @@
                 "dark": "Dark colors"
             },
             "actions": {
-                "reset": "Reset colors"
+                "reset": "Restore default colors"
             },
             "colors": {
                 "--c-accent": "Accent color",
@@ -645,7 +700,7 @@
     "licenses": {
         "title": "Open source licenses",
         "columns": {
-            "project": "Project",
+            "project": "Name",
             "license": "License",
             "url": "Website"
         },
@@ -666,9 +721,13 @@
     "native": {
         "filters": {
             "vocabulary": "Vocabulary files (JSON or tab-separated text)",
+            "vocabularyJSON": "Vocabulary files",
             "media": "Audio and video files",
+            "subtitles": "Subtitle files",
+            "text": "Plain text files",
             "all": "All files",
-            "project": "Vestige project"
+            "project": "Vestige project",
+            "settings": "Vestige settings"
         },
         "media": {
             "locate": {
@@ -704,6 +763,10 @@
                 "title": "Choose backend folder",
                 "confirm": "Choose backend folder"
             }
+        },
+        "settings": {
+            "importTitle": "Import settings",
+            "exportTitle": "Export settings"
         }
     },
     "errors": {
@@ -764,10 +827,8 @@
         },
         "project": {
             "pathNotFile": "The project path must refer to a file.",
-            "invalidStructure": "{{path}} must be {{expected}}.",
             "invalidInteger": "{{path}} must be a valid non-negative integer.",
             "invalidNumber": "{{path}} must be a valid non-negative number.",
-            "version": "Unsupported project version: {{version}}.",
             "invalidUuid": "{{path}} must be a UUID.",
             "duplicateMedia": "{{path}} must be unique in the project.",
             "invalidPath": "{{path}} must be an absolute path or a valid path relative to the project folder.",
@@ -801,7 +862,8 @@
                 "remove": "Could not remove temporary files.",
                 "clear-logs": "Could not clear the logs.",
                 "access": "Could not access the file or folder."
-            }
+            },
+            "backupSameFile": "Choose a different file for the backup."
         },
         "externalOpen": "Could not open the external link: {{url}}",
         "documentation": {
@@ -863,6 +925,24 @@
                 "installed": "The package was installed, but temporary files could not be removed: {{directory}}",
                 "incomplete": "Temporary download files could not be removed: {{directory}}"
             }
+        },
+        "data": {
+            "invalidStructure": "{{path}} must be {{expected}}.",
+            "invalidEncoding": "The file is not valid UTF-8 text.",
+            "unknownField": "{{path}} is not a recognized field.",
+            "unsupportedVersion": {
+                "project": "Unsupported project version: {{version}}.",
+                "settings": "Unsupported settings version: {{version}}.",
+                "vocabulary": "Unsupported vocabulary version: {{version}}."
+            }
+        },
+        "vocabulary": {
+            "invalidRule": "Invalid vocabulary rule.",
+            "duplicate": "This rule already exists.",
+            "conflict": "The vocabulary changed and the list was refreshed. Review it and try again."
+        },
+        "export": {
+            "invalidRequest": "The export request is invalid."
         }
     },
     "documentation": {

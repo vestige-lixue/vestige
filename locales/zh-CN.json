@@ -17,12 +17,12 @@
         "project": {
             "title": "项目",
             "new": "新建",
-            "open": "打开",
-            "saveAs": "另存为"
+            "open": "打开…",
+            "saveAs": "另存为…"
         },
         "media": {
             "title": "媒体",
-            "import": "导入"
+            "import": "导入…"
         },
         "transcription": {
             "title": "转写"
@@ -91,7 +91,7 @@
             "checking": "正在检查媒体",
             "actions": {
                 "ignore": "忽略",
-                "relocate": "重新定位"
+                "relocate": "重新定位…"
             },
             "status": {
                 "missing": "媒体缺失",
@@ -159,7 +159,7 @@
         },
         "unsaved": {
             "name": "未命名",
-            "hint": "尚未保存，点击保存"
+            "hint": "尚未保存，点击保存。"
         },
         "saveConfirmation": {
             "discard": "不保存",
@@ -176,8 +176,8 @@
                 "save": "正在保存项目",
                 "waitSave": "正在等待项目保存"
             },
-            "chooseFile": "请在文件选择器中选择项目文件",
-            "chooseSaveLocation": "请在文件选择器中选择保存位置"
+            "chooseFile": "请在文件选择器中选择项目文件。",
+            "chooseSaveLocation": "请在文件选择器中选择保存位置。"
         },
         "operationFailure": {
             "title": "操作失败",
@@ -254,7 +254,7 @@
             }
         },
         "actions": {
-            "new": "新建转写",
+            "new": "新建转写…",
             "reviewFailure": "查看失败原因",
             "cancelQueued": "取消转写",
             "stop": "停止转写"
@@ -295,14 +295,17 @@
         },
         "vocabulary": {
             "title": "词库",
-            "add": "添加到词库",
-            "addRule": "新增规则",
+            "add": "添加到词库…",
+            "addTitle": "添加到词库",
+            "addRule": "新增规则…",
             "backupAndReset": "备份并重置…",
             "import": "导入…",
             "export": "导出…",
             "importTitle": "导入词库规则",
             "exportTitle": "导出词库规则",
             "importSummary": "已导入 {{imported}} 条规则，跳过 {{skipped}} 条。",
+            "importFailure": "无法导入词库规则：{{error}}",
+            "loadFailure": "无法读取词库文件：{{error}}",
             "backupTitle": "保存词库备份",
             "editRule": "编辑规则",
             "source": "将以下文字",
@@ -313,24 +316,55 @@
             "search": "搜索原文字或替换文字",
             "enableRule": "启用规则：{{source}}",
             "actions": "操作",
-            "edit": "编辑规则",
+            "edit": "编辑规则…",
             "remove": "删除规则",
             "empty": "还没有规则。",
             "noResults": "没有找到匹配的规则。",
-            "errors": {
-                "backupPath": "请选择与当前词库不同的备份文件。",
+            "validation": {
                 "emptySource": "请输入要替换的原文。",
                 "multilineSource": "不支持换行。请去掉原文中的换行。",
                 "multilineReplacement": "不支持换行。请去掉替换文字中的换行。",
-                "unchanged": "替换后的文字与原文相同。",
-                "invalidFile": "词库文件格式无效或版本不受支持，原有文件未被更改。",
-                "invalidRule": "词库规则无效。",
-                "duplicate": "这条规则已经存在。",
-                "conflict": "词库已发生变化，列表已刷新。请检查后重试。"
+                "unchanged": "替换后的文字与原文相同。"
             }
         }
     },
     "transcript": {
+        "export": {
+            "title": "导出",
+            "action": "导出转写…",
+            "currentAction": "导出当前转写…",
+            "runAction": "导出此转写…",
+            "submit": "导出…",
+            "content": "内容",
+            "proofread": "校对稿",
+            "original": "原始结果：",
+            "run": "转写",
+            "format": "格式",
+            "txt": "纯文本（.txt）",
+            "srt": "字幕文件（.srt）",
+            "eachSubtitle": "每条字幕",
+            "eachSubtitleDescription": "装不下时，在前面最近的句末或分句标点处另起一条。",
+            "newSubtitle": "另起一条",
+            "newSubtitleDescription": "满足下列任一已启用的条件时，另起一条字幕。",
+            "lineWidth": "每行最大宽度",
+            "lineWidthDescription": "中日韩文字通常占 2 个宽度，拉丁字母通常占 1 个宽度。",
+            "maxLines": "每条最多行数",
+            "lines": "行",
+            "pause": "在停顿处",
+            "pauseDescription": "两个词之间的空白达到这个时长时另起一条。",
+            "seconds": "秒",
+            "longest": "每条最长时长",
+            "display": "显示",
+            "shortest": "最短显示时长",
+            "shortestDescription": "在不超过下一条字幕起点及媒体结尾的范围内延长显示。",
+            "splitAtLineBreaks": "在换行处",
+            "splitAtSentenceEnds": "在句末标点处",
+            "unlimited": "不限",
+            "noPauseSplit": "不启用",
+            "estimated": "此转写的时间信息不足，部分字幕时间将按文字宽度估算。",
+            "unanchored_other": "{{count}} 处新增文字没有对应的音频时间，将跟随相邻文字显示。",
+            "reset": "还原默认"
+        },
         "find": {
             "title": "查找",
             "replacement": "替换",
@@ -341,10 +375,10 @@
             "close": "关闭查找",
             "caseSensitive": "区分大小写",
             "preserveCase": "保留大小写",
-            "wholeWord": "整词",
+            "wholeWord": "全字匹配",
             "expand": "展开替换",
             "collapse": "收起替换",
-            "addToVocabulary": "添加到词库"
+            "addToVocabulary": "添加到词库…"
         },
         "reference": {
             "replace": "替换为",
@@ -355,7 +389,7 @@
             "blankProbability": "无语音",
             "noPlayableAudio": "无可播放音频",
             "gap": "无语音段",
-            "gaps": "{{count}} ({{duration}}s)",
+            "gaps": "{{count}}（{{duration}} 秒）",
             "restore": "恢复已删除的文字",
             "align": "与原文对齐",
             "expand": "展开已删除的文字",
@@ -375,13 +409,19 @@
             "description": "切换后将清空当前的所有修改。",
             "confirm": "清空修改并切换"
         },
-        "emptyMedia": "此媒体暂无转写结果。",
+        "emptyMedia": "此媒体还没有转写。",
         "empty": "转写正文将在这里显示。"
     },
     "settings": {
+        "loadFailure": {
+            "title": "无法读取设置文件",
+            "description": "可以修复文件后重试，或者先备份原文件，再还原为默认设置。",
+            "backupAndReset": "备份并重置…",
+            "backupTitle": "保存设置备份"
+        },
         "closeFailure": {
             "title": "设置保存失败",
-            "description": "设置已生效，但未能写入磁盘：{{error}}\n你可以重试或关闭设置窗口。退出应用时会再次检查未保存的设置。",
+            "description": "设置已生效，但未能写入磁盘：{{error}}",
             "continue": "关闭设置窗口"
         },
         "quitFailure": {
@@ -427,6 +467,20 @@
             "clearLogs": {
                 "label": "清除日志",
                 "error": "无法清除日志：{{error}}"
+            },
+            "data": {
+                "label": "设置数据",
+                "description": "不含词库数据。词库请在<vocabulary/>窗口中导入或导出。",
+                "import": "导入设置…",
+                "export": "导出设置…",
+                "reset": "还原默认设置",
+                "resetTitle": "还原默认设置？",
+                "resetDescription": "设置窗口中的选项将还原为默认值。界面语言、转写预设和导出选项不受影响。",
+                "resetConfirm": "还原",
+                "importTitle": "导入设置？",
+                "importDescription": "将用“{{name}}”替换当前全部设置，包括转写预设。",
+                "importConfirm": "导入",
+                "importFailure": "无法导入设置：{{error}}"
             }
         },
         "transcription": {
@@ -502,7 +556,7 @@
             },
             "pauseOnOutputDeviceChange": {
                 "label": "切换音频输出设备时暂停播放",
-                "description": "系统默认音频输出设备变化或断开连接时，暂停播放。\n音频设备被另一输出设备抢占时总会暂停。"
+                "description": "系统默认音频输出设备变化或断开连接时，暂停播放。\n当前输出设备被其他设备抢占时，总会暂停播放。"
             },
             "switchPlayback": {
                 "options": {
@@ -558,7 +612,7 @@
                 "dark": "深色配色"
             },
             "actions": {
-                "reset": "恢复默认配色"
+                "reset": "还原默认配色"
             },
             "colors": {
                 "--c-accent": "强调色",
@@ -628,7 +682,7 @@
         "estimatedSize": "（约 {{size}} MiB）",
         "empty": "当前平台暂无可用下载。",
         "status": {
-            "installed": "已下载",
+            "installed": "已安装",
             "loading": "正在读取下载状态…",
             "running": "正在下载",
             "cancelling": "正在取消下载",
@@ -666,9 +720,13 @@
     "native": {
         "filters": {
             "vocabulary": "词库文件（JSON 或制表符分隔文本）",
+            "vocabularyJSON": "词库文件",
             "media": "音视频文件",
+            "subtitles": "字幕文件",
+            "text": "纯文本文件",
             "all": "所有文件",
-            "project": "Vestige 项目"
+            "project": "Vestige 项目",
+            "settings": "Vestige 设置"
         },
         "media": {
             "locate": {
@@ -704,6 +762,10 @@
                 "title": "选择后端文件夹",
                 "confirm": "选择后端文件夹"
             }
+        },
+        "settings": {
+            "importTitle": "导入设置",
+            "exportTitle": "导出设置"
         }
     },
     "errors": {
@@ -764,10 +826,8 @@
         },
         "project": {
             "pathNotFile": "项目路径必须指向文件。",
-            "invalidStructure": "{{path}} 必须符合 {{expected}}。",
             "invalidInteger": "{{path}} 必须是有效的非负整数。",
             "invalidNumber": "{{path}} 必须是有效的非负数。",
-            "version": "不支持的项目版本：{{version}}。",
             "invalidUuid": "{{path}} 必须是 UUID。",
             "duplicateMedia": "{{path}} 在项目中必须唯一。",
             "invalidPath": "{{path}} 必须是绝对路径或相对于项目文件夹的有效路径。",
@@ -801,7 +861,8 @@
                 "remove": "无法删除临时文件。",
                 "clear-logs": "无法清除日志。",
                 "access": "无法访问文件或文件夹。"
-            }
+            },
+            "backupSameFile": "请选择与原文件不同的备份文件。"
         },
         "externalOpen": "无法打开外部链接：{{url}}",
         "documentation": {
@@ -863,6 +924,24 @@
                 "installed": "软件包已安装，但无法删除临时文件：{{directory}}",
                 "incomplete": "无法删除临时下载文件：{{directory}}"
             }
+        },
+        "data": {
+            "invalidStructure": "{{path}} 必须符合 {{expected}}。",
+            "invalidEncoding": "文件不是有效的 UTF-8 文本。",
+            "unknownField": "{{path}} 不是可识别的字段。",
+            "unsupportedVersion": {
+                "project": "不支持的项目版本：{{version}}。",
+                "settings": "不支持的设置版本：{{version}}。",
+                "vocabulary": "不支持的词库版本：{{version}}。"
+            }
+        },
+        "vocabulary": {
+            "invalidRule": "词库规则无效。",
+            "duplicate": "这条规则已经存在。",
+            "conflict": "词库已发生变化，列表已刷新。请检查后重试。"
+        },
+        "export": {
+            "invalidRequest": "导出请求无效。"
         }
     },
     "documentation": {

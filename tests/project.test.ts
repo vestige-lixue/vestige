@@ -51,8 +51,8 @@ describe("project validation contract through the real typia transform", () => {
     it("rejects structurally invalid input through the generated checker (transform canary)", () => {
         const legal = project();
         const invalid = { ...legal, vestiges: [{ ...legal.vestiges[0], media: { ...legal.vestiges[0].media, duration: "one" } }] };
-        expectFailure(invalid, "project-invalid-structure");
-        expectFailure({ ...project(), unexpected: 1 }, "project-invalid-structure");
+        expectFailure(invalid, "invalid-structure");
+        expect(expectFailure({ ...project(), unexpected: 1 }, "unknown-field")).toMatchObject({ path: "project.unexpected" });
     });
 
     it("keeps random edits valid in original Run coordinates and after JSON round-trip", () => {
@@ -113,19 +113,19 @@ describe("project validation contract through the real typia transform", () => {
 
     it("rejects overlapping modifications rather than silently accepting a different project", () => {
         const spans = transcript(["abcd"]);
-        expectFailure(project(spans, [...modification(spans, 0, 3, "x"), ...modification(spans, 2, 4, "")]), "project-invalid-structure");
+        expectFailure(project(spans, [...modification(spans, 0, 3, "x"), ...modification(spans, 2, 4, "")]), "invalid-structure");
     });
 
     it("rejects replacement records and fields outside the insert/delete union", () => {
         const valid = project();
         const source = { segmentIdx: 0, offset: 0 };
-        for (const item of [
-            { range: { start: source, end: source }, text: "x" },
-            { type: "replace", range: { start: source, end: source }, text: "x" },
-            { type: "insert", pos: source, text: "x", range: { start: source, end: source } },
-            { type: "delete", range: { start: source, end: source }, text: "" }
+        for (const { item, kind } of [
+            { item: { range: { start: source, end: source }, text: "x" }, kind: "invalid-structure" },
+            { item: { type: "replace", range: { start: source, end: source }, text: "x" }, kind: "invalid-structure" },
+            { item: { type: "insert", pos: source, text: "x", range: { start: source, end: source } }, kind: "unknown-field" },
+            { item: { type: "delete", range: { start: source, end: source }, text: "" }, kind: "unknown-field" }
         ]) {
-            expectFailure({ ...valid, vestiges: [{ ...valid.vestiges[0], modifications: [item] }] }, "project-invalid-structure");
+            expectFailure({ ...valid, vestiges: [{ ...valid.vestiges[0], modifications: [item] }] }, kind);
         }
     });
 
@@ -213,7 +213,9 @@ describe("project validation contract through the real typia transform", () => {
     });
 
     it("keeps domain diagnostics and the empty-Run coordinate rules", () => {
-        expect(expectFailure({ ...project(), version: "unsupported" }, "project-version")).toMatchObject({ version: "unsupported" });
+        expect(expectFailure({ ...project(), version: "unsupported" }, "unsupported-version")).toMatchObject({ file: "project", version: "unsupported" });
+        // A newer file reports its version before any field it adds.
+        expect(expectFailure({ ...project(), version: "2", futureField: true }, "unsupported-version")).toMatchObject({ version: "2" });
         const empty = project();
         empty.vestiges[0].runs = [];
         expect(() => parseProject(empty)).not.toThrow();
@@ -253,7 +255,7 @@ describe("project validation contract through the real typia transform", () => {
         for (const hash of ["0123456789abcde", "0123456789abcdef0", "0123456789abcdeF", "0123456789abcdef\n", "g123456789abcdef", null]) {
             expect(validMediaHash(hash)).toBe(false);
             const input = project();
-            expect(expectFailure({ ...input, vestiges: [{ ...input.vestiges[0], media: { ...input.vestiges[0].media, hash } }] }, "project-invalid-structure"))
+            expect(expectFailure({ ...input, vestiges: [{ ...input.vestiges[0], media: { ...input.vestiges[0].media, hash } }] }, "invalid-structure"))
                 .toMatchObject({ path: "project.vestiges[0].media.hash" });
         }
     });
@@ -277,10 +279,10 @@ describe("project validation contract through the real typia transform", () => {
             { change: value => value.vestiges[0].runs[0].execution.plan.audio.duration = Infinity, kind: "project-invalid-number" },
             { change: value => value.vestiges[0].runs[0].execution.plan.segmentation.batchSize = 0.5, kind: "project-invalid-number" },
             { change: value => value.vestiges[0].runs[0].execution.plan.parts[0].end = -1, kind: "project-invalid-number" },
-            { change: value => value.vestiges[0].runs[0].execution.request.params = { changed: "yes" }, kind: "project-invalid-structure" },
-            { change: value => value.vestiges[0].runs[0].execution.plan.parts[0].start = 0.5, kind: "project-invalid-structure" },
-            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 1 }, range: { start: 0.2, end: 1 }, options: {}, reasons: ["context"] }], kind: "project-invalid-structure" },
-            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 0.5 }, range: { start: 0, end: 0.5 }, options: {}, reasons: ["context"] }], kind: "project-invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.request.params = { changed: "yes" }, kind: "invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.plan.parts[0].start = 0.5, kind: "invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 1 }, range: { start: 0.2, end: 1 }, options: {}, reasons: ["context"] }], kind: "invalid-structure" },
+            { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 0.5 }, range: { start: 0, end: 0.5 }, options: {}, reasons: ["context"] }], kind: "invalid-structure" },
             { change: value => value.vestiges[0].runs[0].execution.deviations = [{ originalRange: { start: 0, end: 1 }, range: { start: 1, end: 0 }, options: {}, reasons: ["context"] }], kind: "project-reversed-range" }
         ];
         for (const { change, kind } of mutations) {

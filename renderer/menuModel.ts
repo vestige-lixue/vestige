@@ -51,9 +51,11 @@ export function menuItems(group: MenuGroup): readonly (MenuAction | null)[] {
         case "media": return [
             { kind: "importMedia" }, null,
             { kind: "moveSelectedMedia", direction: -1 }, { kind: "moveSelectedMedia", direction: 1 }, null,
-            transcriptionCommand(), { kind: "removeSelectedMedia" }
+            transcriptionCommand(), { kind: "exportTranscript", mediaId: mediaSelection.get() }, { kind: "removeSelectedMedia" }
         ];
-        case "transcription": return [transcriptionCommand(), null, ...transcriptionActions];
+        case "transcription": return [
+            transcriptionCommand(), { kind: "exportCurrentTranscript", mediaId: mediaSelection.get() }, null, ...transcriptionActions
+        ];
         case "edit": return [
             ...editActions.map(action => action ? { kind: "edit" as const, action } : null),
             null, { kind: "openTranscriptFind" }, { kind: "openTranscriptReplace" }

@@ -128,6 +128,8 @@ export type Command = (
     FocusCommand |
     OpenPanelCommand |
     TranscriptionCommand |
+    { kind: "exportTranscript"; mediaId: string | null; runId?: string } |
+    { kind: "exportCurrentTranscript"; mediaId: string | null } |
     MediaCommand |
     RelocateMediaCommand |
     RenameMediaCommand |
@@ -236,6 +238,22 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
         enabled: command => settings.isReady() && !!command.mediaId && mediaImport.isReady(command.mediaId)
             && !transcription.isPending(transcription.getTask(command.mediaId)),
         label: label("transcription.actions.new")
+    },
+    exportTranscript: {
+        run: command => dialogsAPI.show({ kind: "export", mediaId: command.mediaId!, runId: command.runId }),
+        enabled: command => {
+            const vestige = command.mediaId ? project.getVestige(command.mediaId) : null;
+            return settings.isReady() && !!vestige && (command.runId ? vestige.runs.some(run => run.id === command.runId) : vestige.runs.length > 0);
+        },
+        label: command => i18n.t(command.runId ? "transcript.export.runAction" : "transcript.export.action")
+    },
+    exportCurrentTranscript: {
+        run: command => runCommand({ kind: "exportTranscript", mediaId: command.mediaId }),
+        enabled: command => {
+            const vestige = command.mediaId ? project.getVestige(command.mediaId) : null;
+            return settings.isReady() && !!vestige?.runs[vestige.displayedRunIdx];
+        },
+        label: label("transcript.export.currentAction")
     },
     stopTranscription: {
         run: command => transcriptionAPI.stop(command.mediaId!),

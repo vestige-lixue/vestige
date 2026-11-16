@@ -22,13 +22,14 @@
         <TextButton disabled={busy || !!snapshot.error} onclick={() => void saveFile(vocabularyAPI.exportRules)}>{i18n.t("transcription.vocabulary.export")}</TextButton>
     </div>
     {#if snapshot.error}
-        <div class="error-message" role="alert">{describeFailure(snapshot.error)}</div>
+        <div class="error-message" role="alert">{i18n.t("transcription.vocabulary.loadFailure", { error: describeFailure(snapshot.error) })}</div>
         <div class="toolbar">
             <TextButton disabled={busy} onclick={() => void retry()}>{i18n.t("common.retry")}</TextButton>
             <TextButton disabled={busy} onclick={() => void saveFile(vocabularyAPI.backupAndReset)}>{i18n.t("transcription.vocabulary.backupAndReset")}</TextButton>
         </div>
     {/if}
     {#if failure}<div class="error-message" role="alert">{describeFailure(failure)}</div>{/if}
+    {#if importFailure}<div class="error-message" role="alert">{i18n.t("transcription.vocabulary.importFailure", { error: describeFailure(importFailure) })}</div>{/if}
     {#if importSummary}<div role="status">{i18n.t("transcription.vocabulary.importSummary", importSummary)}</div>{/if}
     {#if !snapshot.error}
         <div class="rules">
@@ -139,7 +140,7 @@
     import Tooltip from "../util/Tooltip.svelte";
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
     import Switch from "../util/Switch.svelte";
-    import closeIcon from "../../../resources/icons/carbon--close.svg?raw";
+    import closeIcon from "../../../resources/icons/lucide--x.svg?raw";
     import editIcon from "../../../resources/icons/lucide--square-pen.svg?raw";
 
     let { open = $bindable(), dialogId, onClosed }: { open: boolean; dialogId: string; onClosed: () => void } = $props();
@@ -148,6 +149,7 @@
     let pending = $state(false);
     let importSummary = $state<{ imported: number; skipped: number } | null>(null);
     let failure = $state<FailureInfo | null>(null);
+    let importFailure = $state<FailureInfo | null>(null);
     const rowTabStops = new SvelteMap<string, number>();
     const snapshot = $derived(vocabulary.getSnapshot());
     const busy = $derived(pending || vocabulary.operation.busy);
@@ -160,7 +162,7 @@
 
     async function update(change: VocabularyChange): Promise<void> {
         const target = document.activeElement;
-        failure = null;
+        failure = importFailure = null;
         const result = await vocabularyAPI.change(change);
         if (!result.success) failure = result.error;
         // A pending write temporarily disables the focused button and can blur it.
@@ -169,22 +171,22 @@
     }
 
     async function importRules(): Promise<void> {
-        failure = null;
+        failure = importFailure = null;
         importSummary = null;
         const result = await vocabularyAPI.importRules();
-        if (!result.success) failure = result.error;
+        if (!result.success) importFailure = result.error;
         else if (!result.canceled) importSummary = { imported: result.imported, skipped: result.skipped };
     }
 
     async function saveFile(operation: () => Promise<VocabularyFileResult>): Promise<void> {
-        failure = null;
+        failure = importFailure = null;
         importSummary = null;
         const result = await operation();
         if (!result.success) failure = result.error;
     }
 
     async function retry(): Promise<void> {
-        failure = null;
+        failure = importFailure = null;
         pending = true;
         try {
             await vocabularyAPI.reload();

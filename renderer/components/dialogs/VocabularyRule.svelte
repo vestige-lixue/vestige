@@ -3,7 +3,7 @@
     onOpenChangeComplete={value => {
         if (!value) onClosed();
     }}>
-    <Dialog.Title class="modal-title">{i18n.t(rule ? "transcription.vocabulary.editRule" : "transcription.vocabulary.add")}</Dialog.Title>
+    <Dialog.Title class="modal-title">{i18n.t(rule ? "transcription.vocabulary.editRule" : "transcription.vocabulary.addTitle")}</Dialog.Title>
     <form id={dialogId} oninput={() => failure = null} onsubmit={event => {
         event.preventDefault();
         void save();
@@ -53,7 +53,7 @@
     let replacement = $state(untrack(() => rule?.replacement ?? initialReplacement));
     let pending = $state(false);
     let failure = $state<FailureInfo | ReturnType<typeof vocabularyRuleIssue>>(null);
-    const message = $derived(typeof failure === "string" ? i18n.t(`transcription.vocabulary.errors.${failure}`) : failure && describeFailure(failure));
+    const message = $derived(typeof failure === "string" ? i18n.t(`transcription.vocabulary.validation.${failure}`) : failure && describeFailure(failure));
     let modal: ReturnType<typeof Modal> | undefined;
     let sourceInput: HTMLTextAreaElement;
     let replacementInput: HTMLTextAreaElement;

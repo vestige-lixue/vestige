@@ -23,3 +23,11 @@ export const volumeStabilizationLimits = {
     gateThresholdDb: { min: -90, max: -20 },
     targetLevelDb: { min: -36, max: -6 }
 } as const;
+
+export const srtLimits = {
+    maxLineWidth: { min: 4, max: 200 },
+    maxLines: { min: 1, max: 5 },
+    pauseSeconds: { min: 0.1, max: 10 },
+    maxDurationSeconds: { min: 1, max: 60 },
+    minDurationSeconds: { min: 0, max: 10 }
+} as const;

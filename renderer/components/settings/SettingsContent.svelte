@@ -13,6 +13,22 @@
 </div>
 {#if logsFailure}<div class="error-message">{i18n.t("settings.general.clearLogs.error", { error: logsFailure })}</div>{/if}
 
+<div class="settingsData">
+    <div class="label">{i18n.t("settings.general.data.label")}</div>
+    <div class="description"><span>
+        <LocalizedText text={i18n.t("settings.general.data.description")} slots={{ vocabulary: vocabularyLink }} />
+        {#snippet vocabularyLink()}<button type="button" class="link-button focusable" disabled={pending || dataPending}
+            onclick={() => dialogsAPI.show({ kind: "vocabulary", parentId: dialogId })}>{i18n.t("transcription.vocabulary.title")}</button>{/snippet}
+    </span></div>
+    <div class="transcriptionActions">
+        <TextButton disabled={pending || dataPending} onclick={() => void manageData("import")}>{i18n.t("settings.general.data.import")}</TextButton>
+        <TextButton disabled={pending || dataPending} onclick={() => void manageData("export")}>{i18n.t("settings.general.data.export")}</TextButton>
+        <TextButton disabled={pending || dataPending} onclick={() => void manageData("reset")}>{i18n.t("settings.general.data.reset")}</TextButton>
+    </div>
+    {#if dataFailure}<div class="error-message">{describeFailure(dataFailure)}</div>{/if}
+    {#if importFailure}<div class="error-message">{i18n.t("settings.general.data.importFailure", { error: describeFailure(importFailure) })}</div>{/if}
+</div>
+
 <h2 class="section-title">{i18n.t("settings.transcription.title")}</h2>
 <div class="transcriptionActions">
     <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-backends", parentId: dialogId })}>
@@ -202,6 +218,11 @@
         display: flex;
         gap: 8px;
     }
+    .settingsData {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
     .transcriptionActions :global(.text-button) {
         box-sizing: border-box;
         flex: 1;
@@ -361,6 +382,7 @@
 
 <script lang="ts">
     import TextButton from "../util/TextButton.svelte";
+    import LocalizedText from "../util/LocalizedText.svelte";
     import NumberInput from "../util/NumberInput.svelte";
     import * as i18n from "../../i18n.svelte";
     import * as settings from "../../states/settings.svelte";
@@ -385,15 +407,16 @@
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
     import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
+    import { settingsResetPatch } from "../../../shared/settings/reset";
     import { levelStages } from "../../audio/levels";
     import { minEditorFontSize, maxEditorFontSize, maxVolumeSliderMinDb, volumeStabilizationLimits, minRewindStepMs, maxRewindStepMs, minStartRewindMs, maxStartRewindMs } from "../../../shared/constants";
-    import { VestigeErrors, toFailureInfo } from "../../../shared/failure";
+    import { VestigeErrors, toFailureInfo, type FailureInfo } from "../../../shared/failure";
     import { describeFailure } from "../../failures";
     import languageIcon from "../../../resources/icons/lucide--languages.svg?raw";
-    import externalLinkIcon from "../../../resources/icons/cil--external-link.svg?raw";
-    import lightIcon from "../../../resources/icons/carbon--light.svg?raw";
-    import contrastIcon from "../../../resources/icons/carbon--contrast.svg?raw";
-    import moonIcon from "../../../resources/icons/carbon--moon.svg?raw";
+    import externalLinkIcon from "../../../resources/icons/lucide--folder-symlink.svg?raw";
+    import lightIcon from "../../../resources/icons/lucide--sun.svg?raw";
+    import contrastIcon from "../../../resources/icons/lucide--contrast.svg?raw";
+    import moonIcon from "../../../resources/icons/lucide--moon.svg?raw";
     import {
         themeSchemes, themeColorKeys, resolveTheme, validThemeMode, themeModes as themeModeValues,
         type ThemeColorKey, type ThemeScheme, type ThemeSettings
@@ -402,7 +425,9 @@
     import * as settingsAPI from "../../states/settings";
     import { persistSettings } from "../../states/settingsPersistence";
 
-    let { dialogId, beforeClose = $bindable() }: { dialogId: string; beforeClose?: () => Promise<boolean> } = $props();
+    let { dialogId, beforeClose = $bindable(), onDataReplaced }: {
+        dialogId: string; beforeClose?: () => Promise<boolean>; onDataReplaced: () => void;
+    } = $props();
     const [current, micaSupported] = await Promise.all([load(), window.api.supportsMica()]);
     let language = $state<Locale>(current.language);
     let compressProjectFiles = $state(current.compressProjectFiles);
@@ -446,6 +471,9 @@
     let logsFailure = $state("");
     let openingDirectory = $state(false);
     let directoryFailure = $state("");
+    let dataPending = $state(false);
+    let dataFailure = $state<FailureInfo | null>(null);
+    let importFailure = $state<FailureInfo | null>(null);
     const stabilizationFields = ["maxGainDb", "gainAttackMs", "gainReleaseMs", "gateThresholdDb", "targetLevelDb"] as const;
     const stabilizationUnits = {
         maxGainDb: "dB", gainAttackMs: "ms", gainReleaseMs: "ms", gateThresholdDb: "dBFS", targetLevelDb: "LUFS"
@@ -626,7 +654,7 @@
 
     onMount(() => {
         beforeClose = close;
-        const unsubscribe = settingsAPI.registerDraft({ dialogId, commit });
+        const unsubscribe = settingsAPI.registerDraft({ dialogId, commit: () => dataPending ? Promise.resolve(false) : commit() });
         return () => {
             beforeClose = undefined;
             unsubscribe();
@@ -646,6 +674,55 @@
         }
         finally {
             clearingLogs = false;
+        }
+    }
+
+    function confirmData(mode: "reset" | "import", name?: string): Promise<boolean> {
+        return new Promise(resolve => dialogsAPI.show({
+            kind: "settings-data-confirmation", parentId: dialogId, mode, name,
+            answer: resolve, onClosed: () => resolve(false)
+        }));
+    }
+
+    async function manageData(operation: "import" | "export" | "reset"): Promise<void> {
+        if (pending || dataPending) return;
+        dataPending = pending = true;
+        dataFailure = importFailure = null;
+        try {
+            stopCalibration?.();
+            await updates;
+            if (operation === "export") {
+                if (!await commit()) return;
+                const result = await window.api.settings.exportFile();
+                if (!result.success) dataFailure = result.error;
+                return;
+            }
+            if (operation === "import") {
+                const result = await window.api.settings.importFile();
+                if (!result.success) {
+                    importFailure = result.error;
+                    return;
+                }
+                if (result.canceled || !await confirmData("import", result.name)) return;
+                if (!await settingsAPI.replace(result.settings)) {
+                    importFailure = settings.getError();
+                    return;
+                }
+            }
+            else {
+                if (!await confirmData("reset")) return;
+                if (!await settingsAPI.update(settingsResetPatch())) {
+                    dataFailure = settings.getError();
+                    return;
+                }
+            }
+            onDataReplaced();
+        }
+        catch (error) {
+            dataFailure = toFailureInfo(error);
+        }
+        finally {
+            dataPending = pending = false;
         }
     }
 
@@ -738,7 +815,7 @@
     }
 
     async function close(): Promise<boolean> {
-        if (pending) return false;
+        if (pending || dataPending) return false;
         pending = true;
         try {
             // Quit commits drafts directly and owns its separate D2 confirmation.

@@ -61,7 +61,7 @@
     import { type Download as DownloadInfo, type DownloadKind } from "../../../shared/downloads";
     import LocalizedText from "../util/LocalizedText.svelte";
     import Download from "./Download.svelte";
-    import externalLink from "../../../resources/icons/cil--external-link.svg?raw";
+    import externalLink from "../../../resources/icons/lucide--folder-symlink.svg?raw";
     import * as dialogsAPI from "../../states/dialogs";
 
     type Row = { download: DownloadInfo; busy: boolean; focusCancel?: () => boolean };

@@ -10,6 +10,7 @@ for (const file of readdirSync(sharedDirectory, { recursive: true, encoding: "ut
     schema.update(file).update(readFileSync(resolve(sharedDirectory, file)));
 }
 const schemaKey = schema.digest("hex");
+const typeContracts = /[/\\](?:main[/\\](?:project|settings)[/\\]validate|shared[/\\](?:media[/\\]check|settings[/\\]validate))\.ts$/;
 
 export default defineConfig({
     root: resolve(import.meta.dirname, ".."),
@@ -17,12 +18,12 @@ export default defineConfig({
         name: "typia-live-type-contracts",
         configureVitest({ defineCacheKeyGenerator }) {
             // Generated guards depend on types erased from the runtime import graph.
-            defineCacheKeyGenerator(({ id }) => /[/\\](?:main[/\\]project[/\\]validate|shared[/\\]media[/\\]check)\.ts$/.test(id) ? schemaKey : undefined);
+            defineCacheKeyGenerator(({ id }) => typeContracts.test(id) ? schemaKey : undefined);
         }
     }, UnpluginTypia({
         tsconfig: resolve(import.meta.dirname, "tsconfig.test.json"),
         typia: { undefined: false },
-        include: [/[/\\]main[/\\]project[/\\]validate\.ts$/, /[/\\]shared[/\\]media[/\\]check\.ts$/]
+        include: [typeContracts]
     })],
     test: {
         environment: "node",

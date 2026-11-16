@@ -1,5 +1,5 @@
 import { toFailureInfo } from "../../shared/failure";
-import { type Settings, type SettingsPatch, type SettingsResult, type SettingsSnapshot } from "../../shared/settings/Settings";
+import { type Settings, type SettingsPatch, type SettingsResult, type SettingsSnapshot, type SettingsRecoveryResult } from "../../shared/settings/Settings";
 import { mergeSettings } from "../../shared/settings/merge";
 import { freezeSnapshot } from "../../shared/settings/snapshot";
 import { SvelteSet } from "svelte/reactivity";
@@ -97,6 +97,25 @@ export async function update(patch: SettingsPatch): Promise<boolean> {
 export function registerDraft(draft: SettingsDraft): () => void {
     editors.add(draft);
     return () => editors.delete(draft);
+}
+
+export async function retryLoad(): Promise<SettingsResult> {
+    const current = generation;
+    const result = await window.api.settings.retryLoad();
+    accept(result.snapshot, current);
+    return result;
+}
+
+export async function backupAndReset(): Promise<SettingsRecoveryResult> {
+    const current = generation;
+    const result = await window.api.settings.backupAndReset();
+    if (result.success) accept(result.snapshot, current);
+    return result;
+}
+
+export async function replace(value: Settings): Promise<boolean> {
+    if (!await flushUpdates()) return false;
+    return request(() => window.api.settings.replace(value));
 }
 
 function flushUpdates(): Promise<boolean> {

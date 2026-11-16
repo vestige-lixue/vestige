@@ -22,6 +22,7 @@ export const defaultSettings = {
         }
     },
     transcription: { concurrency: 2, presets: {}, lastConfig: null },
+    export: { format: "txt", srt: { maxLineWidth: 42, maxLines: 2, pauseSeconds: 0.5, maxDurationSeconds: null, minDurationSeconds: 0.8, splitAtLineBreaks: true, splitAtSentenceEnds: true } },
     editing: { followPlayback: false, fontSize: 16, informationDisplay: "tooltip", hideTrivialInformation: false, referenceOverlap: 50 },
     volumeStabilization: {
         maxGainDb: 30,

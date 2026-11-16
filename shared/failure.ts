@@ -31,8 +31,8 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
         | "transcription-param-value" | "transcription-param-null"
         | "transcription-empty-result" | "transcription-truncated-output"
         | "audio-invalid-wave" | "audio-truncated-wave" | "audio-empty-wave"
-        | "settings-invalid-update"
-        | "vocabulary-invalid-file" | "vocabulary-invalid-rule" | "vocabulary-duplicate-rule" | "vocabulary-conflict" | "vocabulary-backup-path"
+        | "settings-invalid-update" | "export-invalid-request" | "invalid-encoding" | "backup-same-file"
+        | "vocabulary-invalid-rule" | "vocabulary-duplicate-rule" | "vocabulary-conflict"
         | "path-not-absolute" | "path-drive-relative" | "project-path-not-file" | "ipc-not-main-frame"
         | "file-invalid-directory";
 } | {
@@ -72,7 +72,7 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
     kind: "transcription-empty-path";
     field: "backendDirectory" | "modelDirectory" | "mediaPath";
 } | {
-    kind: "project-invalid-json";
+    kind: "invalid-json";
     diagnostic: string;
 } | ({
     kind: "transcription-invalid-result";
@@ -92,7 +92,10 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
     executor: Executor;
     field: "transcription" | "text" | "segment.text";
 } | {
-    kind: "project-invalid-structure";
+    kind: "unknown-field";
+    path: string;
+} | {
+    kind: "invalid-structure";
     path: string;
     expected: string;
 } | {
@@ -100,7 +103,8 @@ export type FailureInfo = (DownloadFailure | DocumentationFailure | {
     path: string;
     integer: boolean;
 } | {
-    kind: "project-version";
+    kind: "unsupported-version";
+    file: "project" | "settings" | "vocabulary";
     version: string;
 } | {
     kind: "project-invalid-uuid" | "project-duplicate-media" | "project-invalid-path" | "project-reversed-range";

@@ -5,13 +5,15 @@ import { type Project } from "./project/Project";
 import { type AbsolutePath } from "./util/path";
 import { type MediaValidationLoad } from "./media/validation";
 import { type MediaCheckResult, type MediaReference, type MediaURLResult } from "./media/check";
-import { type SettingsPatch, type SettingsResult, type SettingsSnapshot } from "./settings/Settings";
+import { type Settings, type SettingsPatch, type SettingsResult, type SettingsSnapshot, type SettingsFileResult, type SettingsImportResult, type SettingsRecoveryResult } from "./settings/Settings";
 import { type TaskSnapshot } from "./task";
 import { type DocumentationResult, type DocumentationKind } from "./documentation";
 import { type DownloadListResult, type DownloadStartResult, type DownloadKind } from "./downloads";
 import { type OperationResult } from "./failure";
 import { type NativeMenuState } from "./menu/NativeMenu";
 import { type VocabularyChange, type VocabularySnapshot, type VocabularyResult, type VocabularyFileResult, type VocabularyImportResult } from "./vocabulary/Vocabulary";
+
+import { type TranscriptExportRequest, type TranscriptExportResult } from "./export/TranscriptExport";
 
 export type EditAction = "selectAll" | "undo" | "redo" | "cut" | "copy" | "paste";
 
@@ -30,11 +32,17 @@ export type AppAPI = {
     quit(): void;
     edit(action: EditAction): void;
     clearLogs(): Promise<OperationResult>;
+    exportTranscript(request: TranscriptExportRequest): Promise<TranscriptExportResult>;
     // The renderer prompts/saves and returns true to block, false to allow quitting.
     beforeQuit(check: () => boolean | Promise<boolean>): () => void;
     settings: {
         get(): Promise<SettingsSnapshot>;
+        retryLoad(): Promise<SettingsResult>;
+        backupAndReset(): Promise<SettingsRecoveryResult>;
         update(patch: SettingsPatch): Promise<SettingsResult>;
+        importFile(): Promise<SettingsImportResult>;
+        exportFile(): Promise<SettingsFileResult>;
+        replace(settings: Settings): Promise<SettingsResult>;
         flush(revision: number): Promise<SettingsResult>;
         onChanged(listener: (snapshot: SettingsSnapshot) => void): () => void;
     };

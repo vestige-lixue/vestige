@@ -159,8 +159,8 @@
     import { toFailureInfo } from "../../../shared/failure";
     import { Dialog } from "bits-ui";
     import Modal from "../util/Modal.svelte";
-    import externalLink from "../../../resources/icons/cil--external-link.svg?raw";
-    import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
+    import externalLink from "../../../resources/icons/lucide--folder-symlink.svg?raw";
+    import chevronRight from "../../../resources/icons/lucide--chevron-right.svg?raw";
     import licenseManifest from "../../../resources/licenses/sources.json";
 
     let { open = $bindable(), onClosed }: { open: boolean; onClosed: () => void } = $props();

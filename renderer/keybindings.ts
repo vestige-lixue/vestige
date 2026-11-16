@@ -40,6 +40,7 @@ const bindings: readonly Binding[] = [
     { key: "w", mod: true, command: { kind: "closeProject" } },
     { key: "q", mod: true, command: { kind: "quitApp" } },
     { key: "i", mod: true, command: { kind: "importMedia" } },
+    { key: "e", mod: true, alt: true, command: () => ({ kind: "exportTranscript", mediaId: mediaSelection.get() }) },
     { key: "r", mod: true, command: { kind: "restorePlaybackSpeed" } },
     { key: "e", mod: true, command: { kind: "toggleVolumeStabilization" } },
     { key: "l", mod: true, command: { kind: "openPanel", panel: "vocabulary" } },
@@ -94,6 +95,8 @@ function isMac(): boolean {
 function commandIdentity(command: Command): string {
     if (command.kind === "openPanel") return `${command.kind}:${command.panel}`;
     if (command.kind === "focus") return `${command.kind}:${command.target}`;
+    if (command.kind === "exportTranscript") return `${command.kind}:${command.runId ? "run" : "proofread"}`;
+    if (command.kind === "exportCurrentTranscript") return "exportTranscript:proofread";
     if ("direction" in command) return `${command.kind}:${command.direction}`;
     return command.kind;
 }

@@ -10,13 +10,16 @@ import OpenSourceLicenses from "../dialogs/OpenSourceLicenses.svelte";
 import About from "../dialogs/About.svelte";
 import UserGuide from "../dialogs/UserGuide.svelte";
 import ParameterGuide from "../dialogs/ParameterGuide.svelte";
+import ExportTranscript from "../dialogs/ExportTranscript.svelte";
 import TranscriptionConfig from "../dialogs/TranscriptionConfig.svelte";
 import SwitchDisplayedRun from "../dialogs/SwitchDisplayedRun.svelte";
 import RemoveMedia from "../dialogs/RemoveMedia.svelte";
 import TranscriptionPresets from "../dialogs/TranscriptionPresets.svelte";
 import SaveConfirmation from "../dialogs/SaveConfirmation.svelte";
 import SaveFailure from "../dialogs/SaveFailure.svelte";
+import SettingsLoadFailure from "../dialogs/SettingsLoadFailure.svelte";
 import SettingsSaveFailure from "../dialogs/SettingsSaveFailure.svelte";
+import SettingsDataConfirmation from "../dialogs/SettingsDataConfirmation.svelte";
 import ProjectBusy from "../dialogs/ProjectBusy.svelte";
 import ProjectError from "../dialogs/ProjectError.svelte";
 import MediaImportError from "../dialogs/MediaImportError.svelte";
@@ -53,6 +56,7 @@ const registry: { [Kind in DialogKind]: Presenter<Kind> } = {
     tasks: define("tasks", TranscriptionTasks, dialog => ({
         tasks: dialog.getTasks(), focusTaskId: dialog.focusTaskId, onStop: dialog.onStop, onRetry: dialog.onRetry, onRemove: dialog.onRemove
     })),
+    export: define("export", ExportTranscript, dialog => ({ dialogId: dialog.id, mediaId: dialog.mediaId, runId: dialog.runId })),
     transcription: define("transcription", TranscriptionConfig, dialog => ({ dialogId: dialog.id, mediaId: dialog.mediaId })),
     "remove-media": define("remove-media", RemoveMedia, dialog => ({ mediaId: dialog.mediaId, onConfirm: dialog.onConfirm })),
     "switch-displayed-run": define("switch-displayed-run", SwitchDisplayedRun, dialog => ({ onConfirm: dialog.onConfirm })),
@@ -61,7 +65,9 @@ const registry: { [Kind in DialogKind]: Presenter<Kind> } = {
     })),
     "save-confirmation": define("save-confirmation", SaveConfirmation, dialog => ({ fileName: dialog.fileName, answer: dialog.answer })),
     "save-failure": define("save-failure", SaveFailure, dialog => ({ fileName: dialog.fileName, error: dialog.error, answer: dialog.answer })),
+    "settings-load-failure": define("settings-load-failure", SettingsLoadFailure, () => ({})),
     "settings-save-failure": define("settings-save-failure", SettingsSaveFailure, dialog => ({ purpose: dialog.purpose, error: dialog.error, answer: dialog.answer })),
+    "settings-data-confirmation": define("settings-data-confirmation", SettingsDataConfirmation, dialog => ({ mode: dialog.mode, name: dialog.name, answer: dialog.answer })),
     "project-busy": define("project-busy", ProjectBusy, dialog => ({ operation: dialog.getOperation() })),
     "project-error": define("project-error", ProjectError, dialog => ({ error: dialog.error, onQuit: dialog.onQuit })),
     "media-import-error": define("media-import-error", MediaImportError, dialog => ({ failure: dialog.failure })),

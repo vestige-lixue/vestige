@@ -19,7 +19,7 @@ export type MediaRefImportIssue = {
 };
 
 type PanelDialog = {
-    kind: "transcription-backends" | "transcription-models" | "vocabulary" | "settings" | "licenses" | "about" | "guide" | "parameter-guide";
+    kind: "transcription-backends" | "transcription-models" | "vocabulary" | "settings" | "settings-load-failure" | "licenses" | "about" | "guide" | "parameter-guide";
 };
 
 type VocabularyRuleDialog = {
@@ -41,6 +41,12 @@ type TranscriptionTasksDialog = {
 type TranscriptionConfigDialog = {
     kind: "transcription";
     mediaId: string;
+};
+
+type ExportDialog = {
+    kind: "export";
+    mediaId: string;
+    runId?: string;
 };
 
 type SwitchDisplayedRunDialog = {
@@ -81,6 +87,13 @@ type SettingsSaveFailureDialog = {
     answer: (choice: SettingsSaveChoice) => void;
 };
 
+type SettingsDataConfirmationDialog = {
+    kind: "settings-data-confirmation";
+    mode: "reset" | "import";
+    name?: string;
+    answer: (confirmed: boolean) => void;
+};
+
 type ProjectBusyDialog = {
     kind: "project-busy";
     getOperation: () => project.ProjectOperation;
@@ -110,12 +123,14 @@ export type DialogDescriptor = (
     VocabularyRuleDialog |
     TranscriptionTasksDialog |
     TranscriptionConfigDialog |
+    ExportDialog |
     SwitchDisplayedRunDialog |
     RemoveMediaDialog |
     TranscriptionPresetsDialog |
     SaveConfirmationDialog |
     SaveFailureDialog |
     SettingsSaveFailureDialog |
+    SettingsDataConfirmationDialog |
     ProjectBusyDialog |
     ProjectErrorDialog |
     MediaImportErrorDialog |

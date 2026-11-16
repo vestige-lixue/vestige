@@ -32,12 +32,14 @@ const failureKeys = {
     "audio-invalid-wave": "errors.audio.invalidWave",
     "audio-truncated-wave": "errors.audio.truncatedWave",
     "audio-empty-wave": "errors.audio.emptyWave",
+    "export-invalid-request": "errors.export.invalidRequest",
     "settings-invalid-update": "errors.settings.invalidUpdate",
-    "vocabulary-invalid-file": "transcription.vocabulary.errors.invalidFile",
-    "vocabulary-invalid-rule": "transcription.vocabulary.errors.invalidRule",
-    "vocabulary-duplicate-rule": "transcription.vocabulary.errors.duplicate",
-    "vocabulary-backup-path": "transcription.vocabulary.errors.backupPath",
-    "vocabulary-conflict": "transcription.vocabulary.errors.conflict",
+    "invalid-encoding": "errors.data.invalidEncoding",
+    "unknown-field": "errors.data.unknownField",
+    "backup-same-file": "errors.file.backupSameFile",
+    "vocabulary-invalid-rule": "errors.vocabulary.invalidRule",
+    "vocabulary-duplicate-rule": "errors.vocabulary.duplicate",
+    "vocabulary-conflict": "errors.vocabulary.conflict",
     "path-not-absolute": "errors.path.notAbsolute",
     "path-drive-relative": "errors.path.driveRelative",
     "project-path-not-file": "errors.project.pathNotFile",
@@ -53,13 +55,12 @@ const failureKeys = {
     "transcription-empty-path": "errors.transcription.emptyPath",
     "transcription-invalid-option": "errors.transcription.invalidOption",
     "transcription-managed-option": "errors.transcription.managedOption",
-    "project-invalid-structure": "errors.project.invalidStructure",
-    "project-version": "errors.project.version",
+    "invalid-structure": "errors.data.invalidStructure",
     "project-invalid-uuid": "errors.project.invalidUuid",
     "project-duplicate-media": "errors.project.duplicateMedia",
     "project-invalid-path": "errors.project.invalidPath",
     "project-reversed-range": "errors.project.reversedRange"
-} as const satisfies Partial<Record<FailureInfo["kind"], ParseKeys>>;
+} as const satisfies Partial<Record<FailureInfo["kind"], Extract<ParseKeys, `errors.${string}`>>>;
 
 const outputFields = { transcription: "array", text: "text", "segment.text": "segment" } as const;
 
@@ -98,7 +99,7 @@ export function describeFailure(failure: FailureInfo): string {
         case "download-cleanup":
             return (failure.operation ? `${describeFailure(failure.operation)}\n\n` : "")
                 + withDiagnostic(i18n.t(failure.installed ? "errors.download.cleanup.installed" : "errors.download.cleanup.incomplete", failure), failure);
-        case "unexpected": case "native-spawn-failed": case "project-invalid-json":
+        case "unexpected": case "native-spawn-failed": case "invalid-json":
             return failure.diagnostic;
         case "native-failed":
             return withNativeDiagnostic(i18n.t("errors.native.failed")
@@ -114,6 +115,8 @@ export function describeFailure(failure: FailureInfo): string {
             return i18n.t(`errors.drop.${failure.entry}${failure.diagnostic ? "Diagnostic" : ""}`, failure);
         case "transcription-invalid-output":
             return i18n.t(`errors.transcription.output.${outputFields[failure.field]}`, failure);
+        case "unsupported-version":
+            return i18n.t(`errors.data.unsupportedVersion.${failure.file}`, failure);
         case "project-invalid-number":
             return i18n.t(failure.integer ? "errors.project.invalidInteger" : "errors.project.invalidNumber", failure);
         default:

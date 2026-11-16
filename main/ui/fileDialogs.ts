@@ -52,17 +52,55 @@ export async function selectOpenProjectPath(window: BrowserWindow): Promise<Abso
 
 export async function selectVocabularyImportPath(window: BrowserWindow): Promise<string | null> {
     const result = await dialog.showOpenDialog(window, {
-        title: t("transcription.vocabulary.importTitle"), properties: ["openFile"],
+        title: t("transcription.vocabulary.importTitle"), buttonLabel: t("transcription.vocabulary.importTitle"), properties: ["openFile"],
         filters: [{ name: t("native.filters.vocabulary"), extensions: ["json", "tsv", "txt"] }, { name: t("native.filters.all"), extensions: ["*"] }]
     });
     return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
 }
 
+export async function selectSettingsImportPath(window: BrowserWindow): Promise<string | null> {
+    const result = await dialog.showOpenDialog(window, {
+        title: t("native.settings.importTitle"), buttonLabel: t("native.settings.importTitle"), properties: ["openFile"],
+        filters: [{ name: t("native.filters.settings"), extensions: ["json"] }, { name: t("native.filters.all"), extensions: ["*"] }]
+    });
+    return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
+}
+
+export async function selectSettingsExportPath(window: BrowserWindow): Promise<string | null> {
+    const result = await dialog.showSaveDialog(window, {
+        title: t("native.settings.exportTitle"), buttonLabel: t("native.settings.exportTitle"), defaultPath: "vestige-settings.json",
+        filters: [{ name: t("native.filters.settings"), extensions: ["json"] }],
+        properties: ["showOverwriteConfirmation"]
+    });
+    return result.canceled || !result.filePath ? null : result.filePath;
+}
+
+export async function selectSettingsBackupPath(window: BrowserWindow): Promise<string | null> {
+    const result = await dialog.showSaveDialog(window, {
+        title: t("settings.loadFailure.backupTitle"),
+        defaultPath: `settings-backup-${new Date().toISOString().replace(/[:.]/gu, "-")}.json`,
+        properties: ["showOverwriteConfirmation"]
+    });
+    return result.canceled || !result.filePath ? null : result.filePath;
+}
+
 export async function selectVocabularySavePath(window: BrowserWindow, kind: "backup" | "export"): Promise<string | null> {
     const backup = kind === "backup";
+    const title = t(backup ? "transcription.vocabulary.backupTitle" : "transcription.vocabulary.exportTitle");
     const result = await dialog.showSaveDialog(window, {
-        title: t(backup ? "transcription.vocabulary.backupTitle" : "transcription.vocabulary.exportTitle"),
+        title, buttonLabel: title,
         defaultPath: backup ? `vocabulary-backup-${new Date().toISOString().replace(/[:.]/gu, "-")}.json` : "vocabulary.json",
+        filters: [{ name: t("native.filters.vocabularyJSON"), extensions: ["json"] }],
+        properties: ["showOverwriteConfirmation"]
+    });
+    return result.canceled || !result.filePath ? null : result.filePath;
+}
+
+export async function selectTranscriptExportPath(window: BrowserWindow, defaultPath: AbsolutePath, format: "txt" | "srt"): Promise<string | null> {
+    const result = await dialog.showSaveDialog(window, {
+        title: t("transcript.export.title"), buttonLabel: t("transcript.export.action"), defaultPath,
+        filters: [{ name: t(format === "srt" ? "native.filters.subtitles" : "native.filters.text"), extensions: [format] },
+            { name: t("native.filters.all"), extensions: ["*"] }],
         properties: ["showOverwriteConfirmation"]
     });
     return result.canceled || !result.filePath ? null : result.filePath;

@@ -7,21 +7,14 @@ import { parseProject } from "./validate";
 import { parseAbsolutePath, isSystemError } from "../util/file";
 import { fileOperationFailure, pathKey, statOrNull, writeFileAtomic } from "../util/fs";
 import { serializeMediaPath } from "./path";
+import { decodeUTF8, parseJSON } from "../util/data";
 
 const pendingWritesQueue = new Map<string, Promise<SaveProjectResult>>();
 
 export async function getProject(path: unknown): Promise<GetProjectResult> {
     try {
         const normalized = parseAbsolutePath(path);
-        const text = await readFile(normalized, "utf8");
-        let project: unknown;
-        try {
-            project = JSON.parse(text.replace(/^\uFEFF/, ""));
-        }
-        catch (error) {
-            if (!(error instanceof SyntaxError)) throw error;
-            throw new VestigeErrors({ kind: "project-invalid-json", diagnostic: error.message }, { cause: error });
-        }
+        const project = parseJSON(decodeUTF8(await readFile(normalized)));
         return { success: true, project: parseProject(project, parseAbsolutePath(dirname(normalized))) };
     }
     catch (error) {

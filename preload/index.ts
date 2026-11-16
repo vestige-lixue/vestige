@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import { type AppAPI } from "../shared/app";
-import { appChannels, settingsChannels, fileChannels, projectChannels, menuChannels } from "../shared/ipc";
+import { appChannels, settingsChannels, fileChannels, projectChannels, menuChannels, exportChannels } from "../shared/ipc";
 import { type SettingsSnapshot } from "../shared/settings/Settings";
 import { transcriptionChannels } from "../shared/transcription/ipc";
 import { taskOutputChannels, type TaskSnapshot } from "../shared/task";
@@ -44,6 +44,7 @@ const api: AppAPI = {
     quit: () => ipcRenderer.send(appChannels.quit),
     edit: action => ipcRenderer.send(appChannels.edit, action),
     clearLogs: () => ipcRenderer.invoke(appChannels.clearLogs),
+    exportTranscript: request => ipcRenderer.invoke(exportChannels.transcript, request),
     beforeQuit(check) {
         const listener = (_event: IpcRendererEvent, id: string): void => {
             Promise.resolve().then(check).then(block => {
@@ -60,7 +61,12 @@ const api: AppAPI = {
     },
     settings: {
         get: () => ipcRenderer.invoke(settingsChannels.get),
+        retryLoad: () => ipcRenderer.invoke(settingsChannels.retryLoad),
+        backupAndReset: () => ipcRenderer.invoke(settingsChannels.backupAndReset),
         update: patch => ipcRenderer.invoke(settingsChannels.update, patch),
+        importFile: () => ipcRenderer.invoke(settingsChannels.importFile),
+        exportFile: () => ipcRenderer.invoke(settingsChannels.exportFile),
+        replace: settings => ipcRenderer.invoke(settingsChannels.replace, settings),
         flush: revision => ipcRenderer.invoke(settingsChannels.flush, revision),
         onChanged(callback) {
             const listener = (_event: IpcRendererEvent, snapshot: SettingsSnapshot): void => callback(snapshot);

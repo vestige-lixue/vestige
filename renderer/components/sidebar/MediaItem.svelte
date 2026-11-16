@@ -196,8 +196,8 @@
     import Spinner from "../util/Spinner.svelte";
     import NiceLabel from "../util/NiceLabel.svelte";
     import MediaRuns from "./MediaRuns.svelte";
-    import taskAddIcon from "../../../resources/icons/carbon--task-add.svg?raw";
-    import taskRemoveIcon from "../../../resources/icons/carbon--task-remove.svg?raw";
+    import taskAddIcon from "../../../resources/icons/lucide--captions.svg?raw";
+    import taskRemoveIcon from "../../../resources/icons/lucide--circle-alert.svg?raw";
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
     import Tooltip from "../util/Tooltip.svelte";
 

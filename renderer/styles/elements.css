@@ -141,7 +141,7 @@ h6 { font-size: 14px; }
     width: 16px;
     height: 16px;
     background-color: currentColor;
-    mask: url("../../resources/icons/carbon--chevron-right.svg?inline") center / contain no-repeat;
+    mask: url("../../resources/icons/lucide--chevron-right.svg?inline") center / contain no-repeat;
     transform: rotate(90deg);
     pointer-events: none;
 }
