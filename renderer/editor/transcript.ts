@@ -13,7 +13,7 @@ import { transcriptScrollPlugin, scrollTranscriptPlayback, scrollTranscriptSelec
 import { firstTrue } from "../../shared/util/search";
 import { ProjectionStep, projectionTransaction } from "./projectionStep";
 import { history, undo, redo, closeHistory } from "@tiptap/pm/history";
-import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
+import { type EditorView } from "@tiptap/pm/view";
 import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
@@ -29,8 +29,11 @@ type DirtyRange = { from: number; to: number };
 type PendingEdit = { from: number; to: number; end: number };
 type BridgeState = { index: TextIndex; projection: TextProjection; saved: TextProjection; dirty: DirtyRange[]; pendingEdit: PendingEdit | null };
 const bridgeKey = new PluginKey<BridgeState>("vestigeTranscript");
-type PlaybackState = { time: number; follow: boolean; projection: TextProjection; ranges: number[]; decorations: DecorationSet };
+type PlaybackState = { time: number; follow: boolean; projection: TextProjection; ranges: number[] };
 const playbackKey = new PluginKey<PlaybackState>("vestigePlayback");
+export function transcriptPlaybackRanges(state: EditorState): readonly number[] {
+    return playbackKey.getState(state)!.ranges;
+}
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
 const editors = new Map<HTMLElement, Editor>();
 const texts = new WeakMap<PMNode, string>();
@@ -386,27 +389,19 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
     const playback = new Plugin<PlaybackState>({
         key: playbackKey,
         state: {
-            init: () => ({ time: -1, follow: false, projection: initial, ranges: [], decorations: DecorationSet.empty }),
+            init: () => ({ time: -1, follow: false, projection: initial, ranges: [] }),
             apply(transaction, previous, oldState, state) {
                 const { time, follow } = (transaction.getMeta(playbackKey) as Pick<PlaybackState, "time" | "follow"> | undefined) ?? previous;
-                // Changing token spans during composition corrupts Chromium's IME offsets beside inline markers.
-                // Keep their identities, but map positions so text inserted before a highlight does not shift it.
-                if (compositionActive(state)) {
-                    return { ...previous, time, follow, decorations: previous.decorations.map(transaction.mapping, transaction.doc) };
-                }
+                // The external playback layer stays frozen until composition finishes.
+                if (compositionActive(state)) return { ...previous, time, follow };
                 const projection = transcriptProjection(state);
                 // Even a cancelled composition must resume at the latest playback time.
                 const unchanged = !compositionActive(oldState) && projection === previous.projection;
                 if (unchanged && time === previous.time) return follow === previous.follow ? previous : { ...previous, follow };
                 const ranges = playbackRanges(projection, time);
                 if (unchanged && sameRanges(ranges, previous.ranges)) return { ...previous, time, follow };
-                const decorations: Decoration[] = [];
-                for (let i = 0; i < ranges.length; i += 2) decorations.push(Decoration.inline(ranges[i], ranges[i + 1], { class: "current" }));
-                return { time, follow, projection, ranges, decorations: DecorationSet.create(state.doc, decorations) };
+                return { time, follow, projection, ranges };
             }
-        },
-        props: {
-            decorations: state => playbackKey.getState(state)?.decorations ?? DecorationSet.empty
         },
         view(view) {
             let rendered = playbackKey.getState(view.state)!;
@@ -429,7 +424,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         }
     });
     // Layout must update before the information plugin registered later reads viewport geometry.
-    return [compositionPlugin(), bridge, caretPlugin(), transcriptLayoutPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
+    return [compositionPlugin(state => state.schema.marks.source.create({ kind: "modification", index: 0 })), bridge, caretPlugin(), transcriptLayoutPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
 }
 
 export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = () => true, initial = projectText(index, [])): Extensions {

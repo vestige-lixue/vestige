@@ -1,4 +1,5 @@
-import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
+import { type Mark } from "@tiptap/pm/model";
+import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 
 type CompositionPhase = "idle" | "active" | "committing";
 const compositionKey = new PluginKey<CompositionPhase>("vestigeComposition");
@@ -15,7 +16,7 @@ export function compositionCommit(transaction: Transaction): boolean {
     return transaction.getMeta(compositionKey) === "committing";
 }
 
-export function compositionPlugin(): Plugin<CompositionPhase> {
+export function compositionPlugin(addedMark: (state: EditorState) => Mark): Plugin<CompositionPhase> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let generation = 0;
     function cancel(): void {
@@ -33,7 +34,10 @@ export function compositionPlugin(): Plugin<CompositionPhase> {
             handleDOMEvents: {
                 compositionstart(view) {
                     cancel();
-                    view.dispatch(view.state.tr.setMeta(compositionKey, "active").setMeta("addToHistory", false));
+                    const transaction = view.state.tr.setMeta(compositionKey, "active").setMeta("addToHistory", false);
+                    // ProseMirror uses these marks to start composition in its own added-text cursor wrapper.
+                    if (view.state.selection instanceof TextSelection && view.state.selection.empty) transaction.setStoredMarks([addedMark(view.state)]);
+                    view.dispatch(transaction);
                     return false;
                 },
                 compositionend(view) {
@@ -47,7 +51,9 @@ export function compositionPlugin(): Plugin<CompositionPhase> {
                         view.dispatch(view.state.tr.setMeta(compositionKey, "committing"));
                         if (view.isDestroyed || view.composing || generation !== current) return;
                         // Only after the bridge finishes may information rebuild and inspection measure DOM.
-                        view.dispatch(view.state.tr.setMeta(compositionKey, "idle").setMeta("addToHistory", false));
+                        const transaction = view.state.tr.setMeta(compositionKey, "idle").setMeta("addToHistory", false);
+                        if (view.state.storedMarks) transaction.setStoredMarks(null);
+                        view.dispatch(transaction);
                     }, 0);
                     return false;
                 }

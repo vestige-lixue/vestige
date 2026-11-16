@@ -78,6 +78,7 @@ export function transcriptPlaybackMarkers(view: EditorView, time: number): HTMLE
 
 export function informationPlugin(index: TextIndex, projectionOf: (state: EditorState) => TextProjection, playbackOf: (state: EditorState) => number, options: InspectionOptions): Plugin {
     const cache = new WeakMap<TextProjection, InformationModel>();
+    const widgets = new Map<string, HTMLElement>();
     function modelOf(projection: TextProjection): InformationModel {
         const previous = cache.get(projection);
         if (previous) return previous;
@@ -103,18 +104,23 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
     function build(state: EditorState, expanded: SourceRange[], labels: InspectionLabels): InformationState {
         const projection = projectionOf(state);
         const model = modelOf(projection);
+        const keys = new Set<string>();
         const decorations = model.information.map(information => {
             const position = information.from;
             const open = information.kind === "deletion" && isExpanded(expanded, information);
             // Keep the default end-of-document caret inside the last text node.
             const side = position === state.doc.firstChild!.content.size ? 1 : -1;
             const key = `${side}/${information.key}/${information.sourceFrom}-${information.sourceTo}/${open}/${JSON.stringify(labels)}/${open ? information.gaps?.map(gap => gap.key).join(",") : ""}`;
-            let dom: HTMLElement | undefined;
+            keys.add(key);
             return Decoration.widget(position + 1, () => {
-                // Mapping during composition can redraw a widget; retain its original DOM.
-                if (dom) return dom;
+                // Composition can recreate widget descs after a rebuild; reuse the DOM by key.
+                const cached = widgets.get(key);
+                if (cached) return cached;
                 const anchor = transcriptMarkerAnchor(transcriptMarker(information, { expanded: open, label: open ? labels.collapse : labels.expand }));
-                if (!open) return dom = anchor;
+                if (!open) {
+                    widgets.set(key, anchor);
+                    return anchor;
+                }
                 const expanded = document.createElement("span");
                 expanded.className = "transcript-deletion-expanded";
                 expanded.contentEditable = "false";
@@ -127,13 +133,15 @@ export function informationPlugin(index: TextIndex, projectionOf: (state: Editor
                     gap: gap => transcriptMarkerAnchor(transcriptMarker(gap))
                 });
                 expanded.append(original);
-                return dom = expanded;
+                widgets.set(key, expanded);
+                return expanded;
             }, {
                 key, side, relaxedSide: true, marks: [], ignoreSelection: true,
                 // Text drags over a marker still belong to the editor, including its no-op drop guard.
                 stopEvent: event => event.type !== "drop" && !event.type.startsWith("drag")
             });
         });
+        for (const key of widgets.keys()) if (!keys.has(key)) widgets.delete(key);
         return { ...model, projection, expanded, labels, pending: false, decorations: DecorationSet.create(state.doc, decorations) };
     }
     const plugin = new Plugin<InformationState>({

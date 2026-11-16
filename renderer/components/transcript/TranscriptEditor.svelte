@@ -7,7 +7,11 @@
         <div
             class="editor" spellcheck={false} style:--transcript-font-size={`${fontSize}px`}
             tabindex={-1} bind:this={element}
-        ></div>
+        >
+            <svg class="playback-outline" aria-hidden="true" style:stroke-width={`${playbackOutline.strokeWidth}px`}>
+                {#each playbackOutline.paths as path, index (index)}<path d={path} />{/each}
+            </svg>
+        </div>
         {#if visibleLineBreaks.length}
             <div class="line-breaks" aria-hidden="true">
                 {#each visibleLineBreaks as box (box.pos)}
@@ -42,6 +46,13 @@
 
 
 <style>
+    /* Resizing the viewport changes only the editor root's bottom padding. */
+    @property --transcript-scroll-padding {
+        syntax: "<length>";
+        inherits: false;
+        initial-value: 0px;
+    }
+
     .editor-shell {
         display: flex;
         flex-direction: column;
@@ -70,15 +81,22 @@
         background-color: var(--c-selection);
         pointer-events: none;
     }
-    .inspection-outline {
+    .playback-outline, .inspection-outline {
         position: absolute;
         inset: 0;
         width: 100%;
         height: 100%;
         overflow: visible;
         pointer-events: none;
-        z-index: 2;
         fill: none;
+    }
+    .playback-outline {
+        /* Later marker anchors share this level and paint above playback. */
+        z-index: 1;
+        stroke: var(--c-accent);
+    }
+    .inspection-outline {
+        z-index: 2;
         stroke: var(--c-text-80p);
         stroke-width: 1px;
         stroke-dasharray: 3 2;
@@ -94,15 +112,19 @@
         position: absolute;
         white-space: pre;
         color: var(--c-text-80p);
+        transform: translateZ(0);
     }
-    /* Every glyph is muted; only the underline, colored like added text's, marks an added break. */
-    .line-break.added {
+    /* Keep the underline in the hint's layer; paint containment would snap its fractional text origin. */
+    .line-break.added::after {
+        content: "\2003";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        box-sizing: content-box;
+        padding-bottom: calc(.2em + 1px);
         text-decoration-color: var(--c-text);
-        text-decoration-line: underline;
-        text-decoration-style: dashed;
-        text-underline-offset: .2em;
-        text-decoration-skip-ink: none;
-        text-decoration-thickness: 1px;
     }
     /* Drawn rather than taken from the font, so its size does not depend on the font's arrow glyph. */
     .line-break-glyph {
@@ -187,7 +209,7 @@
         display: inline;
         padding-block: var(--transcript-line-gap);
     }
-    .editor :global(.transcript-added) {
+    .line-break.added::after, .editor :global(.transcript-added) {
         text-decoration-line: underline;
         text-decoration-style: dashed;
         text-underline-offset: .2em;
@@ -209,7 +231,7 @@
     .editor :global(.token-prob-4) {
         color: var(--c-text);
     }
-    .editor :global(.current) {
+    .editor :global(.transcript-event-shape.current) {
         position: relative;
         z-index: 0;
         outline: .125em solid var(--c-accent);
@@ -225,7 +247,7 @@
         user-select: none;
     }
     .editor :global(.transcript-events) {
-        /* A block breaks double-click word selection and Ctrl+Arrow at markers; inline markers need frozen token highlights during IME composition. */
+        /* A block breaks double-click word selection and Ctrl+Arrow at markers. */
         position: relative;
         bottom: .05em;
         left: 0;
@@ -324,6 +346,7 @@
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
+    import { attachTranscriptPlaybackOutline, type PlaybackOutline } from "../../editor/playbackOutline";
     import { attachTranscriptFind } from "../../editor/find";
     import { attachTranscriptSelection } from "../../editor/selection";
     import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
@@ -345,6 +368,7 @@
     let { vestige, run, onInspect }: { vestige: Vestige; run: Run; onInspect?: (information: InspectionInformation | null) => void } = $props();
     let element: HTMLDivElement;
     let editor = $state.raw<Editor>();
+    let playbackOutline = $state.raw<PlaybackOutline>({ paths: [], strokeWidth: 0 });
     let contextMenu: { show: TranscriptMenuCallbacks["open"]; edit: TranscriptMenuCallbacks["edit"] };
     let inspection = $state.raw<TranscriptInspection | null>(null);
     let selectionBounds = $state.raw<{ from: number; to: number } | null>(null);
@@ -521,6 +545,16 @@
         const current = editor;
         if (!current) return;
         return attachTranscriptSelection(current, bounds => selectionBounds = bounds);
+    });
+
+    $effect(() => {
+        const current = editor;
+        if (!current) return;
+        const stop = attachTranscriptPlaybackOutline(current, element, outline => playbackOutline = outline);
+        return () => {
+            stop();
+            playbackOutline = { paths: [], strokeWidth: 0 };
+        };
     });
 
     $effect(() => {
