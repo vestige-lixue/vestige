@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import { resolve } from "node:path";
-import { parseBatchResults, toRun } from "../main/transcription/sherpa/result";
+import { normalizeQwenOutput, parseBatchResults, toRun } from "../main/transcription/sherpa/result";
+import qwenProtocol from "./support/qwen-protocol.json";
 import { type ParsedRequest } from "../main/transcription/parameters";
 import { VestigeErrors } from "../shared/failure";
 import { type AbsolutePath } from "../shared/util/path";
@@ -109,5 +110,64 @@ describe("Sherpa batch results", () => {
         expect(failure).toMatchObject({
             failure: { kind: "transcription-invalid-result", diagnostic }, cause: expect.any(SyntaxError)
         });
+    });
+});
+
+describe("Qwen protocol tokens", () => {
+    const request: ParsedRequest = {
+        executor: "sherpa-onnx", backendDirectory: "fixture", modelDirectory: resolve("fixture") as AbsolutePath,
+        mediaPath: resolve("fixture.wav") as AbsolutePath, mediaDuration: 20, params: {}, startedAt: 0,
+        config: { executor: "sherpa-onnx", backendDirectory: "fixture", modelDirectory: "fixture", params: {} }
+    };
+
+    it("preserves every body token from the real Qwen output", () => {
+        const normalized = normalizeQwenOutput(qwenProtocol);
+        expect(normalized).toMatchObject({
+            text: qwenProtocol.text.split("<asr_text>")[1], lang: "en",
+            tokens: qwenProtocol.tokens.slice(3), timestamps: [], durations: [], ys_log_probs: []
+        });
+        const run = toRun("fixture", request, qwenProtocol, 20, 0, true);
+        expect(run.language).toBe("en");
+        expect(run.transcript.map(span => span.token.text)).toEqual(qwenProtocol.tokens.slice(3));
+        expect(run.transcript[0]).toMatchObject({ token: { text: "Do" }, range: { start: 0, end: 20 } });
+    });
+
+    it.each(["language", "$LANGUAGE", "$LANGUAGES"])("keeps the body inside a header-ending token for %s", protocol => {
+        const output = {
+            text: `  ${protocol} English<asr_text>Do you`,
+            tokens: [" ", protocol, " English", "<asr_text>Do", " you"],
+            timestamps: [0, 1, 2, 3, 4], durations: [1, 1, 1, 1, 1], ys_log_probs: [-5, -4, -3, -2, -1]
+        };
+        expect(normalizeQwenOutput(output)).toMatchObject({
+            text: "Do you", lang: "en", tokens: ["Do", " you"],
+            timestamps: [3, 4], durations: [1, 1], ys_log_probs: [-2, -1]
+        });
+        expect(toRun("fixture", request, output, 20, 0, true).transcript.map(span => span.token.text)).toEqual(["Do", " you"]);
+    });
+
+    it("removes matching timing and probability entries with complete header tokens", () => {
+        expect(normalizeQwenOutput({
+            ...qwenProtocol, timestamps: qwenProtocol.tokens.map((_, index) => index),
+            durations: qwenProtocol.tokens.map(() => 1), ys_log_probs: qwenProtocol.tokens.map(() => -1)
+        })).toMatchObject({
+            timestamps: qwenProtocol.tokens.slice(3).map((_, index) => index + 3),
+            durations: qwenProtocol.tokens.slice(3).map(() => 1), ys_log_probs: qwenProtocol.tokens.slice(3).map(() => -1)
+        });
+    });
+
+    it.each([[" language", " French", "<asr_text>", "Do", " you"], [" language"], [" language", 42]])(
+        "falls back to the whole body when header tokens disagree: %j", (...tokens) => {
+            const output = { text: "language English<asr_text>Do you", tokens, timestamps: [1], durations: [1], ys_log_probs: [-1] };
+            expect(normalizeQwenOutput(output)).toMatchObject({ text: "Do you", lang: "en", tokens: [], timestamps: [], durations: [], ys_log_probs: [] });
+            expect(toRun("fixture", request, output, 20, 0, true).transcript).toEqual([
+                { range: { start: 0, end: 20 }, blankProb: 0, token: { text: "Do you", prob: 1 } }
+            ]);
+        }
+    );
+
+    it("leaves output without a complete protocol header unchanged", () => {
+        const output = { text: "language is useful", lang: "en", tokens: ["language", " is", " useful"], timestamps: [0, 1, 2], durations: [1, 1, 1] };
+        expect(normalizeQwenOutput(output)).toBe(output);
+        expect(toRun("fixture", request, output, 20, 0, true)).toEqual(toRun("fixture", request, output, 20, 0));
     });
 });

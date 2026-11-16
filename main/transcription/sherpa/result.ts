@@ -17,11 +17,29 @@ export function normalizeQwenOutput(output: NativeObject): NativeObject {
     // such as "language" that may themselves be the spoken transcript.
     const prefix = /^\s*\$?languages?\s+([A-Za-z][A-Za-z -]{0,40})<asr_text>/i.exec(output.text);
     if (!prefix) return output;
+    const header = prefix[0].trimStart();
+    const tokens = array(output.tokens);
+    let joined = "";
+    let removed = tokens.length;
+    let remaining: unknown[] = [];
+    for (let index = 0; index < tokens.length; index++) {
+        if (typeof tokens[index] !== "string") break;
+        joined += tokens[index];
+        const text = joined.trimStart();
+        if (text.startsWith(header)) {
+            const suffix = text.slice(header.length);
+            removed = index + (suffix ? 0 : 1);
+            remaining = suffix ? [suffix, ...tokens.slice(index + 1)] : tokens.slice(removed);
+            break;
+        }
+        if (!header.startsWith(text)) break;
+    }
+    const trim = (value: unknown): unknown[] => remaining.length ? array(value).slice(removed) : [];
     return {
         ...output,
         text: output.text.slice(prefix[0].length).trimStart(),
         lang: qwenLanguages[prefix[1].trim().toLowerCase()] ?? output.lang,
-        tokens: [], timestamps: [], durations: [], ys_log_probs: []
+        tokens: remaining, timestamps: trim(output.timestamps), durations: trim(output.durations), ys_log_probs: trim(output.ys_log_probs)
     };
 }
 
