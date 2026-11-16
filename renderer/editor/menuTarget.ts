@@ -9,7 +9,7 @@ import { pointerRectangle, type InspectionGeometry, type InspectionTarget } from
 import { compositionPending } from "./composition";
 import { projectionTransaction } from "./projectionStep";
 import { dispatchPreservingScroll } from "./scroll";
-import { transcriptPreviewOriginal, transcriptPreviewSelection } from "./selectionDOM";
+import { restoreTranscriptDOMSelection, transcriptPreviewOriginal, transcriptPreviewSelection } from "./selectionDOM";
 
 export type TranscriptMenuTarget = {
     kind: "deletion" | "gap" | "token" | "selection" | "text";
@@ -54,6 +54,15 @@ export function closeTranscriptMenu(view: EditorView): void {
 
 export function editTranscriptMenu(view: EditorView, action: EditAction): boolean {
     return controllers.get(view)?.edit(action) ?? false;
+}
+
+export function restoreTranscriptMenuFocus(view: EditorView): void {
+    const selection = view.dom.ownerDocument.getSelection();
+    const anchor = selection?.anchorNode, head = selection?.focusNode;
+    const anchorOffset = selection?.anchorOffset, headOffset = selection?.focusOffset;
+    view.focus();
+    // Closing can run before or after the next native press. Keep its current endpoints, not the old menu request's.
+    if (anchor && head && view.dom.contains(anchor) && view.dom.contains(head)) selection!.setBaseAndExtent(anchor, anchorOffset!, head, headOffset!);
 }
 
 export function restoreTranscriptMenuSelection(request: TranscriptMenuRequest): boolean {
@@ -180,6 +189,16 @@ export function transcriptMenuController(
 
     function down(event: MouseEvent): void {
         if (event.type === "pointerdown") {
+            if (event.button === 2 && !blocked()) {
+                const preview = transcriptPreviewSelection(view);
+                const original = transcriptPreviewOriginal(view, event.target);
+                if (preview && original && !(event.target instanceof Element && event.target.closest(".transcript-event"))) {
+                    // Match the selected line fragments, including the right half of the island's last character.
+                    const inside = original === transcriptPreviewOriginal(view, preview.startContainer) && [...preview.getClientRects()]
+                        .some(rect => rect.width > 0 && rect.height > 0 && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom);
+                    if (!inside) restoreTranscriptDOMSelection(view);
+                }
+            }
             close();
             composingRequest = event.button === 2 && blocked();
             // Suppress inspection from right-button down until contextmenu opens the menu.

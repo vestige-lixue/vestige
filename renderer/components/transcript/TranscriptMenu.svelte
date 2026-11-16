@@ -1,6 +1,6 @@
 <DropdownMenu.Root {open} onOpenChange={changeOpen}>
     <DropdownMenu.Portal>
-        <DropdownMenu.Content class={["transcript-menu", { "reference-preview": referencePreview }]} data-keyboard={keyboard.current} bind:ref={content} customAnchor={anchor}
+        <DropdownMenu.Content class="transcript-menu" data-keyboard={keyboard.current} bind:ref={content} customAnchor={anchor}
             align="start" side="bottom" sideOffset={2} collisionPadding={8} preventScroll={false}
             style={`z-index: ${layerIndex + 1};`} onOpenAutoFocus={focusMenu} onCloseAutoFocus={returnFocus}
             onkeydown={keydown}>
@@ -13,18 +13,16 @@
                 </DropdownMenu.Item>
             {/if}
             {#if references.length}
-                <DropdownMenu.Sub onOpenChange={referenceOpenChange}>
-                    <DropdownMenu.SubTrigger class="reference-trigger activable focusable"
-                        onpointerenter={() => referenceHover = "trigger"} onpointerleave={() => referenceHover = null}>
+                <DropdownMenu.Sub onOpenChange={value => referenceFocusPending = value}>
+                    <DropdownMenu.SubTrigger class="reference-trigger activable focusable">
                         <div>{i18n.t(request?.target.kind === "gap" ? "transcript.reference.insert" : "transcript.reference.replace")}</div>
                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                         {@html chevronRight}
                     </DropdownMenu.SubTrigger>
                     <DropdownMenu.Portal>
-                        <DropdownMenu.SubContent class={["transcript-menu transcript-references", { "reference-preview": referencePreview }]} data-keyboard={keyboard.current}
+                        <DropdownMenu.SubContent class="transcript-menu transcript-references" data-keyboard={keyboard.current}
                             align="start" sideOffset={8} collisionPadding={8} style={`z-index: ${layerIndex + 1};`} onkeydown={keydown}
-                            onOpenAutoFocus={focusReferences}
-                            onpointerenter={() => referenceHover = "content"} onpointerleave={() => referenceHover = null}>
+                            onOpenAutoFocus={focusReferences}>
                             {#each references as reference (reference.text)}
                                 {@const lines = timing(reference.range, reference.target)}
                                 <DropdownMenu.Item class="reference-item activable focusable" disabled={disabled("paste")} onSelect={() => applyReference(reference.text)}>
@@ -48,7 +46,7 @@
                         {@html chevronRight}
                     </DropdownMenu.SubTrigger>
                     <DropdownMenu.Portal>
-                        <DropdownMenu.SubContent class="transcript-menu transcript-vocabulary" data-keyboard={keyboard.current}
+                        <DropdownMenu.SubContent class={["transcript-menu transcript-vocabulary", { counted: vocabularyMatches.some(group => group.ranges.length > 1) }]} data-keyboard={keyboard.current}
                             align="start" sideOffset={8} collisionPadding={8} style={"z-index: " + (layerIndex + 1)} onkeydown={keydown}
                             onOpenAutoFocus={event => {
                                 if (!vocabularyFocusPending) event.preventDefault();
@@ -58,11 +56,14 @@
                                 <DropdownMenu.Item class="vocabulary-item activable focusable" disabled={disabled("paste")}
                                     onSelect={() => applyVocabulary(group)}>
                                     <div class="vocabulary-source">{group.rule.source}</div>
-                                    <span aria-hidden="true">→</span>
+                                    <span class="vocabulary-arrow" aria-hidden="true">
+                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                        {@html arrowRight}
+                                    </span>
                                     <div class="vocabulary-replacement">
                                         {#if group.rule.replacement}{group.rule.replacement}{:else}<i>{i18n.t("transcription.vocabulary.deleteText")}</i>{/if}
                                     </div>
-                                    {#if group.ranges.length > 1}<span class="reference-runs">×{group.ranges.length}</span>{/if}
+                                    {#if group.ranges.length > 1}<span class="vocabulary-count"><span class="vocabulary-count-text">{i18n.t("transcription.vocabulary.matchCount", { count: group.ranges.length })}</span></span>{/if}
                                 </DropdownMenu.Item>
                             {/each}
                         </DropdownMenu.SubContent>
@@ -105,14 +106,10 @@
         padding: 4px;
         border-radius: 8px;
         background: var(--bg);
-        transition: opacity .12s;
         box-shadow:
             0 0 0 1px var(--c-shadow-1),
             0 2px 6px -2px var(--c-shadow-2),
             0 12px 28px -4px var(--c-shadow-3);
-    }
-    :global(.transcript-menu.reference-preview) {
-        opacity: .75;
     }
     :global(.transcript-menu [role="menuitem"]) {
         display: flex;
@@ -181,27 +178,49 @@
         font-size: 12px;
         white-space: nowrap;
     }
+    :global(.transcript-vocabulary) {
+        display: grid;
+        grid-template-columns: minmax(0, max-content) auto minmax(0, max-content);
+        column-gap: 24px;
+        width: max-content;
+        min-width: 0;
+    }
+    :global(.transcript-vocabulary.counted) {
+        grid-template-columns: minmax(0, max-content) auto minmax(0, max-content) auto;
+    }
     :global(.transcript-vocabulary .vocabulary-item) {
         display: grid;
-        gap: 12px;
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        grid-column: 1 / -1;
+        grid-template-columns: subgrid;
+        column-gap: 24px;
+        align-items: center;
     }
-    :global(.transcript-vocabulary .vocabulary-item:has(.reference-runs)) {
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    .vocabulary-source, .vocabulary-arrow, .vocabulary-replacement, .vocabulary-count {
+        line-height: 20px;
     }
+    .vocabulary-arrow { display: flex; align-items: center; }
+    .vocabulary-arrow :global(svg) { width: 16px; height: 16px; }
+    .vocabulary-count {
+        justify-self: end;
+        color: var(--c-text-80p);
+        white-space: nowrap;
+    }
+    .vocabulary-count-text { font-size: 12px; }
     .vocabulary-source, .vocabulary-replacement {
         white-space: pre-wrap;
         overflow-wrap: anywhere;
     }
-    .vocabulary-source { color: var(--c-text-80p); }
+    .vocabulary-source, .vocabulary-arrow { color: var(--c-text-80p); }
+    .vocabulary-replacement i { color: var(--c-text-80p); line-height: inherit; }
 </style>
 
 <script lang="ts">
     import { onDestroy, tick, untrack } from "svelte";
     import { DropdownMenu, IsUsingKeyboard } from "bits-ui";
     import chevronRight from "../../../resources/icons/carbon--chevron-right.svg?raw";
+    import arrowRight from "../../../resources/icons/carbon--arrow-right.svg?raw";
     import { type EditAction } from "../../../shared/app";
-    import { transcriptMenuClipboardActions, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
+    import { transcriptMenuClipboardActions, restoreTranscriptMenuFocus, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
     import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection, transcriptReferenceTarget, applyTranscriptReference } from "../../editor/transcript";
     import { referenceCandidate } from "../../../shared/transcript/reference";
     import { type Run } from "../../../shared/transcription/Run";
@@ -228,8 +247,6 @@
     let referenceFocusPending = false;
     let vocabularyFocusPending = false;
     let vocabularyRevision = -1;
-    let referenceHover = $state<"trigger" | "content" | null>(null);
-    const referencePreview = $derived(open && request?.target.kind === "selection" && referenceHover !== null);
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
     const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
@@ -245,7 +262,6 @@
     const layerIndex = $derived(modal.getLayerIndex(layer));
 
     export function show(value: TranscriptMenuRequest | null): boolean {
-        referenceHover = null;
         if (!value) {
             open = false;
             return false;
@@ -271,13 +287,7 @@
 
     function changeOpen(value: boolean): void {
         open = value;
-        if (!value) referenceHover = null;
         if (!value && request) dismissTranscriptMenu(request.view.dom);
-    }
-
-    function referenceOpenChange(value: boolean): void {
-        referenceFocusPending = value;
-        if (!value && referenceHover === "content") referenceHover = null;
     }
 
     function applyVocabulary(group: VocabularyGroup): void {
@@ -398,7 +408,7 @@
 
     function returnFocus(event: Event): void {
         event.preventDefault();
-        if (!open && request && !request.view.isDestroyed && document.hasFocus()) request.view.focus();
+        if (!open && request && !request.view.isDestroyed && document.hasFocus()) restoreTranscriptMenuFocus(request.view);
     }
 
     function keydown(event: KeyboardEvent): void {
