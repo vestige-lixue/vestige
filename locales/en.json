@@ -585,8 +585,8 @@
                     "description": "Stop increasing gain below this level, then remove the boost if audio stays quiet."
                 },
                 "targetLevelDb": {
-                    "label": "Target level",
-                    "description": "The average level automatic gain aims for (subject to the maximum boost and peak limit)."
+                    "label": "Target loudness",
+                    "description": "The target for the K-weighted loudness estimate. Output remains subject to the maximum boost and peak limit."
                 }
             }
         }

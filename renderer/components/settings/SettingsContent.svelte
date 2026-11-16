@@ -443,7 +443,7 @@
     let directoryFailure = $state("");
     const stabilizationFields = ["maxGainDb", "gainAttackMs", "gainReleaseMs", "gateThresholdDb", "targetLevelDb"] as const;
     const stabilizationUnits = {
-        maxGainDb: "dB", gainAttackMs: "ms", gainReleaseMs: "ms", gateThresholdDb: "dBFS", targetLevelDb: "dBFS RMS"
+        maxGainDb: "dB", gainAttackMs: "ms", gainReleaseMs: "ms", gateThresholdDb: "dBFS", targetLevelDb: "LUFS"
     } satisfies Record<keyof VolumeStabilizationSettings, string>;
     let updates = Promise.resolve(true);
     const failure = $derived(settings.getError());

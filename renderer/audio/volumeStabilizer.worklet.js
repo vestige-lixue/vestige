@@ -21,6 +21,8 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         this.dry = [];
         /** @type {Float32Array[]} */
         this.wet = [];
+        /** @type {Float64Array[]} */
+        this.weighting = [];
         this.peaks = new Float64Array(this.size);
         this.peakFrames = new Float64Array(this.size);
         this.limiterRelease = 1 - Math.exp(-1 / (sampleRate * 0.08));
@@ -36,6 +38,7 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
     reset() {
         for (const channel of this.dry) channel.fill(0);
         for (const channel of this.wet) channel.fill(0);
+        for (const channel of this.weighting) channel.fill(0);
         this.position = 0;
         this.frame = 0;
         this.peakHead = 0;
@@ -56,25 +59,46 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         if (this.dry.length !== output.length) {
             this.dry = Array.from({ length: output.length }, () => new Float32Array(this.size));
             this.wet = Array.from({ length: output.length }, () => new Float32Array(this.size));
+            this.weighting = Array.from({ length: output.length }, () => new Float64Array(6));
             this.reset();
         }
 
-        // Link channels with the loudest channel's RMS, preserving stereo balance
-        // and avoiding a boost when one channel contains silence.
+        // Playback mixes to the destination's channels before this node. Sum their
+        // K-weighted energies instead of selecting the loudest channel per block.
+        // The two BS.1770 filters below use the playback context's fixed 48 kHz rate.
+        // Filtering is confined to detection; the audible samples retain their spectrum.
         let power = 0;
-        for (const channel of input ?? []) {
-            let sum = 0;
+        let rawPower = 0;
+        for (let channel = 0; channel < output.length; channel++) {
+            const samples = input?.[channel];
+            const state = this.weighting[channel];
+            let x1 = state[0], x2 = state[1], y1 = state[2], y2 = state[3], z1 = state[4], z2 = state[5];
+            let sum = 0, rawSum = 0;
             for (let i = 0; i < frames; i++) {
-                const value = Number.isFinite(channel[i]) ? channel[i] : 0;
-                sum += value * value;
+                const sample = samples?.[i] ?? 0;
+                const value = Number.isFinite(sample) ? sample : 0;
+                const shelf = 1.53512485958697 * value - 2.69169618940638 * x1 + 1.19839281085285 * x2
+                    + 1.69065929318241 * y1 - 0.73248077421585 * y2;
+                const weighted = shelf - 2 * y1 + y2 + 1.99004745483398 * z1 - 0.99007225036621 * z2;
+                x2 = x1; x1 = value;
+                y2 = y1; y1 = shelf;
+                z2 = z1; z1 = weighted;
+                sum += weighted * weighted;
+                rawSum += value * value;
             }
-            power = Math.max(power, sum / frames);
+            state[0] = x1; state[1] = x2; state[2] = y1; state[3] = y2; state[4] = z1; state[5] = z2;
+            power += sum / frames;
+            rawPower = Math.max(rawPower, rawSum / frames);
         }
+        // BS.1770's -0.691 dB calibration. The existing envelope remains an
+        // adaptive estimate, not a gated integrated or fixed-window LUFS meter.
+        power *= 10 ** (-0.691 / 10);
         const levelTime = power > this.power ? 0.03 : 0.2;
         const levelBlend = 1 - Math.exp(-frames / (sampleRate * levelTime));
         let targetGain = this.gain;
-        // The level gate controls amplification, not noise removal or speech detection.
-        if (power >= gatePower) {
+        // Keep the quiet threshold in unweighted dBFS, independent of the new
+        // loudness estimate. It controls amplification, not noise removal.
+        if (rawPower >= gatePower) {
             this.power = this.power === 0 || this.quietFrames > sampleRate * 0.25
                 ? power : this.power + (power - this.power) * levelBlend;
             this.quietFrames = 0;

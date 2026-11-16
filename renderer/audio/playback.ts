@@ -65,6 +65,10 @@ export function create(element: HTMLMediaElement, volume: number, enabled: boole
         initialized: context.audioWorklet.addModule(processorURL).then(() => {
             if (audio.disposed) return;
             audio.processor = new AudioWorkletNode(context, "vestige-volume-stabilizer", {
+                // Measure the channels that reach the output, including mono duplication
+                // and surround downmixing, so channel layout cannot change the reference.
+                channelCount: context.destination.channelCount, channelCountMode: "explicit",
+                outputChannelCount: [context.destination.channelCount],
                 processorOptions: { enabled: audio.enabled, settings: audio.settings, lookaheadFrames: audio.lookaheadFrames }
             });
             audio.processor.onprocessorerror = () => fail(audio, new Error("The volume stabilization processor failed."));
