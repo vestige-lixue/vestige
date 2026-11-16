@@ -1,7 +1,9 @@
 <svelte:window onpointerdowncapture={handlePointerdown} />
 
-<Popover.Root bind:open>
-    <Tooltip text={i18n.t("transcript.runs.title")} {disabled} {tabindex} {onfocus} onclick={event => event.stopPropagation()}>
+<Popover.Root bind:open={() => open, setOpen}>
+    <Tooltip text={i18n.t("transcript.runs.title")} {disabled} {tabindex} {onfocus} onclick={event => event.stopPropagation()}
+        bind:open={() => triggerTooltipOpen, value => triggerTooltipOpen = value && !open && !hasDialog}
+        disableCloseOnTriggerClick={false}>
         {#snippet child({ props })}
             <Popover.Trigger {...props} bind:ref={trigger} class="runsTrigger icon-button hoverable activable focusable">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -16,14 +18,18 @@
         <PopoverContent bind:ref={content} class="mediaRuns option-surface" customAnchor={anchor} align="start" sideOffset={6}
             collisionBoundary={mediaList} collisionPadding={0} hideWhenDetached
             style={`z-index: ${layerIndex + 1}; font-size: ${fontSize};`}
-            trapFocus={!hasDialog && !menuOpen} interactOutsideBehavior="ignore"
+            trapFocus={open && !hasDialog} interactOutsideBehavior="ignore"
             onOpenAutoFocus={event => {
                 event.preventDefault();
                 focusRun(vestige?.displayedRunIdx ?? 0, false);
             }}
             onCloseAutoFocus={event => {
                 event.preventDefault();
-                if (!menuOpen && dismissReason !== "outside") modal.restoreFocus(trigger, { preventScroll: dismissReason === "detached" });
+                const active = document.activeElement;
+                if (!menu.isOpen() && !hasDialog && dismissReason !== "outside"
+                    && (active === document.body || (active && content?.contains(active)))) {
+                    modal.restoreFocus(trigger, { preventScroll: dismissReason === "detached" });
+                }
                 dismissReason = null;
             }}
             onkeydown={handleKeydown}
@@ -176,23 +182,30 @@
     const vestige = $derived(project.getVestige(mediaId));
     const runCount = $derived(vestige?.runs.length ?? 0);
     const hasDialog = $derived(dialogs.state.dialogs.length > 0);
-    const menuOpen = $derived(menu.get() !== "");
-    let open = $state(false);
     let dismissReason: "outside" | "detached" | null = null;
     let trigger = $state<HTMLButtonElement | null>(null);
     let content = $state<HTMLDivElement | null>(null);
     let fontSize = $state("inherit");
+    let triggerTooltipOpen = $state(false);
     const layer = Symbol();
+    const open = $derived(menu.isOpen(layer));
     const layerIndex = $derived(modal.getLayerIndex(layer));
 
     $effect.pre(() => {
         if (open) untrack(() => modal.openLayer(layer));
         else untrack(() => modal.closeLayer(layer));
     });
-    onDestroy(() => modal.closeLayer(layer));
+    onDestroy(() => {
+        menu.close(layer);
+        modal.closeLayer(layer);
+    });
 
     $effect.pre(() => {
-        if (disabled || menuOpen) open = false;
+        if (disabled || hasDialog) menu.close(layer);
+    });
+
+    $effect.pre(() => {
+        if (open || hasDialog) triggerTooltipOpen = false;
     });
 
     $effect(() => {
@@ -207,11 +220,18 @@
         const observer = new IntersectionObserver(entries => {
             if (entries.at(-1)?.intersectionRatio !== 0) return;
             dismissReason = "detached";
-            open = false;
+            setOpen(false);
         }, { root: mediaList, threshold: Number.EPSILON });
         observer.observe(anchor);
         return () => observer.disconnect();
     });
+
+    function setOpen(value: boolean): void {
+        if (value) {
+            if (!disabled && !hasDialog) menu.open(layer);
+        }
+        else menu.close(layer);
+    }
 
     function formatStartedAt(value: number): string {
         const date = new Date(value);
@@ -248,7 +268,7 @@
         if (!open) return;
         dismissOutside(event, target => !!(content?.contains(target) || trigger?.contains(target)), () => {
             dismissReason = "outside";
-            flushSync(() => open = false);
+            flushSync(() => setOpen(false));
         });
     }
 
@@ -257,7 +277,7 @@
         if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();
-            open = false;
+            setOpen(false);
             return;
         }
         if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;

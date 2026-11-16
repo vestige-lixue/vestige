@@ -329,7 +329,7 @@
     function runMenuCommand(action: Command): void {
         if (interfaceBlocked() || commandDisabled(action)) return;
         focusingControl = menu.get() !== "" && (action.kind === "focus" || action.kind === "openTranscriptFind" || action.kind === "openTranscriptReplace");
-        menu.set("");
+        menu.close();
         runCommand(action);
     }
 
@@ -353,7 +353,7 @@
         run: runMenuCommand,
         edit: runEdit,
         toggle: () => {
-            if (menu.get()) menu.set("");
+            if (menu.isOpen()) menu.close();
             else {
                 rememberEditor();
                 focusMenuOnOpen = true;
@@ -374,7 +374,7 @@
 
     function handleCloseAutoFocus(event: Event, value: string): void {
         // Switching menus or opening a dialog must keep focus in the new content.
-        if (menu.get() || interfaceBlocked() || restoringEditor || focusingControl || pointerDismissed) {
+        if (menu.isOpen() || interfaceBlocked() || restoringEditor || focusingControl || pointerDismissed) {
             event.preventDefault();
         }
         else if (editor?.isConnected) {
@@ -390,7 +390,7 @@
                 void tick().then(() => {
                     // Tab or another action may already have moved focus to its destination.
                     const active = document.activeElement;
-                    if (!menu.get() && !interfaceBlocked() && trigger.isConnected
+                    if (!menu.isOpen() && !interfaceBlocked() && trigger.isConnected
                         && (active === document.body || active?.closest("[data-menubar-content], [data-menubar-sub-content]"))) {
                         trigger.focus({ preventScroll: true });
                     }

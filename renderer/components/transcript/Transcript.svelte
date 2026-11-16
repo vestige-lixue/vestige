@@ -12,7 +12,7 @@
     {:else}
         <div class="placeholder">
             {mediaSelection.get() ? i18n.t("transcript.emptyMedia") : i18n.t("transcript.empty")}
-            {#if mediaSelection.get()}
+            {#if vestige && mediaImport.isReady(vestige.media.id)}
                 <span class="new-transcription">
                     <kbd>{shortcut(transcriptionCommand)}</kbd>
                     <button type="button" class="link-button focusable" disabled={commandDisabled(transcriptionCommand)} onclick={() => runCommand(transcriptionCommand)}>
@@ -46,6 +46,8 @@
         flex: 1;
         min-height: 0;
         overflow-y: auto;
+        /* Repeated Tab focus restarts native smooth scrolling before it can reach the marker. */
+        scroll-behavior: auto;
     }
     .placeholder {
         margin: 24px;
@@ -72,6 +74,7 @@
     import { type InspectionInformation } from "../../editor/information";
     import * as project from "../../states/project.svelte";
     import * as mediaSelection from "../../states/mediaSelection.svelte";
+    import * as mediaImport from "../../states/mediaImport.svelte";
     import * as transcript from "../../states/transcript.svelte";
     import * as settings from "../../states/settings.svelte";
     import { shortcut } from "../../keybindings";

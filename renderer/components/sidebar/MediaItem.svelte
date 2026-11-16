@@ -114,7 +114,7 @@
         --bg: color-mix(in srgb, var(--c-danger) 20%, var(--c-background));
     }
     .media.selected.ignored {
-        --bg: color-mix(in srgb, var(--c-danger) 30%, var(--c-selection-bg));
+        --bg: color-mix(in srgb, var(--c-danger) 30%, var(--c-background));
     }
     .media-secondary-wrapper {
         display: flex;

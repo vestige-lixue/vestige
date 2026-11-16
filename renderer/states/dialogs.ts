@@ -1,11 +1,15 @@
+import { flushSync } from "svelte";
 import { type Config } from "../../shared/transcription/Config";
 import * as dialogs from "./dialogs.svelte";
+import * as menu from "./menu.svelte";
 
 const closeRequests = new Map<string, { result: Promise<boolean>; finish: (accepted: boolean) => void }>();
 
 export function show(descriptor: dialogs.DialogDescriptor): string {
     // Progress-only layers must not reveal a hidden window during a silent quit.
     if (window.api.platform === "darwin" && descriptor.kind !== "project-busy") window.api.revealWindow();
+    // Finish menu dismissal and focus restoration before the dialog captures its return target.
+    flushSync(() => menu.close());
     const id = crypto.randomUUID();
     dialogs.state.dialogs.push({ ...descriptor, id, open: true });
     return id;

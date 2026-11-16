@@ -46,6 +46,10 @@
         gap: 12px;
         text-align: left;
     }
+    :global(.dropdownSelector:disabled), :global(.dropdownSelector[data-disabled]) {
+        opacity: 0.5;
+        cursor: default;
+    }
     .value {
         display: grid;
         grid-template-columns: minmax(0, 1fr);

@@ -109,7 +109,7 @@
     const media = $derived(mediaId !== null && mediaImport.isReady(mediaId) ? project.getMedia(mediaId) : null);
     const source = $derived(player.getURL());
     const isVideo = $derived(media?.kind === "video");
-    const previewName = $derived(media?.name ?? i18n.t("player.noMedia"));
+    const previewName = $derived(project.getMedia(mediaId)?.name ?? i18n.t("player.noMedia"));
     const minimumVideoHeight = 112;
     const minimumTranscriptHeight = 160;
     const resizerThickness = 3;

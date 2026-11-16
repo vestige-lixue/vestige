@@ -92,7 +92,7 @@
         position: fixed;
         top: calc(42% + env(titlebar-area-height) / 2);
         left: 50%;
-        transform: translate(-50%, max(-50%, calc(-40vh + env(titlebar-area-height) / 2 + 24px)));
+        transform: translate(-50%, max(-50%, calc(-42vh + env(titlebar-area-height) / 2 + 24px)));
         width: var(--modal-width);
         max-width: calc(100vw - 48px);
         height: var(--modal-height);
