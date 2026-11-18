@@ -37,7 +37,7 @@ mac:
   target:
     - dmg
 dmg:
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-macos-${arch}.${ext}
 linux:
   icon: resources/logos/logo-square.svg
   target:
@@ -49,7 +49,7 @@ linux:
   synopsis: A workspace for media transcription and records.
   description: Vestige brings listening, transcription, and proofreading into one workspace.
 appImage:
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-linux-${arch}.${ext}
 deb:
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-linux-${arch}.${ext}
   maintainer: LJM12914 <LJM12914@outlook.com>
