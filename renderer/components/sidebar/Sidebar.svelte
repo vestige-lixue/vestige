@@ -4,8 +4,10 @@
     style:max-width={maxWidth}
 >
     <div class="logo" class:hide-logo={hideLogo} bind:contentRect={logoBounds}>
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        {@html logo}
+        {#if !mac}
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html logo}
+        {/if}
     </div>
     {#if mediaImport.getIds().length > 0}
         <div class="skip-media">
@@ -82,6 +84,7 @@
 
 
 <script lang="ts">
+    const mac = window.api.platform === "darwin";
     let logoBounds = $state<DOMRectReadOnly>();
     const hideLogo = $derived(!!logoBounds && logoBounds.width < logoBounds.height * 1092 / 417 * 0.6);
 
