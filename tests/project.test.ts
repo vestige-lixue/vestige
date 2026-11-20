@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
-import { parseProject } from "../main/project/validate";
+import { parseProject, parseProjectSnapshot } from "../main/project/validate";
 import { VestigeErrors } from "../shared/failure";
 import { validMediaHash } from "../shared/media/check";
 import { createTextIndex, projectText, editText } from "../shared/transcript/text";
@@ -9,6 +9,20 @@ import { type AbsolutePath } from "../shared/util/path";
 import { project, sourceOffset, transcript, modification } from "./support/fixtures";
 import { editingArbitrary, editRange } from "./support/generators";
 import { checkProperty } from "./support/properties";
+
+it("decodes immutable save snapshots and validates the expanded project before writing", () => {
+    const spans = transcript(["hello", " world"]);
+    const input = project(spans, modification(spans, 1, 2, "a"));
+    const snapshot = {
+        ...input, vestiges: input.vestiges.map(vestige => ({
+            ...vestige, runs: vestige.runs.map(run => JSON.stringify(run)), modifications: JSON.stringify(vestige.modifications)
+        }))
+    };
+    expect(JSON.stringify(parseProjectSnapshot(snapshot))).toBe(JSON.stringify(parseProject(input)));
+    expect(() => parseProject(snapshot)).toThrow(VestigeErrors);
+    snapshot.vestiges[0].runs[0] = "{}";
+    expect(() => parseProjectSnapshot(snapshot)).toThrow(VestigeErrors);
+});
 
 function expectFailure(value: unknown, kind: string, directory?: AbsolutePath): VestigeErrors["failure"] {
     try {

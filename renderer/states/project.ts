@@ -370,7 +370,7 @@ export function updateMediaPath(id: string, path: AbsolutePath): void {
 export function appendRun(id: string, run: Run): void {
     const vestige = project.getVestige(id);
     if (!vestige) return;
-    vestige.runs.push(run);
+    project.appendVestigeRun(vestige, run);
     projectRevision++;
 }
 

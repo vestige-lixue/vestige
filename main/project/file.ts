@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type AbsolutePath } from "../../shared/util/path";
 import { type GetProjectResult, type SaveProjectResult, type CheckProjectFileResult, type MediaPathMode } from "../../shared/project/file";
-import { parseProject } from "./validate";
+import { parseProject, parseProjectSnapshot } from "./validate";
 import { parseAbsolutePath, isSystemError } from "../util/file";
 import { fileOperationFailure, pathKey, statOrNull, writeFileAtomic } from "../util/fs";
 import { serializeMediaPath } from "./path";
@@ -49,7 +49,7 @@ async function writeProject(path: AbsolutePath, text: string): Promise<SaveProje
 export async function saveProject(path: unknown, project: unknown, compress = false, rememberPlaybackPosition = true, mediaPathMode: MediaPathMode = "project"): Promise<SaveProjectResult> {
     try {
         const normalized = parseAbsolutePath(path);
-        const parsed = parseProject(project);
+        const parsed = parseProjectSnapshot(project);
         const directory = parseAbsolutePath(dirname(normalized));
         // Capture before waiting, so a queued write cannot observe later mutations.
         // Only the disk snapshot uses relative paths; runtime media keeps absolute paths.

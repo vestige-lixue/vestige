@@ -18,6 +18,11 @@ export type GetProjectResult = ({
     error: FailureInfo;
 });
 
+// Cached JSON crosses the context bridge and IPC without cloning individual tokens and edits.
+export type ProjectSaveSnapshot = Omit<Project, "vestiges"> & {
+    vestiges: (Omit<Project["vestiges"][number], "runs" | "modifications"> & { runs: string[]; modifications: string })[];
+};
+
 export type SaveProjectResult = ({
     success: true;
 } | {

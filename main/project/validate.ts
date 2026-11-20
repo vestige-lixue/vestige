@@ -8,7 +8,8 @@ import { createTextIndex, normalizeModifications, type TextIndex } from "../../s
 import { projectVersion } from "../../shared/project/constants";
 import { type AbsolutePath } from "../../shared/util/path";
 import { resolveMediaPath } from "./path";
-import { checkVersion, structureError } from "../util/data";
+import { checkVersion, parseJSON, structureError } from "../util/data";
+import { type ProjectSaveSnapshot } from "../../shared/project/file";
 
 // JSON stores plain strings; establish the path brand after structural validation.
 type SerializedProject = Omit<Project, "version" | "selectedMediaId" | "vestiges"> & {
@@ -83,6 +84,16 @@ function execution(run: Run, path: string): void {
         }
         if (end !== part.end) invalid("deviations", "complete final coverage of each changed original range");
     }
+}
+
+export function parseProjectSnapshot(value: unknown): Project {
+    type EncodedLists = Pick<ProjectSaveSnapshot["vestiges"][number], "runs" | "modifications">;
+    if (!typia.is<{ vestiges: EncodedLists[] }>(value)) return parseProject(value);
+    return parseProject({
+        ...value, vestiges: value.vestiges.map(vestige => ({
+            ...vestige, runs: vestige.runs.map(parseJSON), modifications: parseJSON(vestige.modifications)
+        }))
+    });
 }
 
 export function parseProject(value: unknown, directory?: AbsolutePath): Project {

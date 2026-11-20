@@ -1,5 +1,7 @@
 import { type FailureInfo } from "../../shared/failure";
 import { type Project } from "../../shared/project/Project";
+import { type ProjectSaveSnapshot } from "../../shared/project/file";
+import { type Run } from "../../shared/transcription/Run";
 import { type Media } from "../../shared/Media";
 import { type Vestige } from "../../shared/Vestige";
 import { getFileName as getPathFileName, type AbsolutePath } from "../../shared/util/path";
@@ -95,16 +97,41 @@ export function getVestige(id: string | null): Vestige | null {
     return id === null ? null : vestiges.get(id)?.vestige ?? null;
 }
 
+// Runs are immutable. Edits and undo replace the modification list. Cache JSON by identity
+// so neither snapshots nor Electron's context bridge repeatedly walk their contents.
+type SnapshotSource = Run | Vestige["modifications"];
+const snapshots = new WeakMap<SnapshotSource, string>();
+
+function snapshotJSON(value: SnapshotSource, source = value): string {
+    let snapshot = snapshots.get(value);
+    if (snapshot === undefined) {
+        snapshot = JSON.stringify(source);
+        snapshots.set(value, snapshot);
+    }
+    return snapshot;
+}
+
+function registerVestige(stored: Vestige, incoming: Vestige): void {
+    for (let i = 0; i < incoming.runs.length; i++) snapshotJSON(stored.runs[i], incoming.runs[i]);
+    snapshotJSON(stored.modifications, incoming.modifications);
+    slotOf(stored.media.id).vestige = stored;
+}
+
+export function appendVestigeRun(vestige: Vestige, run: Run): void {
+    const index = vestige.runs.push(run) - 1;
+    snapshotJSON(vestige.runs[index], run);
+}
+
 export function setProject(value: Project | null): void {
     projectState.project = value;
     for (const slot of vestiges.values()) slot.vestige = null;
-    for (const vestige of projectState.project?.vestiges ?? []) slotOf(vestige.media.id).vestige = vestige;
+    if (value) projectState.project!.vestiges.forEach((vestige, i) => registerVestige(vestige, value.vestiges[i]));
 }
 
 export function insertVestige(index: number, vestige: Vestige): void {
     const list = projectState.project!.vestiges;
     list.splice(index, 0, vestige);
-    slotOf(vestige.media.id).vestige = list[index];
+    registerVestige(list[index], vestige);
 }
 
 export function removeVestige(id: string): boolean {
@@ -125,6 +152,11 @@ export function createBusyState(operation: ProjectOperation): { id: string; oper
     return current;
 }
 
-export function snapshotProject(value: Project): Project {
-    return $state.snapshot(value);
+export function snapshotProject(value: Project): ProjectSaveSnapshot {
+    return {
+        ...value, vestiges: value.vestiges.map(vestige => ({
+            ...vestige, media: $state.snapshot(vestige.media), modifications: snapshotJSON(vestige.modifications),
+            runs: vestige.runs.map(run => snapshotJSON(run))
+        }))
+    };
 }
