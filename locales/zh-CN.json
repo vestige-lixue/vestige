@@ -766,6 +766,9 @@
         "settings": {
             "importTitle": "导入设置",
             "exportTitle": "导出设置"
+        },
+        "transcript": {
+            "exportTitle": "导出转写"
         }
     },
     "errors": {

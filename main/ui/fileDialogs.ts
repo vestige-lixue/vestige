@@ -98,7 +98,7 @@ export async function selectVocabularySavePath(window: BrowserWindow, kind: "bac
 
 export async function selectTranscriptExportPath(window: BrowserWindow, defaultPath: AbsolutePath, format: "txt" | "srt"): Promise<string | null> {
     const result = await dialog.showSaveDialog(window, {
-        title: t("transcript.export.title"), buttonLabel: t("transcript.export.action"), defaultPath,
+        title: t("native.transcript.exportTitle"), buttonLabel: t("native.transcript.exportTitle"), defaultPath,
         filters: [{ name: t(format === "srt" ? "native.filters.subtitles" : "native.filters.text"), extensions: [format] },
             { name: t("native.filters.all"), extensions: ["*"] }],
         properties: ["showOverwriteConfirmation"]

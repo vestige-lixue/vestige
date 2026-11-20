@@ -767,6 +767,9 @@
         "settings": {
             "importTitle": "Import settings",
             "exportTitle": "Export settings"
+        },
+        "transcript": {
+            "exportTitle": "Export transcript"
         }
     },
     "errors": {
