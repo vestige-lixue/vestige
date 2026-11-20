@@ -1,4 +1,4 @@
-[English](README.md) | 中文（简体）
+[English](README.md) | 简体中文
 
 <p align="center">
     <picture>

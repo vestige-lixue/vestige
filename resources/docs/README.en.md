@@ -118,6 +118,8 @@ Settings also control the playback state after switching media or jumping to a w
 
 Open the Transcriptions button on a media row to see all of its results, each with its start time and configuration. Select a result to display it in the editor.
 
+To read another original result alongside your edits, click the two-column button at the right end of the menu bar (the title bar on macOS), or choose **Show reference transcript** from the **Transcription** menu. This needs at least two results for the media. Pick the reference result from the list above its column. Both columns scroll to the same point in the recording, and selecting text in either column highlights the words spoken at the same time in the other. Drag the divider to resize the columns or double-click it to restore equal widths. Choose the reference side in **Settings → Editing → Reference transcript position**. Vestige remembers the visibility, width ratio and side between sessions.
+
 Edits belong to the displayed result. Switching to another result discards all edits, so Vestige asks for confirmation first. Deleting the displayed result also deletes its edits.
 
 ## Exporting transcripts
