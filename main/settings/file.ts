@@ -35,10 +35,17 @@ export function readSettings(path: string, preferredLanguages: readonly string[]
 }
 
 export function normalizeSettings(value: unknown): unknown {
-    // Spell checking was removed; discard its legacy field before strict validation.
-    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
-        && "spellcheck" in value.editing) {
-        delete value.editing.spellcheck;
+    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object") {
+        if ("spellcheck" in value.editing) delete value.editing.spellcheck;
+        for (const key of ["followPlayback", "hideTrivialInformation", "referenceOverlap", "referenceTranscriptPosition"] as const) {
+            if (!(key in value.editing)) Object.assign(value.editing, { [key]: defaultSettings.editing[key] });
+        }
+    }
+    // Version 1.0.0 and earlier stored neither reference column visibility nor its width.
+    if (value && typeof value === "object" && "layout" in value && value.layout && typeof value.layout === "object") {
+        for (const key of ["showReferenceTranscript", "referenceTranscriptRatio"] as const) {
+            if (!(key in value.layout)) Object.assign(value.layout, { [key]: defaultSettings.layout[key] });
+        }
     }
     // These colors are derived now. Discard only their legacy overrides before strict validation.
     if (value && typeof value === "object" && "theme" in value && value.theme && typeof value.theme === "object") {
@@ -50,19 +57,6 @@ export function normalizeSettings(value: unknown): unknown {
                 if ("--c-audio-level" in palette) delete palette["--c-audio-level"];
             }
         }
-    }
-    // Older settings predate playback following; retain their other preferences.
-    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
-        && !("followPlayback" in value.editing)) {
-        value.editing = { ...value.editing, followPlayback: defaultSettings.editing.followPlayback };
-    }
-    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
-        && !("hideTrivialInformation" in value.editing)) {
-        value.editing = { ...value.editing, hideTrivialInformation: defaultSettings.editing.hideTrivialInformation };
-    }
-    if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object"
-        && !("referenceOverlap" in value.editing)) {
-        value.editing = { ...value.editing, referenceOverlap: defaultSettings.editing.referenceOverlap };
     }
     // 0.5.1 settings also predate the rewind amounts; saved values override these defaults.
     if (value && typeof value === "object" && "playback" in value && value.playback && typeof value.playback === "object") {

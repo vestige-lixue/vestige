@@ -10,6 +10,7 @@ import * as player from "./player.svelte";
 import * as mediaImport from "./mediaImport.svelte";
 import * as mediaSelection from "./mediaSelection.svelte";
 import * as transcription from "./transcription.svelte";
+import * as transcript from "./transcript.svelte";
 import * as dialogs from "./dialogs.svelte";
 import * as settings from "./settings.svelte";
 import * as project from "./project.svelte";
@@ -387,6 +388,10 @@ export function removeRun(id: string, runId: string): void {
         vestige.displayedRunIdx = Math.max(0, Math.min(index, vestige.runs.length - 1));
     }
     else if (index < displayed) vestige.displayedRunIdx--;
+    if (vestige.runs.length === 1 && mediaSelection.get() === id && settings.getCurrent().layout.showReferenceTranscript) {
+        void settingsAPI.update({ layout: { showReferenceTranscript: false } });
+    }
+    transcript.referenceAfterRemoval(vestige, runId);
 }
 
 export function updateModifications(id: string, runId: string, modifications: readonly Modification[]): void {
@@ -403,6 +408,7 @@ export function displayRun(id: string, index: number): void {
     const run = vestige.runs[index];
     const apply = (): void => {
         if (project.projectState.locked || project.getVestige(id) !== vestige || vestige.runs[index] !== run) return;
+        transcript.swapReference(vestige, run);
         vestige.modifications = [];
         vestige.displayedRunIdx = index;
         projectRevision++;

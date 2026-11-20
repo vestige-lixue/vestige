@@ -57,10 +57,10 @@ export function attachDropScroll(view: EditorView, refresh: () => void): { updat
 
     function update(point?: DropPointer): void {
         pointer = point;
-        if (!velocity()) {
+        if (!point || !velocity()) {
             owner.cancelAnimationFrame(frame);
             frame = direction = 0;
-            if (scroll) position = applied = scroll.scrollTop;
+            if (point && scroll) position = applied = scroll.scrollTop;
         }
         else if (!frame) tick(owner.performance.now());
     }

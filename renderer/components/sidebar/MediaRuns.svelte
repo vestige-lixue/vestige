@@ -38,11 +38,7 @@
                 {@const displayed = index === vestige?.displayedRunIdx}
                 <Tooltip side="right" sideOffset={24} disabled={disabled || hasDialog} tabindex={0} onclick={() => selectRun(run.id)}>
                     {#snippet text()}
-                        <div class="runDetails">
-                            <div><b>{i18n.t("transcription.config.executor.label")}</b><span>{run.config.executor}</span></div>
-                            <div><b>{i18n.t("transcription.config.backendDirectory.label")}</b><span>{displayDirectoryName(run.config.backendDirectory)}</span></div>
-                            <div><b>{i18n.t("transcription.config.modelDirectory.label")}</b><span>{displayDirectoryName(run.config.modelDirectory)}</span></div>
-                        </div>
+                        <RunDetails {run} />
                     {/snippet}
                     {#snippet child({ props })}
                         <div {...props} class="runRow activable focusable" onpointerover={event => {
@@ -54,7 +50,7 @@
                                 props.onpointerenter(event);
                             }
                         }}>
-                            <NiceLabel class="runLabel" value={`#${index + 1} ${formatStartedAt(run.startedAt)}`}
+                            <NiceLabel class="runLabel" value={formatRunLabel(index, run.startedAt)}
                                 editable={false} onchange={() => {}} scrollMode="ontime" scrollParam={1.5} scrollPause={0.5} />
                             {#if displayed}
                                 <span class="option-checkmark">
@@ -141,23 +137,6 @@
         min-width: 0;
         padding: 4px 0;
     }
-    .runDetails {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-    .runDetails > div {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-    }
-    .runDetails b {
-        flex-shrink: 0;
-    }
-    .runDetails span {
-        min-width: 0;
-        text-align: right;
-    }
     .empty {
         padding: 8px;
         color: var(--c-text-80p);
@@ -176,6 +155,8 @@
     import * as menu from "../../states/menu.svelte";
     import { runCommand } from "../../states/commands";
     import NiceLabel from "../util/NiceLabel.svelte";
+    import RunDetails from "../transcript/RunDetails.svelte";
+    import { formatRunLabel } from "../../format";
     import Tooltip from "../util/Tooltip.svelte";
     import PopoverContent from "../util/PopoverContent.svelte";
     import ConfirmDeleteButton from "../util/ConfirmDeleteButton.svelte";
@@ -246,16 +227,6 @@
             if (!disabled && !hasDialog) menu.open(layer);
         }
         else menu.close(layer);
-    }
-
-    function formatStartedAt(value: number): string {
-        const date = new Date(value);
-        return `${date.getFullYear().toString().padStart(4, "0")}.${date.getMonth() + 1}.${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
-    }
-
-    function displayDirectoryName(path: string): string {
-        const parts = path.split(path.startsWith("/") ? /\// : /[\\/]/).filter(Boolean);
-        return parts.at(-1) ?? path;
     }
 
     function selectRun(runId: string): void {

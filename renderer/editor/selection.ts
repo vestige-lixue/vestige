@@ -1,4 +1,5 @@
 import { type Editor, type EditorEvents } from "@tiptap/core";
+import { type EditorView } from "@tiptap/pm/view";
 import { TextSelection } from "@tiptap/pm/state";
 import { intersectTextWindow } from "../../shared/transcript/find";
 import { subscribeTranscriptLayout } from "./layout";
@@ -8,22 +9,72 @@ import { restoreTranscriptDOMSelection, transcriptPreviewOriginal, transcriptPre
 type Endpoints = { startContainer: Node; startOffset: number; endContainer: Node; endOffset: number };
 type PaintedRange = Endpoints & { range: StaticRange; startText: string | null; endText: string | null };
 type Bounds = { from: number; to: number };
+export type PaintedSelectionBounds = Bounds & { reference: boolean };
 
-export function attachTranscriptSelection(editor: Editor, boundsChanged: (bounds: Bounds | null) => void): () => void {
+type PaneSelection = { selected: Bounds | null; reference: Bounds | null; changed?: () => void; repaint?: () => void };
+const paneSelections = new WeakMap<EditorView, PaneSelection>();
+
+function selectionOf(view: EditorView): PaneSelection {
+    let pane = paneSelections.get(view);
+    if (!pane) paneSelections.set(view, pane = { selected: null, reference: null });
+    return pane;
+}
+
+function sameBounds(a: Bounds | null, b: Bounds | null): boolean {
+    return a?.from === b?.from && a?.to === b?.to;
+}
+
+export function observeTranscriptSelection(view: EditorView, changed: () => void): {
+    selected: () => Bounds | null; compare: (bounds: Bounds | null) => void; destroy: () => void;
+} {
+    const pane = selectionOf(view);
+    pane.changed = changed;
+    function compare(bounds: Bounds | null): void {
+        if (sameBounds(bounds, pane.reference)) return;
+        pane.reference = bounds;
+        pane.repaint?.();
+    }
+    return {
+        selected: () => pane.selected, compare,
+        destroy() {
+            pane.changed = undefined;
+            compare(null);
+        }
+    };
+}
+
+type SelectionHighlights = { editors: number; selection: Highlight; deletion: Highlight; reference: Highlight };
+const sharedHighlights = new WeakMap<HighlightRegistry, SelectionHighlights>();
+
+function acquireHighlights(registry: HighlightRegistry): SelectionHighlights {
+    let shared = sharedHighlights.get(registry);
+    if (!shared) {
+        shared = { editors: 0, selection: new Highlight(), deletion: new Highlight(), reference: new Highlight() };
+        shared.selection.priority = shared.deletion.priority = 1;
+        shared.reference.priority = 1;
+        registry.set("transcript-reference-selection", shared.reference);
+        registry.set("transcript-selection", shared.selection);
+        registry.set("transcript-deletion-selection", shared.deletion);
+        sharedHighlights.set(registry, shared);
+    }
+    shared.editors++;
+    return shared;
+}
+
+export function attachTranscriptSelection(editor: Editor, boundsChanged: (bounds: PaintedSelectionBounds | null) => void): () => void {
     const view = editor.view, document = view.dom.ownerDocument;
-    const name = "transcript-selection", previewName = "transcript-deletion-selection";
-    const highlight = new Highlight(), previewHighlight = new Highlight();
-    highlight.priority = previewHighlight.priority = 1;
-    CSS.highlights.set(name, highlight);
-    CSS.highlights.set(previewName, previewHighlight);
+    const owner = document.defaultView!;
+    const shared = acquireHighlights(owner.CSS.highlights);
+    const { selection: highlight, deletion: previewHighlight } = shared;
     let painted: PaintedRange | null = null;
     let previewPainted: PaintedRange | null = null;
-    let bounds: Bounds | null = null;
+    const pane = selectionOf(view);
+    let bodyHighlight = highlight;
+    let bounds: PaintedSelectionBounds | null = null;
     let dragging: { original: HTMLElement; pointer: number; anchor: TranscriptPreviewPoint; x: number; y: number; whole: boolean } | null = null;
     let dragFrame = 0;
     let bodyPointer: number | null = null;
     let bodyFrame = 0;
-    const owner = document.defaultView!;
     const listeners = new AbortController();
     const capture = { capture: true, signal: listeners.signal };
 
@@ -147,30 +198,49 @@ export function attachTranscriptSelection(editor: Editor, boundsChanged: (bounds
         return { ...next, range, startText: data(next.startContainer), endText: data(next.endContainer) };
     }
 
-    function paintBounds(next: Bounds | null): void {
-        if (bounds?.from !== next?.from || bounds?.to !== next?.to) boundsChanged(next);
+    function paintBounds(next: PaintedSelectionBounds | null): void {
+        if (!sameBounds(bounds, next) || bounds?.reference !== next?.reference) boundsChanged(next);
         bounds = next;
     }
 
     function paint(from: number, to: number, native?: Range): void {
+        const selected = from < to ? { from, to } : null;
+        if (!sameBounds(selected, pane.selected)) {
+            pane.selected = selected;
+            pane.changed?.();
+        }
+        const comparison = pane.reference;
+        const nextHighlight = comparison ? shared.reference : highlight;
+        if (bodyHighlight !== nextHighlight) {
+            painted = paintRange(bodyHighlight, painted, null);
+            bodyHighlight = nextHighlight;
+        }
+        if (comparison) {
+            ({ from, to } = comparison);
+        }
         viewport.setNeeded(from < to);
         previewPainted = paintRange(previewHighlight, previewPainted, null);
         const clipped = intersectTextWindow({ from: from - 1, to: to - 1 }, transcriptViewport(view));
         if (!clipped) {
-            painted = paintRange(highlight, painted, null);
+            painted = paintRange(bodyHighlight, painted, null);
             return paintBounds(null);
         }
-        const mirror = native && clipped.from === from - 1 && clipped.to === to - 1;
-        const start = mirror ? { node: native.startContainer, offset: native.startOffset } : view.domAtPos(clipped.from + 1, 1);
-        const end = mirror ? { node: native.endContainer, offset: native.endOffset } : view.domAtPos(clipped.to + 1, -1);
+        const mirror = !comparison && clipped.from === from - 1 && clipped.to === to - 1 ? native : undefined;
+        const start = mirror ? { node: mirror.startContainer, offset: mirror.startOffset } : view.domAtPos(clipped.from + 1, 1);
+        const end = mirror ? { node: mirror.endContainer, offset: mirror.endOffset } : view.domAtPos(clipped.to + 1, -1);
         // CSS keeps this one bounded body range transparent inside deletion islands.
-        painted = paintRange(highlight, painted, { startContainer: start.node, startOffset: start.offset, endContainer: end.node, endOffset: end.offset });
-        paintBounds({ from: clipped.from + 1, to: clipped.to + 1 });
+        painted = paintRange(bodyHighlight, painted, { startContainer: start.node, startOffset: start.offset, endContainer: end.node, endOffset: end.offset });
+        paintBounds({ from: clipped.from + 1, to: clipped.to + 1, reference: !!comparison });
     }
 
     function paintPreview(range: Range): void {
+        if (pane.reference) return paint(0, 0);
+        if (pane.selected) {
+            pane.selected = null;
+            pane.changed?.();
+        }
         viewport.setNeeded(true);
-        painted = paintRange(highlight, painted, null);
+        painted = paintRange(bodyHighlight, painted, null);
         paintBounds(null);
         const window = transcriptViewport(view), original = transcriptPreviewOriginal(view, range.startContainer)!;
         const position = view.posAtDOM(original, 0) - 1;
@@ -234,16 +304,24 @@ export function attachTranscriptSelection(editor: Editor, boundsChanged: (bounds
     editor.on("transaction", update);
     // Repair mixed native ranges before ProseMirror's bubbling selectionchange observer reads them.
     document.addEventListener("selectionchange", fromDOM, true);
+    pane.repaint = fromState;
     fromState();
     return () => {
+        pane.repaint = undefined;
         finishDrag();
         listeners.abort();
         unsubscribe();
         viewport.unsubscribe();
         editor.off("transaction", update);
         document.removeEventListener("selectionchange", fromDOM, true);
-        if (CSS.highlights.get(name) === highlight) CSS.highlights.delete(name);
-        if (CSS.highlights.get(previewName) === previewHighlight) CSS.highlights.delete(previewName);
+        paintRange(bodyHighlight, painted, null);
+        paintRange(previewHighlight, previewPainted, null);
+        if (--shared.editors === 0) {
+            owner.CSS.highlights.delete("transcript-reference-selection");
+            owner.CSS.highlights.delete("transcript-selection");
+            owner.CSS.highlights.delete("transcript-deletion-selection");
+            sharedHighlights.delete(owner.CSS.highlights);
+        }
         boundsChanged(null);
     };
 }

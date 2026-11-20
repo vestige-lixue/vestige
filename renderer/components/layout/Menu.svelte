@@ -23,6 +23,9 @@
         {/if}
     </Menubar.Root>
     <ProjectStatus bind:reservedWidth={projectReservedWidth} />
+    {#if selectedMediaId}
+        <div class="reference-toggle" bind:offsetWidth={referenceToggleWidth}><ReferenceTranscriptToggle /></div>
+    {/if}
     <div class="measurement">
         <div class="menu-labels" bind:contentRect={menuTextBounds}>
             {#each menus as menu (menu.value)}<span>{i18n.t(menu.label)}</span>{/each}
@@ -111,6 +114,10 @@
     }
     .menu-bar.compact {
         padding-left: 8px;
+    }
+    .reference-toggle {
+        flex-shrink: 0;
+        margin-left: auto;
     }
     .measurement {
         position: absolute;
@@ -215,6 +222,7 @@
     import { flushSync, onDestroy, onMount, tick, untrack } from "svelte";
     import { IsUsingKeyboard, Menubar } from "bits-ui";
     import ProjectStatus from "./ProjectStatus.svelte";
+    import ReferenceTranscriptToggle from "./ReferenceTranscriptToggle.svelte";
     import menuIcon from "../../../resources/icons/lucide--menu.svg?raw";
     import chevronRight from "../../../resources/icons/lucide--chevron-right.svg?raw";
     import externalLinkIcon from "../../../resources/icons/lucide--external-link.svg?raw";
@@ -235,6 +243,7 @@
     let menuBarBounds = $state<DOMRectReadOnly>();
     let menuTextBounds = $state<DOMRectReadOnly>();
     let projectReservedWidth = $state(0);
+    let referenceToggleWidth = $state(0);
     let menuPadding = $state(16);
     let compact = $state(false);
     let mediaSubmenuOpen = $state(false);
@@ -278,7 +287,7 @@
 
     $effect(() => {
         if (!menuBarBounds || !menuTextBounds) return;
-        const availableWidth = menuBarBounds.width - projectReservedWidth;
+        const availableWidth = menuBarBounds.width - projectReservedWidth - (selectedMediaId ? referenceToggleWidth : 0);
         const menuTextWidth = menuTextBounds.width;
         menuPadding = Math.max(4, Math.min(16, (availableWidth - menuTextWidth) / (menus.length * 2)));
         const wasCompact = untrack(() => compact);
@@ -377,22 +386,19 @@
         if (menu.isOpen() || interfaceBlocked() || restoringEditor || focusingControl || pointerDismissed) {
             event.preventDefault();
         }
-        else if (editor?.isConnected) {
-            event.preventDefault();
-            restoreEditor();
-        }
         else {
             // Pointer-opened triggers may have tabindex="-1", which the menu's default restoration skips.
-            const trigger = menuRoot?.querySelector<HTMLButtonElement>(`[data-menubar-trigger][data-menu-value="${value}"]`);
-            if (trigger) {
+            const target = editor?.isConnected ? editor : menuRoot?.querySelector<HTMLButtonElement>(`[data-menubar-trigger][data-menu-value="${value}"]`);
+            if (target) {
                 event.preventDefault();
-                // Let the closing content finish its pending autofocus before restoring the trigger.
+                // The closing menu can still take focus until its content unmounts.
                 void tick().then(() => {
                     // Tab or another action may already have moved focus to its destination.
                     const active = document.activeElement;
-                    if (!menu.isOpen() && !interfaceBlocked() && trigger.isConnected
-                        && (active === document.body || active?.closest("[data-menubar-content], [data-menubar-sub-content]"))) {
-                        trigger.focus({ preventScroll: true });
+                    if (!menu.isOpen() && !interfaceBlocked() && target.isConnected
+                        && (active === target || active === document.body || active?.closest("[data-menubar-content], [data-menubar-sub-content]"))) {
+                        if (target === editor) restoreEditor();
+                        else target.focus({ preventScroll: true });
                     }
                 });
             }

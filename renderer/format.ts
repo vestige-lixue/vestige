@@ -1,3 +1,9 @@
+export function formatRunLabel(index: number, startedAt: number): string {
+    const date = new Date(startedAt);
+    const time = `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+    return `#${index + 1} ${date.getFullYear().toString().padStart(4, "0")}.${date.getMonth() + 1}.${date.getDate()} ${time}`;
+}
+
 export function formatDuration(seconds: number, { precision = 0, rounding = "round" }: {
     precision?: 0 | 1 | 2 | 3;
     rounding?: "round" | "floor";

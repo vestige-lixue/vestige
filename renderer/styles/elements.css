@@ -117,6 +117,15 @@ h6 { font-size: 14px; }
     pointer-events: none;
 }
 
+.icon-button.toggle {
+    border: 1px solid transparent;
+}
+
+.icon-button.toggle.enabled {
+    border-color: var(--c-accent);
+    background-color: var(--c-selection);
+}
+
 .link-button {
     color: var(--c-link);
     text-decoration: underline;

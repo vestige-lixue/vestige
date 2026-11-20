@@ -1,8 +1,8 @@
 import { type EditorView } from "@tiptap/pm/view";
 import { subscribeTranscriptLayout } from "./layout";
 
-type ScrollListener = (user: boolean) => void;
-type ScrollInput = { listeners: Set<ScrollListener>; automatic: (top?: number) => void; destroy: () => void };
+type ScrollListener = (user: boolean, caret: boolean, selecting: boolean) => void;
+type ScrollInput = { listeners: Set<ScrollListener>; automatic: (top?: number, caret?: boolean) => void; destroy: () => void };
 const inputs = new WeakMap<EditorView, ScrollInput>();
 // Native momentum can outlast the last wheel event; each continuing scroll renews this interval.
 const inputInterval = 200;
@@ -13,15 +13,19 @@ function createInput(view: EditorView, scroll: HTMLElement): ScrollInput {
     const capture = { capture: true, signal: events.signal };
     let until = -Infinity, sequence = 0, scrollbar = false, middle = false, dragging = false;
     let middlePress: { x: number; y: number; moved: boolean } | undefined;
-    let automatic: { sequence: number; until: number; top?: number } | undefined;
+    let automatic: { sequence: number; until: number; top?: number; caretTop?: number } | undefined;
     function input(): void {
         sequence++;
         until = window.performance.now() + inputInterval;
     }
-    function markAutomatic(top?: number): void {
+    function markAutomatic(top?: number, caret = false): void {
+        const destination = top === undefined ? undefined : Math.max(0, Math.min(top, scroll.scrollHeight - scroll.clientHeight));
+        // A resize observer can run between a caret write and its native scroll event.
+        const now = window.performance.now();
+        const pendingCaret = automatic?.sequence === sequence && now <= automatic.until ? automatic.caretTop : undefined;
         automatic = {
-            sequence, until: window.performance.now() + inputInterval,
-            top: top === undefined ? undefined : Math.max(0, Math.min(top, scroll.scrollHeight - scroll.clientHeight))
+            sequence, until: now + inputInterval, top: destination,
+            caretTop: caret ? destination : top === undefined ? pendingCaret : undefined
         };
     }
     scroll.addEventListener("wheel", input, { ...capture, passive: true });
@@ -59,7 +63,7 @@ function createInput(view: EditorView, scroll: HTMLElement): ScrollInput {
     }, capture);
     window.addEventListener("keydown", () => middle = false, capture);
     scroll.addEventListener("keydown", event => {
-        if (event.isComposing || event.defaultPrevented || event.target instanceof Node && view.dom.contains(event.target)) return;
+        if (event.isComposing || event.defaultPrevented || view.editable && event.target instanceof Node && view.dom.contains(event.target)) return;
         if (["PageUp", "PageDown", " ", "Home", "End", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) input();
     }, capture);
     window.addEventListener("blur", () => {
@@ -70,10 +74,12 @@ function createInput(view: EditorView, scroll: HTMLElement): ScrollInput {
         const now = window.performance.now();
         const known = automatic && automatic.sequence === sequence && now <= automatic.until
             && (automatic.top === undefined || Math.abs(scroll.scrollTop - automatic.top) < 2);
+        const caret = !!known && automatic?.caretTop !== undefined && Math.abs(scroll.scrollTop - automatic.caretTop) < 2;
         automatic = undefined;
         const user = !known && !dragging && (scrollbar || middle || now <= until);
         if (user) until = now + inputInterval;
-        for (const listener of listeners) listener(user);
+        const selecting = !known && dragging && (!view.state.selection.empty || document.getSelection()?.isCollapsed === false);
+        for (const listener of listeners) listener(user, caret, selecting);
     }, { passive: true, signal: events.signal });
     // Content/size changes can move Chromium's scroll anchor without any scroll API call.
     const stopLayout = subscribeTranscriptLayout(view, reason => {
@@ -106,6 +112,6 @@ export function subscribeTranscriptScroll(view: EditorView, listener: ScrollList
 }
 
 /** A known write wins over an earlier wheel/key intent, but never over a newer user input. */
-export function markAutomaticTranscriptScroll(view: EditorView, top: number): void {
-    inputs.get(view)?.automatic(top);
+export function markAutomaticTranscriptScroll(view: EditorView, top: number, caret = false): void {
+    inputs.get(view)?.automatic(top, caret);
 }

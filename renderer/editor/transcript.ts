@@ -5,12 +5,13 @@ import { handleTranscriptDrop } from "./drop";
 import { dropCursorPlugin } from "./dropCursor";
 import { compositionPlugin, compositionActive, compositionCommit, compositionPending } from "./composition";
 import { caretPlugin } from "./caret";
-import { transcriptPreviewOriginal, transcriptPreviewSelection } from "./selectionDOM";
+import { restoreTranscriptDOMSelection, transcriptPreviewOriginal, transcriptPreviewSelection } from "./selectionDOM";
 import { transcriptLayoutPlugin } from "./layout";
 import { trackTranscriptViewport } from "./viewport";
 import { type VocabularyGroup } from "../../shared/vocabulary/match";
 import { transcriptScrollPlugin, scrollTranscriptPlayback, scrollTranscriptSelectionHead, dispatchPreservingScroll } from "./scroll";
 import { firstTrue } from "../../shared/util/search";
+import { orderedTokenTimes } from "../../shared/transcript/timing";
 import { ProjectionStep, projectionTransaction } from "./projectionStep";
 import { history, undo, redo, closeHistory } from "@tiptap/pm/history";
 import { type EditorView } from "@tiptap/pm/view";
@@ -35,7 +36,8 @@ export function transcriptPlaybackRanges(state: EditorState): readonly number[] 
     return playbackKey.getState(state)!.ranges;
 }
 const probabilityThresholds = [0.2, 0.4, 0.6, 0.8, Infinity];
-const editors = new Map<HTMLElement, Editor>();
+const editors = new WeakMap<HTMLElement, Editor>();
+let primaryTarget: HTMLElement | null = null;
 const texts = new WeakMap<PMNode, string>();
 const sourceDOM = new WeakMap<HTMLElement, { kind: string; index: number }>();
 
@@ -233,6 +235,10 @@ export function transcriptProjection(state: EditorState): TextProjection {
     return bridgeKey.getState(state)!.projection;
 }
 
+export function transcriptTextIndex(state: EditorState): TextIndex {
+    return bridgeKey.getState(state)!.index;
+}
+
 export function transcriptModifications(state: EditorState): Modification[] {
     return bridgeKey.getState(state)!.saved.modifications;
 }
@@ -358,8 +364,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             }
         }
     });
-    const intervals = index.transcript.map((segment, segmentIdx) => ({ ...segment.range, segmentIdx }))
-        .sort((left, right) => left.start - right.start);
+    const intervals = orderedTokenTimes(index);
     const latestEnd: number[] = [];
     for (const interval of intervals) latestEnd.push(Math.max(latestEnd.at(-1) ?? -Infinity, interval.end));
     function playbackRanges(projection: TextProjection, time: number): number[] {
@@ -396,6 +401,14 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
         },
         view(view) {
             let rendered = playbackKey.getState(view.state)!;
+            const owner = view.dom.ownerDocument.defaultView!;
+            // Follow the latest initial playback position after mount, before the paired panes align.
+            let mounted = false, followOnMount = false;
+            const firstFrame = owner.requestAnimationFrame(() => {
+                mounted = true;
+                if (followOnMount && rendered.follow && !compositionPending(view.state))
+                    scrollTranscriptPlayback(view, rendered.ranges, transcriptPlaybackMarkers(view, rendered.time));
+            });
             return {
                 update(view) {
                     if (compositionPending(view.state)) return;
@@ -409,12 +422,14 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
                         const previousMarkers = new Set(transcriptPlaybackMarkers(view, previous.time));
                         if (markers.length === previousMarkers.size && markers.every(marker => previousMarkers.has(marker))) return;
                     }
-                    scrollTranscriptPlayback(view, rendered.ranges, markers);
-                }
+                    if (mounted) scrollTranscriptPlayback(view, rendered.ranges, markers);
+                    else followOnMount = true;
+                },
+                destroy: () => owner.cancelAnimationFrame(firstFrame)
             };
         }
     });
-    // Layout must update before the information plugin registered later reads viewport geometry.
+    // Layout must update before the information plugin reads viewport geometry.
     return [compositionPlugin(state => state.schema.marks.source.create({ kind: "modification", index: 0 })), bridge, caretPlugin(), transcriptLayoutPlugin(), transcriptScrollPlugin(), dropCursorPlugin(), playback, history()];
 }
 
@@ -450,37 +465,55 @@ export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = 
     return [Document, Paragraph, Text, HardBreak, source, bridge];
 }
 
-export function createTranscriptEditor(element: HTMLElement, run: Run, modifications: readonly Modification[], onChange: (modifications: Modification[]) => void, canEdit: () => boolean = () => true, inspection?: InspectionOptions): Editor {
+export function createTranscriptEditor(element: HTMLElement, run: Run, modifications: readonly Modification[], onChange: ((modifications: Modification[]) => void) | undefined, canEdit: () => boolean = () => true, inspection?: InspectionOptions, reference = false): Editor {
     const index = createTextIndex(run.transcript);
     const initial = projectText(index, modifications);
     let previous = initial.modifications;
+    const interaction = Extension.create({
+        name: "transcriptInteraction", priority: 0,
+        addProseMirrorPlugins() {
+            const plugins: Plugin[] = [];
+            if (inspection) plugins.push(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state)?.time ?? -1, inspection));
+            plugins.push(new Plugin({
+                props: {
+                    handleKeyDown(view, event) {
+                        if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
+                            || view.composing || !view.hasFocus()) return false;
+                        event.stopPropagation();
+                        element.focus({ preventScroll: true });
+                        return true;
+                    }
+                }
+            }));
+            return plugins;
+        }
+    });
     const editor = new Editor({
-        element, extensions: transcriptExtensions(index, canEdit, initial), content: contentOf(index, initial),
-        injectCSS: false, enableInputRules: false, enablePasteRules: false,
+        element, extensions: [...transcriptExtensions(index, canEdit, initial), interaction], content: contentOf(index, initial),
+        editable: canEdit(), injectCSS: false, enableInputRules: false, enablePasteRules: false,
+        coreExtensionOptions: reference ? { tabindex: { value: "0" } } : undefined,
         editorProps: { attributes: { autocapitalize: "off", writingsuggestions: "false", autocorrect: "off" } },
         onTransaction({ editor }) {
             const next = transcriptModifications(editor.state);
             if (next === previous) return;
             previous = next;
-            onChange(next);
+            onChange?.(next);
         }
     });
-    if (inspection) editor.registerPlugin(informationPlugin(index, transcriptProjection, state => playbackKey.getState(state)?.time ?? -1, inspection));
     const target = editor.view.dom;
     const stopViewport = trackTranscriptViewport(editor);
+    if (!reference) primaryTarget = target;
     editors.set(target, editor);
     editor.on("destroy", () => {
         stopViewport();
         editors.delete(target);
+        if (primaryTarget === target) primaryTarget = null;
     });
     return editor;
 }
 
 export function transcriptEditorTarget(): HTMLElement | null {
-    for (const [element, editor] of editors) {
-        if (element.isConnected && !editor.isDestroyed) return element;
-    }
-    return null;
+    return primaryTarget?.isConnected ? primaryTarget : null;
 }
 
 function transcriptEditorAt(element: HTMLElement | null): Editor | null {
@@ -489,6 +522,14 @@ function transcriptEditorAt(element: HTMLElement | null): Editor | null {
         if (editor && !editor.isDestroyed) return editor;
     }
     return null;
+}
+
+export function registerTranscriptMenuTarget(element: HTMLElement, view: EditorView): () => void {
+    const editor = editors.get(view.dom);
+    if (editor) editors.set(element, editor);
+    return () => {
+        editors.delete(element);
+    };
 }
 
 export function isTranscriptEditorTarget(element: HTMLElement | null): boolean {
@@ -660,9 +701,13 @@ export function handleTranscriptEdit(element: HTMLElement | null, action: EditAc
     }
     else {
         // Restore the editor's stored selection before selecting or using the native clipboard.
-        if (action !== "copy" || !transcriptPreviewSelection(editor.view)) editor.view.focus();
+        if (action !== "copy" || !transcriptPreviewSelection(editor.view)) {
+            if (!editor.view.editable) editor.view.dom.focus({ preventScroll: true });
+            editor.view.focus();
+        }
         if (action === "selectAll") editor.commands.selectAll();
-        else window.api.edit(action);
+        if (!editor.view.editable && !transcriptPreviewSelection(editor.view)) restoreTranscriptDOMSelection(editor.view);
+        if (action !== "selectAll") window.api.edit(action);
     }
     return true;
 }

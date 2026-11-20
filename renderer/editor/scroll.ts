@@ -8,7 +8,7 @@ const topRatio = 0.2;
 const bottomRatio = 0.8;
 const navigationKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
-function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: number }, position?: number): boolean {
+function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: number }, position: number | undefined, source: "caret" | "playback"): boolean {
     const viewport = view.dom.closest<HTMLElement>(".transcript-scroll");
     if (!viewport || !viewport.clientHeight) return false;
     const origin = viewport.getBoundingClientRect().top + viewport.clientTop;
@@ -20,14 +20,14 @@ function scrollTranscriptRect(view: EditorView, rect: { top: number; bottom: num
     if (offset) {
         if (position !== undefined) anchorTranscriptViewport(view, position);
         const top = viewport.scrollTop + offset;
-        markAutomaticTranscriptScroll(view, top);
+        markAutomaticTranscriptScroll(view, top, source === "caret");
         viewport.scrollTo({ top, behavior: "instant" });
     }
     return true;
 }
 
 export function scrollTranscriptSelectionHead(view: EditorView): void {
-    scrollTranscriptRect(view, view.coordsAtPos(view.state.selection.head), view.state.selection.head);
+    scrollTranscriptRect(view, view.coordsAtPos(view.state.selection.head), view.state.selection.head, "caret");
 }
 
 export function dispatchPreservingScroll(view: EditorView, transaction: Transaction): void {
@@ -84,7 +84,7 @@ export function scrollTranscriptPlayback(view: EditorView, ranges: readonly numb
         top = Math.min(top, rect.top, lineTop);
         bottom = Math.max(bottom, rect.bottom, lineTop + lineHeight);
     }
-    return top <= bottom && scrollTranscriptRect(view, { top, bottom }, position);
+    return top <= bottom && scrollTranscriptRect(view, { top, bottom }, position, "playback");
 }
 
 export function transcriptScrollPlugin(): Plugin {
@@ -115,12 +115,12 @@ export function transcriptScrollPlugin(): Plugin {
                     // Native navigation can move the DOM caret before ProseMirror receives selectionchange.
                     const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
                     if (before && before.doc === view.state.doc && before.selection.empty && before.selection.head === head) return;
-                    scrollTranscriptRect(view, view.coordsAtPos(head), head);
+                    scrollTranscriptRect(view, view.coordsAtPos(head), head, "caret");
                 });
             }
-            function resize(): void {
+            function resize([entry]: ResizeObserverEntry[]): void {
                 // Only the last line needs extra room; the first lines may stay above the follow interval.
-                view.dom.style.setProperty("--transcript-scroll-padding", `${viewport!.clientHeight * (1 - bottomRatio)}px`);
+                view.dom.style.setProperty("--transcript-scroll-padding", `${entry.contentRect.height * (1 - bottomRatio)}px`);
             }
             function edit(): void {
                 if (view.editable) followCaret(view.state);
@@ -144,7 +144,6 @@ export function transcriptScrollPlugin(): Plugin {
             window.addEventListener("blur", cancel, { signal: listeners.signal });
             const observer = new ResizeObserver(resize);
             observer.observe(viewport);
-            resize();
             return {
                 destroy() {
                     cancel();

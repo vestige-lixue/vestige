@@ -4,6 +4,7 @@ import { Mapping } from "@tiptap/pm/transform";
 import { bufferTextWindow, mapTextWindow, type TextWindow } from "../../shared/transcript/find";
 import { subscribeTranscriptLayout } from "./layout";
 import { compositionPending } from "./composition";
+import { firstTrue } from "../../shared/util/search";
 import * as modal from "../states/modal.svelte";
 
 type Viewport = {
@@ -11,6 +12,7 @@ type Viewport = {
     valid: boolean;
     fallback: "missing-scroll" | "not-visible" | "hit-test" | "occluded" | null;
     users: number;
+    paired?: boolean;
     listeners: Set<() => void>;
     refresh?: () => void;
     anchor?: (position: number) => void;
@@ -40,6 +42,32 @@ export function transcriptViewportFallback(view: EditorView): Viewport["fallback
 /** A programmatic scroll already knows its PM target; reuse the measured screen span instead of hit-testing it again. */
 export function anchorTranscriptViewport(view: EditorView, position: number): void {
     viewportOf(view).anchor?.(position);
+}
+
+export function setTranscriptViewportPaired(view: EditorView, paired: boolean): void {
+    const viewport = viewports.get(view);
+    if (viewport) viewport.paired = paired;
+}
+
+// UTF-16 offset of the first caret box reaching y. Wrapped lines stay in document order.
+function offsetAtHeight(view: EditorView, from: number, to: number, y: number): number {
+    return from + firstTrue(to - from, i => view.coordsAtPos(from + i + 1).bottom >= y);
+}
+
+/** Use the measured painting window when it covers the midline, otherwise hit the visible center once. */
+export function transcriptViewportCenter(view: EditorView, scroll: HTMLElement): number | null {
+    if (!scroll.clientHeight || !scroll.clientWidth || modal.hasBlockingLayer()) return null;
+    const rect = scroll.getBoundingClientRect();
+    const x = rect.left + scroll.clientLeft + scroll.clientWidth / 2, y = rect.top + scroll.clientTop + scroll.clientHeight / 2;
+    const viewport = viewportOf(view), { from, to } = viewport.window;
+    if (viewport.valid && to > from && view.coordsAtPos(from + 1).bottom < y && view.coordsAtPos(to + 1).top > y) {
+        const start = offsetAtHeight(view, from, to, y);
+        const bottom = view.coordsAtPos(start + 1).bottom;
+        // Take the middle of this line, including for bidirectional text.
+        const end = offsetAtHeight(view, start, to, bottom + 1);
+        return 1 + Math.floor((start + end) / 2);
+    }
+    return view.posAtCoords({ left: x, top: y })?.pos ?? null;
 }
 
 export function subscribeTranscriptViewport(view: EditorView, listener: () => void): { setNeeded: (needed: boolean) => void; unsubscribe: () => void } {
@@ -112,6 +140,9 @@ export function trackTranscriptViewport(editor: Editor): () => void {
             return;
         }
         function position(end: boolean): number | null {
+            // A paired editor may already be resolving its scroll source this frame. Derive the
+            // painting edges from line geometry so followers never hit-test the destination.
+            if (viewport.paired) return offsetAtHeight(view, 0, length, end ? bottom : top);
             for (const inset of [2, 8, 24, 48]) {
                 const x = Math.min(inset, (right - left) / 2), y = Math.min(inset, (bottom - top) / 2);
                 const hit = view.posAtCoords({ left: end ? right - x : left + x, top: end ? bottom - y : top + y });

@@ -1,5 +1,5 @@
 import { type tags } from "typia";
-import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits, type minRewindStepMs, type maxRewindStepMs, type minStartRewindMs, type maxStartRewindMs, type srtLimits } from "../constants";
+import { type maxLayoutDimension, type settingsVersion, type minWindowWidth, type minWindowHeight, type minSidebarWidth, type maxSidebarWidth, type minReferenceTranscriptRatio, type maxReferenceTranscriptRatio, type minEditorFontSize, type maxEditorFontSize, type minPlaybackSpeed, type maxPlaybackSpeed, type maxVolumeSliderMinDb, type minAudioOffsetMs, type maxAudioOffsetMs, type volumeStabilizationLimits, type minRewindStepMs, type maxRewindStepMs, type minStartRewindMs, type maxStartRewindMs, type srtLimits } from "../constants";
 import { type Locale } from "../locale";
 import { type FailureInfo } from "../failure";
 import { type ThemeSettings } from "../theme";
@@ -7,7 +7,7 @@ import { type Config, type Presets } from "../transcription/Config";
 import { type MediaPathMode } from "../project/file";
 
 import { type taskCapacity } from "../task";
-import { type audioLevelStages, type playbackModes, type informationDisplays, type volumeSliderMappings, type switchPlaybackModes } from "./options";
+import { type audioLevelStages, type playbackModes, type informationDisplays, type referenceTranscriptPositions, type volumeSliderMappings, type switchPlaybackModes } from "./options";
 import { type settingsSections } from "./policy";
 
 type StabilizationLimits = typeof volumeStabilizationLimits;
@@ -52,6 +52,7 @@ export type Settings = {
         readonly informationDisplay: typeof informationDisplays[number];
         readonly hideTrivialInformation: boolean;
         readonly referenceOverlap: number & tags.Type<"uint32"> & tags.Maximum<100>;
+        readonly referenceTranscriptPosition: typeof referenceTranscriptPositions[number];
     };
     readonly volumeStabilization: VolumeStabilizationSettings;
     readonly window: {
@@ -64,6 +65,9 @@ export type Settings = {
         readonly sidebarWidth: (number & tags.Minimum<typeof minSidebarWidth> & tags.Maximum<typeof maxSidebarWidth>) | null;
         // null uses the responsive default; viewport limits only affect the displayed height.
         readonly videoHeight: (number & tags.Minimum<0> & tags.Maximum<typeof maxLayoutDimension>) | null;
+        readonly showReferenceTranscript: boolean;
+        // Share of the two columns' available width occupied by the reference on either side.
+        readonly referenceTranscriptRatio: number & tags.Minimum<typeof minReferenceTranscriptRatio> & tags.Maximum<typeof maxReferenceTranscriptRatio>;
     };
     readonly playback: {
         readonly mode: PlaybackMode;
@@ -88,9 +92,8 @@ export type Settings = {
 // All renderer updates share this schema; window state comes from BrowserWindow events.
 type EditableSettings = Omit<Settings, "version" | "window">;
 export type SettingsPatch = {
-    readonly [Key in keyof EditableSettings]?: Key extends "layout" ? {
+    readonly [Key in keyof EditableSettings]?: Key extends "layout" ? Partial<Omit<Settings["layout"], "sidebarWidth">> & {
         readonly sidebarWidth?: NonNullable<Settings["layout"]["sidebarWidth"]>;
-        readonly videoHeight?: Settings["layout"]["videoHeight"];
     } : Key extends typeof settingsSections[number] ? Partial<EditableSettings[Key]> : EditableSettings[Key];
 };
 

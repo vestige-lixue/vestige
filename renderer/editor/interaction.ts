@@ -209,8 +209,8 @@ export function inspectionController(view: EditorView, geometry: InspectionGeome
         // Releasing the modifier ends the hold, together with any chord made during it.
         if (!primary(event)) state.chorded = false;
         const held = inspectionModifier(event) && !event.isComposing && !view.composing && !compositionPending(view.state);
-        const seek = !menuPending && !menuTarget && event.type === "keydown" && event.key === "Enter" && held && !event.shiftKey
-            && (view.dom.contains(document.activeElement) || !!state.hovered);
+        const seek = !event.defaultPrevented && !menuPending && !menuTarget && event.type === "keydown" && event.key === "Enter" && held && !event.shiftKey
+            && (view.dom.contains(document.activeElement) || !!state.hovered && !document.activeElement?.closest(".tiptap"));
         if (!seek) {
             if (event.type === "keydown" && primary(event) && !holdKeys.has(event.key)) state.chorded = true;
             if (hold(held)) retarget();

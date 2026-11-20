@@ -60,6 +60,7 @@ export function restoreTranscriptMenuFocus(view: EditorView): void {
     const selection = view.dom.ownerDocument.getSelection();
     const anchor = selection?.anchorNode, head = selection?.focusNode;
     const anchorOffset = selection?.anchorOffset, headOffset = selection?.focusOffset;
+    if (!view.editable) view.dom.focus({ preventScroll: true });
     view.focus();
     // Closing can run before or after the next native press. Keep its current endpoints, not the old menu request's.
     if (anchor && head && view.dom.contains(anchor) && view.dom.contains(head)) selection!.setBaseAndExtent(anchor, anchorOffset!, head, headOffset!);

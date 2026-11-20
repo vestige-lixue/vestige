@@ -8,6 +8,7 @@
     --c-link: #2170bf;
     --c-text-80p: color-mix(in oklab, var(--c-text) 64.8%, var(--c-background));
     --c-selection: color-mix(in srgb, var(--c-accent) 22%, var(--c-background));
+    --c-reference-selection: color-mix(in srgb, var(--c-accent) 12%, var(--c-background));
     --c-find: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 25%, var(--c-background));
     --c-find-current: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 52%, var(--c-background));
     --c-selection-bg: color-mix(in srgb, var(--c-accent) 25%, var(--c-background));
@@ -19,6 +20,7 @@
     --c-link: #79b8ff;
     --c-text-80p: color-mix(in oklab, var(--c-text) 64.3%, var(--c-background));
     --c-selection: color-mix(in srgb, var(--c-accent) 30%, var(--c-background));
+    --c-reference-selection: color-mix(in srgb, var(--c-accent) 17%, var(--c-background));
     --c-find: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 28%, var(--c-background));
     --c-find-current: color-mix(in srgb, oklch(from var(--c-accent) l c calc(h + 180)) 58%, var(--c-background));
     --c-selection-bg: color-mix(in srgb, var(--c-accent) 22%, var(--c-background));

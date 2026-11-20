@@ -9,9 +9,11 @@ import * as transcription from "./transcription.svelte";
 import * as player from "./player.svelte";
 import * as mediaSelection from "./mediaSelection.svelte";
 import * as settings from "./settings.svelte";
+import * as settingsAPI from "./settings";
 import * as dialogsAPI from "./dialogs";
 import * as transcriptionAPI from "./transcription";
 import * as transcriptAPI from "./transcript";
+import * as transcript from "./transcript.svelte";
 import * as transcriptFind from "./transcriptFind.svelte";
 import * as projectAPI from "./project";
 import * as playerAPI from "./player";
@@ -19,7 +21,7 @@ import { isTranscriptEditorTarget, toggleTranscriptDeletions, transcriptDeletion
 
 type ParameterlessCommand = {
     kind: "newProject" | "saveProject" | "saveProjectAs" | "closeProject" | "quitApp" | "openDevTools" | "openProjectRepository" | "savePlaybackSpeed" | "restorePlaybackSpeed" | "toggleVolumeStabilization" | "cyclePlaybackMode" | "toggleSelectionDeletions"
-        | "openTranscriptFind" | "openTranscriptReplace" | "closeTranscriptFind" | "toggleTranscriptFindCase" | "toggleTranscriptFindWord"
+        | "toggleReferenceTranscript" | "openTranscriptFind" | "openTranscriptReplace" | "closeTranscriptFind" | "toggleTranscriptFindCase" | "toggleTranscriptFindWord"
         | "replaceTranscriptMatch" | "replaceAllTranscriptMatches" | "toggleTranscriptFindPreserveCase";
 };
 
@@ -254,6 +256,11 @@ const definitions: { [Kind in Command["kind"]]: CommandDefinition<Kind> } = {
             return settings.isReady() && !!vestige?.runs[vestige.displayedRunIdx];
         },
         label: label("transcript.export.currentAction")
+    },
+    toggleReferenceTranscript: {
+        run: () => void settingsAPI.update({ layout: { showReferenceTranscript: !settings.getCurrent().layout.showReferenceTranscript } }),
+        enabled: () => settings.isReady() && (project.getVestige(mediaSelection.get())?.runs.length ?? 0) >= 2,
+        label: () => i18n.t(transcript.getReference() ? "transcript.reference.hide" : "transcript.reference.show")
     },
     stopTranscription: {
         run: command => transcriptionAPI.stop(command.mediaId!),

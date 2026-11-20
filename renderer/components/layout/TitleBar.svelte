@@ -1,5 +1,8 @@
 <header class="title-bar">
     <ProjectStatus centered />
+    {#if mediaSelection.get()}
+        <div class="reference-toggle"><ReferenceTranscriptToggle /></div>
+    {/if}
 </header>
 
 
@@ -7,6 +10,7 @@
     .title-bar {
         -webkit-app-region: drag;
         container-type: inline-size;
+        position: relative;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -16,9 +20,15 @@
         padding: 0 16px;
         min-width: 0;
     }
+    .reference-toggle {
+        position: absolute;
+        right: 16px;
+    }
 </style>
 
 
 <script lang="ts">
+    import * as mediaSelection from "../../states/mediaSelection.svelte";
     import ProjectStatus from "./ProjectStatus.svelte";
+    import ReferenceTranscriptToggle from "./ReferenceTranscriptToggle.svelte";
 </script>

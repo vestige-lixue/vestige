@@ -9,7 +9,7 @@
             text={project.projectState.path ?? i18n.t("project.unsaved.hint")}
             shortcut={project.projectState.path === null ? shortcut({ kind: "saveProject" }) : undefined}
             side="bottom"
-            sideOffset={15}
+            sideOffset={titleBarTooltipOffset}
             onclick={project.projectState.path === null ? () => runCommand({ kind: "saveProject" }) : undefined}
         >
             {#snippet child({ props })}
@@ -95,6 +95,7 @@
     import { runCommand } from "../../states/commands";
     import NiceLabel from "../util/NiceLabel.svelte";
     import Tooltip from "../util/Tooltip.svelte";
+    import { titleBarTooltipOffset } from "./titleBar";
 
     type Props = {
         reservedWidth?: number;

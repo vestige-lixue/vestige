@@ -64,7 +64,7 @@ const bindings: readonly Binding[] = [
 
 const editKeys: Record<string, EditAction> = { a: "selectAll", z: "undo", y: "redo", x: "cut", c: "copy", v: "paste" };
 let menuBindings: MenuBindings | null = null;
-let transcriptTooltip: (() => boolean) | null = null;
+const transcriptTooltips = new Map<HTMLElement, () => boolean>();
 let mounted = false;
 let alt: "idle" | "pressed" = "idle";
 let wordNavigation: {
@@ -81,11 +81,17 @@ export function registerMenu(bindings: MenuBindings): () => void {
 }
 
 // Escape dismisses the editor's tooltip before running the scoped find binding.
-export function registerTranscriptTooltip(dismiss: () => boolean): () => void {
-    transcriptTooltip = dismiss;
+export function registerTranscriptTooltip(element: HTMLElement, dismiss: () => boolean): () => void {
+    transcriptTooltips.set(element, dismiss);
     return () => {
-        if (transcriptTooltip === dismiss) transcriptTooltip = null;
+        transcriptTooltips.delete(element);
     };
+}
+
+function dismissTranscriptTooltip(): boolean {
+    for (const [element, dismiss] of transcriptTooltips) if (element.matches(":hover") && dismiss()) return true;
+    for (const [element, dismiss] of transcriptTooltips) if (element.contains(document.activeElement) && dismiss()) return true;
+    return false;
 }
 
 function isMac(): boolean {
@@ -138,7 +144,7 @@ function cancel(): void {
 }
 
 function editingTarget(target: EventTarget | null): target is HTMLElement {
-    return target instanceof HTMLElement && (target.closest("input, textarea") !== null || target.isContentEditable);
+    return target instanceof HTMLElement && (target.closest("input, textarea, select, .input-control") !== null || target.isContentEditable);
 }
 
 function deletionControl(target: EventTarget | null): boolean {
@@ -240,7 +246,12 @@ function keydown(event: KeyboardEvent): void {
     }
     const mod = isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
     const key = event.key.toLowerCase();
-    if (key === "escape" && transcriptTooltip?.()) {
+    const activation = (key === " " || key === "enter") && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (activation && event.target instanceof HTMLButtonElement && event.target.ariaDisabled === "true") {
+        event.preventDefault();
+        return;
+    }
+    if (key === "escape" && dismissTranscriptTooltip()) {
         cancel();
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -259,7 +270,7 @@ function keydown(event: KeyboardEvent): void {
         }
         return;
     }
-    if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && (key === " " || key === "enter") && deletionControl(event.target)) return;
+    if (activation && deletionControl(event.target)) return;
     const editing = editingTarget(event.target);
     const editTarget = event.target instanceof HTMLElement && (editing || isTranscriptEditorTarget(event.target)) ? event.target : null;
     const edit = mod && !event.altKey ? event.shiftKey ? key === "z" ? "redo" : undefined : editKeys[key] : undefined;
@@ -302,7 +313,7 @@ function keyup(event: KeyboardEvent): void {
 function progressKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented) return;
     const target = event.target;
-    if (menu.get() || !(target instanceof HTMLElement) || target.isContentEditable || target.closest("input, textarea, select, [data-slider-root]")) {
+    if (menu.get() || !(target instanceof HTMLElement) || target.closest("[data-slider-root]") || editingTarget(target)) {
         cancelProgressNavigation();
         return;
     }

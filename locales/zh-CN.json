@@ -382,6 +382,8 @@
         },
         "reference": {
             "replace": "替换为",
+            "show": "显示参考转写",
+            "hide": "隐藏参考转写",
             "insert": "插入"
         },
         "information": {
@@ -492,6 +494,13 @@
             }
         },
         "editing": {
+            "referenceTranscriptPosition": {
+                "label": "参考转写位置",
+                "options": {
+                    "left": "左侧",
+                    "right": "右侧"
+                }
+            },
             "referenceOverlap": {
                 "label": "参考文字重叠阈值",
                 "description": "其他转写中的文字与目标在时间上的重叠，达到两者较短时长的这一比例时，才会作为候选出现在右键菜单的“替换为”和“插入”里。",

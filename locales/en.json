@@ -383,6 +383,8 @@
         },
         "reference": {
             "replace": "Replace with",
+            "show": "Show reference transcript",
+            "hide": "Hide reference transcript",
             "insert": "Insert"
         },
         "information": {
@@ -493,6 +495,13 @@
             }
         },
         "editing": {
+            "referenceTranscriptPosition": {
+                "label": "Reference transcript position",
+                "options": {
+                    "left": "Left",
+                    "right": "Right"
+                }
+            },
             "referenceOverlap": {
                 "label": "Reference overlap threshold",
                 "description": "Offer text from other transcriptions under “Replace with” and “Insert” when its time overlap with the target reaches this percentage of the shorter duration.",

@@ -26,7 +26,7 @@ export function unplayableTimestamp(time: number, duration: number, playable: bo
 }
 
 function inspectionAudio(
-    index: TextIndex, duration: number, tokens: readonly number[], deletions: readonly Pick<TextPiece, "sourceFrom" | "sourceTo">[] = []
+    index: TextIndex, duration: number, tokens: Iterable<number>, deletions: readonly Pick<TextPiece, "sourceFrom" | "sourceTo">[] = []
 ): Pick<TranscriptInformation, "range" | "playable" | "seekStart"> {
     const intervals = { start: Infinity, end: -Infinity };
     const points = { start: Infinity, end: -Infinity };
@@ -167,13 +167,29 @@ export function transcriptSelectionUnits(index: TextIndex, projection: TextProje
     return { tokens: tokenIndices, deletions };
 }
 
+type SelectionAudio = { from: number; to: number; duration: number; tokens: Set<number>; deletions: TranscriptInformation[]; audio: ReturnType<typeof inspectionAudio> };
+const selectedAudio = new WeakMap<TextProjection, SelectionAudio>();
+
+function selectionAudio(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): SelectionAudio {
+    const cached = selectedAudio.get(projection);
+    if (cached && cached.from === from && cached.to === to && cached.duration === duration) return cached;
+    const { tokens, deletions } = transcriptSelectionUnits(index, projection, duration, from, to);
+    const value = { from, to, duration, tokens, deletions, audio: inspectionAudio(index, duration, tokens, deletions) };
+    selectedAudio.set(projection, value);
+    return value;
+}
+
+export function transcriptSelectionTime(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): Range | null {
+    const selected = selectionAudio(index, projection, duration, from, to);
+    return selected.tokens.size ? selected.audio.range : null;
+}
+
 // Selection and geometry use displayed UTF-16 offsets; source identities remain codepoint offsets.
 export function transcriptSelection(index: TextIndex, projection: TextProjection, duration: number, from: number, to: number): SelectionInformation | null {
     if (from >= to) return null;
-    const { tokens: tokenIndices, deletions } = transcriptSelectionUnits(index, projection, duration, from, to);
-    const tokens = [...tokenIndices];
-    const { range, playable, seekStart } = inspectionAudio(index, duration, tokens, deletions);
+    const { tokens: tokenIndices, deletions, audio: { range, playable, seekStart } } = selectionAudio(index, projection, duration, from, to);
     if (!range) return null;
+    const tokens = [...tokenIndices];
     let sourceFrom = index.characters.length;
     let sourceTo = 0;
     let first = from;

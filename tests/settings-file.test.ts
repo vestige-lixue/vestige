@@ -8,7 +8,7 @@ import { validSettings } from "../main/settings/validate";
 import { defaultSettings } from "../shared/settings/defaults";
 
 type JSONRecord = { [key: string]: unknown };
-const releases = ["v0.5.0", "v0.6.0", "v0.7.0", "v0.8.0", "v0.8.1"];
+const releases = ["v0.5.0", "v0.6.0", "v0.7.0", "v0.8.0", "v0.8.1", "v1.0.0"];
 const directories: string[] = [];
 const invalidUTF8 = Buffer.from(JSON.stringify({
     ...defaultSettings,
@@ -69,6 +69,17 @@ describe("settings file reading and upgrade", () => {
         expect(readFileSync(path)).toEqual(bytes);
     });
 
+    it("fills only the missing reference preferences when upgrading a settings file", () => {
+        const path = temporaryPath();
+        const previous = JSON.parse(readFileSync(new URL("./support/settings/v1.0.0.json", import.meta.url), "utf8"));
+        previous.editing.referenceTranscriptPosition = "left";
+        previous.layout.referenceTranscriptRatio = 0.7;
+        writeFileSync(path, JSON.stringify(previous));
+        const loaded = readSettings(path);
+        expect(loaded.loadError).toBeNull();
+        expect(loaded.settings).toEqual({ ...previous, layout: { ...previous.layout, showReferenceTranscript: false } });
+    });
+
     it("round-trips the current defaults", () => {
         const path = temporaryPath();
         writeFileSync(path, JSON.stringify(defaultSettings, null, 4));
@@ -100,6 +111,8 @@ describe("settings file reading and upgrade", () => {
         { label: "a newer settings version", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, version: 2, futureSetting: true })), error: { kind: "unsupported-version", file: "settings", version: "2" } },
         { label: "an unknown field from a newer version", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, futureSetting: true })), error: { kind: "unknown-field", path: "settings.futureSetting" } },
         { label: "invalid UTF-8 bytes", bytes: invalidUTF8, error: { kind: "invalid-encoding" } },
+        { label: "an invalid reference position", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, editing: { ...defaultSettings.editing, referenceTranscriptPosition: "top" } })), error: { kind: "invalid-structure", path: "settings.editing.referenceTranscriptPosition" } },
+        { label: "an out-of-range reference ratio", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, layout: { ...defaultSettings.layout, referenceTranscriptRatio: 1 } })), error: { kind: "invalid-structure", path: "settings.layout.referenceTranscriptRatio" } },
         { label: "a field with the wrong type", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, playback: { ...defaultSettings.playback, speed: "fast" } })), error: { kind: "invalid-structure", path: "settings.playback.speed" } }
     ])("reports $label without changing the original bytes", ({ bytes, error }) => {
         const path = temporaryPath();

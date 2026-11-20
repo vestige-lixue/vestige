@@ -1,14 +1,17 @@
 <div class="editor-shell">
     <div class="editor-surface">
         {#each selectedBreaks as box (box.pos)}
-            <div class="selected-break" aria-hidden="true" style:left={`${box.left}px`} style:top={`${box.top}px`}
+            <div class="selected-break" class:comparison={selectionBounds?.reference} aria-hidden="true" style:left={`${box.left}px`} style:top={`${box.top}px`}
                 style:width={`${box.fontSize / 2}px`} style:height={`${box.height}px`}></div>
         {/each}
         <div
             class="editor" spellcheck={false} style:--transcript-font-size={`${fontSize}px`}
             tabindex={-1} bind:this={element}
         >
-            <svg class="playback-outline" aria-hidden="true" style:stroke-width={`${playbackOutline.strokeWidth}px`}>
+            <svg
+                class="playback-outline" aria-hidden="true" viewBox={outlineViewBox(playbackOutline.box)} style={outlineStyle(playbackOutline.box)}
+                style:stroke-width={`${playbackOutline.strokeWidth}px`}
+            >
                 {#each playbackOutline.paths as path, index (index)}<path d={path} />{/each}
             </svg>
         </div>
@@ -23,8 +26,8 @@
             </div>
         {/if}
         {#if inspection?.rectangles.length}
-            <svg class="inspection-outline">
-                {#each outlines as path (path)}<path d={path} />{/each}
+            <svg class="inspection-outline" viewBox={outlineViewBox(inspectionOutline.box)} style={outlineStyle(inspectionOutline.box)}>
+                {#each inspectionOutline.paths as path (path)}<path d={path} />{/each}
             </svg>
         {/if}
     </div>
@@ -42,7 +45,7 @@
     </Tooltip.Portal>
 </Tooltip.Root>
 
-<TranscriptMenu bind:this={contextMenu} runs={vestige.runs} {run} />
+<TranscriptMenu bind:this={contextMenu} runs={vestige.runs} {run} {reference} />
 
 
 <style>
@@ -75,17 +78,16 @@
         flex-direction: column;
         flex: 1;
     }
+    .selected-break.comparison { background-color: var(--c-reference-selection); }
     .selected-break {
         position: absolute;
         z-index: 0;
         background-color: var(--c-selection);
         pointer-events: none;
     }
+    /* Sized to their paths: a full-editor box makes every insertion or compositing change repaint the whole editor. */
     .playback-outline, .inspection-outline {
         position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
         overflow: visible;
         pointer-events: none;
         fill: none;
@@ -197,6 +199,11 @@
     .editor :global(::highlight(transcript-selection)) {
         background-color: var(--c-selection);
     }
+    .editor :global(::highlight(transcript-reference-selection)) {
+        background-color: var(--c-reference-selection);
+    }
+    .editor :global(.transcript-deletion-original::highlight(transcript-reference-selection)),
+    .editor :global(.transcript-deletion-original *::highlight(transcript-reference-selection)),
     .editor :global(.transcript-deletion-original::highlight(transcript-selection)),
     .editor :global(.transcript-deletion-original *::highlight(transcript-selection)) {
         background-color: transparent;
@@ -311,8 +318,14 @@
         height: .45em;
         overflow: visible;
         fill: currentColor;
-        transform: scale(1);
-        transition: transform .12s ease;
+    }
+    /*
+     * Scaled through the path data around the viewBox center (markers.ts draws M0 0H10L5 10Z): a transform transition is
+     * composited and promotes every overlapping marker and outline into its own layer.
+     */
+    .editor :global(.transcript-event-shape > path) {
+        d: path("M0 0H10L5 10Z");
+        transition: d .12s ease;
     }
     .editor :global(.transcript-event-stroke) {
         fill: none;
@@ -321,14 +334,14 @@
         stroke-linejoin: round;
         vector-effect: non-scaling-stroke;
     }
-    .editor :global(.transcript-event:hover .transcript-event-shape) {
-        transform: scale(1.25);
+    .editor :global(.transcript-event:hover .transcript-event-shape > path) {
+        d: path("M-1.25 -1.25H11.25L5 11.25Z");
     }
-    .editor :global(.transcript-event.deletion.pressed .transcript-event-shape) {
-        transform: scale(.95);
+    .editor :global(.transcript-event.deletion.pressed .transcript-event-shape > path) {
+        d: path("M.25 .25H9.75L5 9.75Z");
     }
     @media (prefers-reduced-motion: reduce) {
-        .editor :global(.transcript-event-shape) {
+        .editor :global(.transcript-event-shape > path) {
             transition: none;
         }
     }
@@ -336,20 +349,19 @@
 
 
 <script lang="ts">
-    import { untrack } from "svelte";
+    import { tick, untrack } from "svelte";
     import { Tooltip } from "bits-ui";
     import TranscriptInformation from "./TranscriptInformation.svelte";
     import TranscriptMenu from "./TranscriptMenu.svelte";
     import { type TranscriptMenuCallbacks } from "../../editor/menuTarget";
     import { type Editor } from "@tiptap/core";
-    import { Plugin } from "@tiptap/pm/state";
     import { type Vestige } from "../../../shared/Vestige";
     import { type Run } from "../../../shared/transcription/Run";
     import { createTranscriptEditor, setTranscriptPlayback } from "../../editor/transcript";
-    import { attachTranscriptPlaybackOutline, type PlaybackOutline } from "../../editor/playbackOutline";
+    import { attachTranscriptPlaybackOutline, emptyOutlineBox, outlineBox, type OutlineBox, type PlaybackOutline } from "../../editor/playbackOutline";
     import { attachTranscriptFind } from "../../editor/find";
-    import { attachTranscriptSelection } from "../../editor/selection";
-    import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection, type InspectionInformation } from "../../editor/information";
+    import { attachTranscriptSelection, type PaintedSelectionBounds } from "../../editor/selection";
+    import { refreshTranscriptInformation, inspectionKey, type TranscriptInspection } from "../../editor/information";
     import { measureLineBreaks, measureCaretLineBreak, lineBreakAt, type LineBreakBox } from "../../editor/lineBreaks";
     import { invalidateTranscriptLayout, subscribeTranscriptLayout } from "../../editor/layout";
     import { subscribeTranscriptViewport, transcriptScrollIdleDelay } from "../../editor/viewport";
@@ -365,13 +377,15 @@
     import { registerTranscriptTooltip } from "../../keybindings";
     import * as i18n from "../../i18n.svelte";
 
-    let { vestige, run, onInspect }: { vestige: Vestige; run: Run; onInspect?: (information: InspectionInformation | null) => void } = $props();
+    let { vestige, run, reference = false, editor = $bindable() }: { vestige: Vestige; run: Run; reference?: boolean; editor?: Editor } = $props();
+    const labels = $derived({ expand: i18n.t("transcript.information.expand"), collapse: i18n.t("transcript.information.collapse") });
     let element: HTMLDivElement;
-    let editor = $state.raw<Editor>();
-    let playbackOutline = $state.raw<PlaybackOutline>({ paths: [], strokeWidth: 0 });
+    let referenceToMount = $state.raw<Run>();
+    let playbackOutline = $state.raw<PlaybackOutline>({ paths: [], strokeWidth: 0, box: emptyOutlineBox });
     let contextMenu: { show: TranscriptMenuCallbacks["open"]; edit: TranscriptMenuCallbacks["edit"] };
     let inspection = $state.raw<TranscriptInspection | null>(null);
-    let selectionBounds = $state.raw<{ from: number; to: number } | null>(null);
+    let selectionBounds = $state.raw<PaintedSelectionBounds | null>(null);
+    let scheduleSelectedBreaks: (() => void) | undefined;
     let lineBreaks = $state.raw<LineBreakBox[]>([]);
     const firstSelectedBreak = $derived(selectionBounds ? breakIndex(selectionBounds.from) : 0);
     const endSelectedBreak = $derived(selectionBounds ? breakIndex(selectionBounds.to) : 0);
@@ -397,19 +411,31 @@
         const rect = inspection?.anchor;
         return rect ? { getBoundingClientRect: () => rect } : undefined;
     });
-    const outlines = $derived.by(() => {
-        if (!inspection?.rectangles.length || !element) return [];
+    const inspectionOutline = $derived.by(() => {
+        if (!inspection?.rectangles.length || !element) return { paths: [], box: emptyOutlineBox };
         const origin = element.getBoundingClientRect();
-        return inspection.rectangles.flatMap(rectangles => rectangles.map((rect, index) => {
+        const outlined: { left: number; right: number; top: number; bottom: number }[] = [];
+        const paths = inspection.rectangles.flatMap(rectangles => rectangles.map((rect, index) => {
             const left = rect.left - origin.left - 1;
             const right = rect.right - origin.left + 1;
             const top = rect.top - origin.top - 1;
             const bottom = rect.bottom - origin.top + 1;
+            outlined.push({ left, right, top, bottom });
             return `M ${left} ${top} H ${right} M ${left} ${bottom} H ${right}`
                 + (index === 0 ? ` M ${left} ${top} V ${bottom}` : "")
                 + (index === rectangles.length - 1 ? ` M ${right} ${top} V ${bottom}` : "");
         }));
+        // Matches the inspection outline's CSS stroke width.
+        return { paths, box: outlineBox(outlined, 1) };
     });
+
+    function outlineViewBox(box: OutlineBox): string {
+        return `${box.left} ${box.top} ${box.width} ${box.height}`;
+    }
+
+    function outlineStyle(box: OutlineBox): string {
+        return `left: ${box.left}px; top: ${box.top}px; width: ${box.width}px; height: ${box.height}px`;
+    }
 
     function breakIndex(position: number): number {
         return firstTrue(lineBreaks.length, i => lineBreaks[i].pos >= position);
@@ -472,13 +498,6 @@
         if (changed || !value || value.suspended) closeTooltip();
         if (value?.menu && hoverSession) hoverSession.warm = false;
         inspection = value;
-        if (informationChanged) {
-            onInspect?.(value?.information ?? null);
-            const information = value?.information;
-            transcript.setInspection(information?.range ? {
-                mediaId: vestige.media.id, runId: run.id, range: information.range, playable: information.playable
-            } : null);
-        }
         if (!value || value.suspended || value.menu || value.pressed || value.tooltipPending || informationDisplay !== "tooltip" || !changed) return;
         if (value.control ? controlDismissed : hoverSession?.dismissed) return;
         if (value.control || value.keyboard || !released && hoverSession?.warm) tooltipOpen = true;
@@ -488,43 +507,59 @@
         }, 700);
     }
 
+    $effect.pre(() => {
+        if (!reference) return;
+        const next = run;
+        const timer = setTimeout(() => referenceToMount = next, 0);
+        return () => clearTimeout(timer);
+    });
+
     $effect(() => {
         const current = vestige;
         const displayed = run;
         const duration = current.media.duration;
-        const stopTooltip = registerTranscriptTooltip(dismissTooltip);
+        const isReference = reference;
+        if (isReference && referenceToMount !== displayed) return;
+        // Plugins need their real scroll container while mounting. Stage that entire subtree
+        // off-document so ProseMirror's native selection reads cannot lay out half-built text.
+        const viewport = isReference ? element.closest(".transcript-scroll") : null;
+        const anchor = viewport && document.createComment("reference transcript");
+        function attach(): void {
+            if (anchor?.parentNode && viewport) anchor.replaceWith(viewport);
+        }
+        if (viewport && anchor) {
+            viewport.replaceWith(anchor);
+            void tick().then(attach);
+        }
+        const stopTooltip = registerTranscriptTooltip(element, dismissTooltip);
         window.addEventListener("keydown", inspectionKeydown, true);
-        const instance = untrack(() => createTranscriptEditor(element, displayed, $state.snapshot(current.modifications), modifications => {
+        const instance = untrack(() => createTranscriptEditor(element, displayed, isReference ? [] : $state.snapshot(current.modifications), isReference ? undefined : modifications => {
             if (project.getVestige(current.media.id) === current) projectAPI.updateModifications(current.media.id, displayed.id, modifications);
-        }, () => !project.projectState.locked, {
-            duration, onChange: inspect,
+        }, isReference ? () => false : () => !project.projectState.locked, {
+            duration, labels, onChange: value => {
+                if (inspection?.information !== value?.information)
+                    transcript.setInspection(current.media.id, displayed.id, value?.information ?? null);
+                inspect(value);
+            },
             menu: { open: request => contextMenu.show(request), edit: action => contextMenu.edit(action) },
             onHover: hover,
             onSeek: time => runCommand({ kind: "seekWord", time })
-        }));
-        instance.registerPlugin(new Plugin({
-            props: {
-                handleKeyDown(view, event) {
-                    if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
-                        || view.composing || !view.hasFocus()) return false;
-                    event.stopPropagation();
-                    element.focus({ preventScroll: true });
-                    return true;
-                }
-            }
-        }));
+        }, isReference));
         editor = instance;
-        const stopFind = untrack(() => attachTranscriptFind(instance));
+        const stopFind = isReference ? undefined : untrack(() => attachTranscriptFind(instance));
         instance.on("transaction", ({ transaction }) => {
             if (transaction.docChanged || transaction.selectionSet) notifyEditStateChanged();
         });
         notifyEditStateChanged();
         return () => {
             window.removeEventListener("keydown", inspectionKeydown, true);
+            attach();
             stopTooltip();
-            stopFind();
+            stopFind?.();
             instance.destroy();
+            editor = undefined;
             notifyEditStateChanged();
+            transcript.setInspection(current.media.id, displayed.id, null);
             inspect(null);
             clearTimeout(hoverEndTimer);
             hoverEndTimer = undefined;
@@ -533,18 +568,19 @@
     });
 
     $effect(() => {
-        editor?.setEditable(!project.projectState.locked, false);
+        if (!reference) editor?.setEditable(!project.projectState.locked, false);
         untrack(notifyEditStateChanged);
-        const labels = {
-            expand: i18n.t("transcript.information.expand"), collapse: i18n.t("transcript.information.collapse")
-        };
-        if (editor) untrack(() => refreshTranscriptInformation(editor!.view, labels));
+        const currentLabels = labels;
+        if (editor) untrack(() => refreshTranscriptInformation(editor!.view, currentLabels));
     });
 
     $effect(() => {
         const current = editor;
         if (!current) return;
-        return attachTranscriptSelection(current, bounds => selectionBounds = bounds);
+        return attachTranscriptSelection(current, bounds => {
+            selectionBounds = bounds;
+            scheduleSelectedBreaks?.();
+        });
     });
 
     $effect(() => {
@@ -553,7 +589,7 @@
         const stop = attachTranscriptPlaybackOutline(current, element, outline => playbackOutline = outline);
         return () => {
             stop();
-            playbackOutline = { paths: [], strokeWidth: 0 };
+            playbackOutline = { paths: [], strokeWidth: 0, box: emptyOutlineBox };
         };
     });
 
@@ -568,7 +604,7 @@
         function refresh(): void {
             frame = 0;
             if (view.isDestroyed) return;
-            if (!view.state.selection.empty || pointer && !scrolling) lineBreaks = measureLineBreaks(view);
+            if (selectionBounds || !view.state.selection.empty || pointer && !scrolling) lineBreaks = measureLineBreaks(view);
             else if (lineBreaks.length) lineBreaks = [];
             hoveredBreak = pointer && !scrolling ? lineBreakAt(view, pointer.x, pointer.y) : -1;
             caretBreak = measureCaretLineBreak(view);
@@ -605,6 +641,7 @@
         }
         const unsubscribe = subscribeTranscriptLayout(view, schedule);
         const stopViewport = subscribeTranscriptViewport(view, schedule);
+        scheduleSelectedBreaks = schedule;
         current.on("selectionUpdate", schedule);
         current.on("focus", schedule);
         current.on("blur", schedule);
@@ -623,6 +660,7 @@
             unsubscribe();
             stopViewport.unsubscribe();
             clearTimeout(scrollTimer);
+            scheduleSelectedBreaks = undefined;
             current.off("selectionUpdate", schedule);
             current.off("focus", schedule);
             current.off("blur", schedule);

@@ -1,5 +1,18 @@
 import { type TextIndex } from "./text";
 
+type TokenTime = { start: number; end: number; segmentIdx: number };
+const tokenTimes = new WeakMap<TextIndex, TokenTime[]>();
+
+/** Playback and reference scrolling use the same time order, even for runs with nonmonotonic timestamps. */
+export function orderedTokenTimes(index: TextIndex): readonly TokenTime[] {
+    let times = tokenTimes.get(index);
+    if (!times) {
+        times = index.transcript.map((token, segmentIdx) => ({ ...token.range, segmentIdx })).sort((a, b) => a.start - b.start);
+        tokenTimes.set(index, times);
+    }
+    return times;
+}
+
 export type SpeechInterval = { start: number; end: number; offset: number };
 const speechIntervals = new WeakMap<TextIndex, { duration: number; intervals: SpeechInterval[] }>();
 

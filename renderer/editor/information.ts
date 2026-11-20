@@ -27,11 +27,13 @@ type InformationState = InformationModel & {
     labels: InspectionLabels;
     pending: boolean;
 };
-type InformationAction = { ranges?: SourceRange[]; selection?: boolean; labels?: InspectionLabels; refresh?: boolean };
+type InformationAction = { ranges?: SourceRange[]; selection?: boolean; labels?: InspectionLabels };
 const informationKey = new PluginKey<InformationState>("vestigeInformation");
 
 export function refreshTranscriptInformation(view: EditorView, labels: InspectionLabels): void {
-    if (!view.isDestroyed) view.dispatch(view.state.tr.setMeta(informationKey, { labels, refresh: true } satisfies InformationAction).setMeta("addToHistory", false));
+    const previous = informationKey.getState(view.state)?.labels;
+    if (!view.isDestroyed && (previous?.expand !== labels.expand || previous.collapse !== labels.collapse))
+        view.dispatch(view.state.tr.setMeta(informationKey, { labels } satisfies InformationAction).setMeta("addToHistory", false));
 }
 
 export function toggleSelectionDeletions(view: EditorView): boolean {

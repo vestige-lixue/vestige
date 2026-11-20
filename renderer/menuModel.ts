@@ -54,7 +54,7 @@ export function menuItems(group: MenuGroup): readonly (MenuAction | null)[] {
             transcriptionCommand(), { kind: "exportTranscript", mediaId: mediaSelection.get() }, { kind: "removeSelectedMedia" }
         ];
         case "transcription": return [
-            transcriptionCommand(), { kind: "exportCurrentTranscript", mediaId: mediaSelection.get() }, null, ...transcriptionActions
+            transcriptionCommand(), { kind: "exportCurrentTranscript", mediaId: mediaSelection.get() }, { kind: "toggleReferenceTranscript" }, null, ...transcriptionActions
         ];
         case "edit": return [
             ...editActions.map(action => action ? { kind: "edit" as const, action } : null),

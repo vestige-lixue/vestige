@@ -1,160 +1,175 @@
-<div class="titlebarMeasure" bind:clientHeight={titlebarHeight}></div>
+<div class="titlebarMeasure" bind:contentRect={titlebarBounds}></div>
 
-<h2 class="section-title">{i18n.t("settings.general.title")}</h2>
-{@render fields(generalFields)}
+<section class="general">
+    <h2 class="section-title">{i18n.t("settings.general.title")}</h2>
+    {@render fields(generalFields)}
 
-<div class="item">
-    <div id="clear-logs-label" class="text">
-        <div class="label">{i18n.t("settings.general.clearLogs.label")}</div>
-    </div>
-    <TextButton id="clear-logs" aria-labelledby="clear-logs-label" disabled={pending || clearingLogs} onclick={() => void clearLogs()}>
-        {i18n.t("common.clear")}
-    </TextButton>
-</div>
-{#if logsFailure}<div class="error-message">{i18n.t("settings.general.clearLogs.error", { error: logsFailure })}</div>{/if}
-
-<div class="settingsData">
-    <div class="label">{i18n.t("settings.general.data.label")}</div>
-    <div class="description"><span>
-        <LocalizedText text={i18n.t("settings.general.data.description")} slots={{ vocabulary: vocabularyLink }} />
-        {#snippet vocabularyLink()}<button type="button" class="link-button focusable" disabled={pending || dataPending}
-            onclick={() => dialogsAPI.show({ kind: "vocabulary", parentId: dialogId })}>{i18n.t("transcription.vocabulary.title")}</button>{/snippet}
-    </span></div>
-    <div class="transcriptionActions">
-        <TextButton disabled={pending || dataPending} onclick={() => void manageData("import")}>{i18n.t("settings.general.data.import")}</TextButton>
-        <TextButton disabled={pending || dataPending} onclick={() => void manageData("export")}>{i18n.t("settings.general.data.export")}</TextButton>
-        <TextButton disabled={pending || dataPending} onclick={() => void manageData("reset")}>{i18n.t("settings.general.data.reset")}</TextButton>
-    </div>
-    {#if dataFailure}<div class="error-message">{describeFailure(dataFailure)}</div>{/if}
-    {#if importFailure}<div class="error-message">{i18n.t("settings.general.data.importFailure", { error: describeFailure(importFailure) })}</div>{/if}
-</div>
-
-<h2 class="section-title">{i18n.t("settings.transcription.title")}</h2>
-<div class="transcriptionActions">
-    <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-backends", parentId: dialogId })}>
-        {i18n.t("transcription.backends.actions.manage")}
-    </TextButton>
-    <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-models", parentId: dialogId })}>
-        {i18n.t("transcription.models.actions.manage")}
-    </TextButton>
-    <TextButton disabled={pending} onclick={() => dialogsAPI.showTranscriptionPresets(dialogId)}>
-        {i18n.t("transcription.presets.actions.manage")}
-    </TextButton>
-</div>
-<div class="transcriptionActions">
-    <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("user-data")}>
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        {@html externalLinkIcon}
-        <span>{i18n.t("settings.general.openUserDataDirectory")}</span>
-    </TextButton>
-    <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("backend")}>
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        {@html externalLinkIcon}
-        <span>{i18n.t("downloads.backends.actions.openDirectory")}</span>
-    </TextButton>
-    <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("model")}>
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-        {@html externalLinkIcon}
-        <span>{i18n.t("downloads.models.actions.openDirectory")}</span>
-    </TextButton>
-</div>
-{#if directoryFailure}<div class="error-message">{directoryFailure}</div>{/if}
-{@render fields(transcriptionFields)}
-
-<h2 class="section-title">{i18n.t("settings.editing.title")}</h2>
-{@render fields(editingFields)}
-
-<h2 class="section-title">{i18n.t("settings.playback.title")}</h2>
-{@render fields(playbackFields)}
-<AudioSync bind:value={() => audioOffsetMs, setAudioOffset} bind:input={audioOffsetInput} bind:stopTest={stopCalibration} disabled={pending}
-    onchange={value => {
-        setAudioOffset(value);
-        void applyFields(["audio-offset"]);
-    }} />
-{@render fields(meterFields)}
-
-<h2 class="section-title">{i18n.t("settings.theme.title")}</h2>
-<div class="item">
-    <label for={`theme-mode-${themeSettings.mode}`} class="text">
-        <div class="label">{i18n.t("settings.theme.mode.label")}</div>
-    </label>
-    <RadioGroup.Root class="theme-mode-group" orientation="horizontal" disabled={pending}
-        bind:value={() => themeSettings.mode, value => {
-            if (validThemeMode(value) && value !== themeSettings.mode) {
-                themeSettings = { ...themeSettings, mode: value };
-                touch("theme-mode");
-                void applyFields(["theme-mode"]);
-            }
-        }}
-    >
-        {#each themeModes as item (item.mode)}
-            <Tooltip id={`theme-mode-${item.mode}`} text={i18n.t(`settings.theme.mode.options.${item.mode}`)} disabled={pending}>
-                {#snippet child({ props })}
-                    <RadioGroup.Item {...props} value={item.mode} class="themeModeButton hoverable activable focusable">
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                        {@html item.icon}
-                    </RadioGroup.Item>
-                {/snippet}
-            </Tooltip>
-        {/each}
-    </RadioGroup.Root>
-</div>
-{@render fields(themeFields)}
-{#each themeSchemes as scheme (scheme)}
-    <div class="themeHeading">
-        <h3>{i18n.t(`settings.theme.schemes.${scheme}`)}</h3>
-        <TextButton class="themeReset" disabled={pending} onclick={() => void resetTheme(scheme)}>
-            {i18n.t(`settings.theme.actions.reset`)}
+    <div class="item">
+        <div id="clear-logs-label" class="text">
+            <div class="label">{i18n.t("settings.general.clearLogs.label")}</div>
+        </div>
+        <TextButton id="clear-logs" aria-labelledby="clear-logs-label" disabled={pending || clearingLogs} onclick={() => void clearLogs()}>
+            {i18n.t("common.clear")}
         </TextButton>
     </div>
-    {#each themeColorKeys as key (key)}
-        {@const color = themeValues[scheme][key]}
-        {@const picker = pickers[`${scheme}-${key}`]}
-        <div class="item">
-            <label for={`theme-${scheme}-${key}`} class="text">
-                <div class="label">{i18n.t(`settings.theme.colors.${key}`)}</div>
-            </label>
-            <div class="themeColorControl">
-                <Popover.Root bind:open={picker.open} onOpenChange={open => {
-                    if (open) {
-                        picker.detached = false;
-                        pickerColor = hexToHsla(color)!;
-                    }
-                }}>
-                    <Tooltip id={`theme-${scheme}-${key}`} text={i18n.t("colorPicker.pick")} disabled={pending}
-                        ignoreNonKeyboardFocus disableCloseOnTriggerClick={false}>
-                        {#snippet child({ props })}
-                            <Popover.Trigger {...props} bind:ref={picker.anchor} class="themeSwatch focusable"
-                                style={`background-color: ${color};`} disabled={pending} />
-                        {/snippet}
-                    </Tooltip>
-                    <Popover.Portal>
-                        <PopoverContent class="themeColorPicker" style={`z-index: ${modal.getTopLayer()};`} align="end" sideOffset={8}
-                            onCloseAutoFocus={event => {
-                                event.preventDefault();
-                                modal.restoreFocus(picker.anchor, { preventScroll: picker.detached });
-                            }}
-                            collisionPadding={{ top: titlebarHeight + 12, right: 12, bottom: 12, left: 12 }}>
-                            <ColorPicker bind:value={pickerColor} alpha={false} disabled={pending} hexLabel={i18n.t("colorPicker.hex")}
-                                anchor={picker.anchor} onCloseRequest={() => {
-                                    picker.detached = true;
-                                    picker.open = false;
-                                }}
-                                onValueChange={value => editThemeColor(scheme, key, value)}
-                                onValueCommit={() => void applyFields([`theme-${scheme}-${key}`])} />
-                        </PopoverContent>
-                    </Popover.Portal>
-                </Popover.Root>
-                <div class="themeHex">{color}</div>
-            </div>
+    {#if logsFailure}<div class="error-message">{i18n.t("settings.general.clearLogs.error", { error: logsFailure })}</div>{/if}
+
+    <div class="settingsData">
+        <div class="label">{i18n.t("settings.general.data.label")}</div>
+        <div class="description"><span>
+            <LocalizedText text={i18n.t("settings.general.data.description")} slots={{ vocabulary: vocabularyLink }} />
+            {#snippet vocabularyLink()}<button type="button" class="link-button focusable" disabled={pending || dataPending}
+                onclick={() => dialogsAPI.show({ kind: "vocabulary", parentId: dialogId })}>{i18n.t("transcription.vocabulary.title")}</button>{/snippet}
+        </span></div>
+        <div class="transcriptionActions">
+            <TextButton disabled={pending || dataPending} onclick={() => void manageData("import")}>{i18n.t("settings.general.data.import")}</TextButton>
+            <TextButton disabled={pending || dataPending} onclick={() => void manageData("export")}>{i18n.t("settings.general.data.export")}</TextButton>
+            <TextButton disabled={pending || dataPending} onclick={() => void manageData("reset")}>{i18n.t("settings.general.data.reset")}</TextButton>
         </div>
+        {#if dataFailure}<div class="error-message">{describeFailure(dataFailure)}</div>{/if}
+        {#if importFailure}<div class="error-message">{i18n.t("settings.general.data.importFailure", { error: describeFailure(importFailure) })}</div>{/if}
+    </div>
+</section>
+
+<section class="transcription">
+    <h2 class="section-title">{i18n.t("settings.transcription.title")}</h2>
+    <div class="transcriptionActions">
+        <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-backends", parentId: dialogId })}>
+            {i18n.t("transcription.backends.actions.manage")}
+        </TextButton>
+        <TextButton disabled={pending} onclick={() => dialogsAPI.show({ kind: "transcription-models", parentId: dialogId })}>
+            {i18n.t("transcription.models.actions.manage")}
+        </TextButton>
+        <TextButton disabled={pending} onclick={() => dialogsAPI.showTranscriptionPresets(dialogId)}>
+            {i18n.t("transcription.presets.actions.manage")}
+        </TextButton>
+    </div>
+    <div class="transcriptionActions">
+        <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("user-data")}>
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html externalLinkIcon}
+            <span>{i18n.t("settings.general.openUserDataDirectory")}</span>
+        </TextButton>
+        <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("backend")}>
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html externalLinkIcon}
+            <span>{i18n.t("downloads.backends.actions.openDirectory")}</span>
+        </TextButton>
+        <TextButton class="openDirectory" disabled={pending || openingDirectory} onclick={() => void openDirectory("model")}>
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html externalLinkIcon}
+            <span>{i18n.t("downloads.models.actions.openDirectory")}</span>
+        </TextButton>
+    </div>
+    {#if directoryFailure}<div class="error-message">{directoryFailure}</div>{/if}
+    {@render fields(transcriptionFields)}
+</section>
+
+<section class="editing">
+    <h2 class="section-title">{i18n.t("settings.editing.title")}</h2>
+    {@render fields(editingFields)}
+</section>
+
+<section class="playback">
+    <h2 class="section-title">{i18n.t("settings.playback.title")}</h2>
+    {@render fields(playbackFields)}
+    <AudioSync bind:value={() => audioOffsetMs, setAudioOffset} bind:input={audioOffsetInput} bind:stopTest={stopCalibration} disabled={pending}
+        onchange={value => {
+            setAudioOffset(value);
+            void applyFields(["audio-offset"]);
+        }} />
+    {@render fields(meterFields)}
+</section>
+
+<section class="theme">
+    <h2 class="section-title">{i18n.t("settings.theme.title")}</h2>
+    <div class="item">
+        <label for={`theme-mode-${themeSettings.mode}`} class="text">
+            <div class="label">{i18n.t("settings.theme.mode.label")}</div>
+        </label>
+        <RadioGroup.Root class="theme-mode-group" orientation="horizontal" disabled={pending}
+            bind:value={() => themeSettings.mode, value => {
+                if (validThemeMode(value) && value !== themeSettings.mode) {
+                    themeSettings = { ...themeSettings, mode: value };
+                    touch("theme-mode");
+                    void applyFields(["theme-mode"]);
+                }
+            }}
+        >
+            {#each themeModes as item (item.mode)}
+                <Tooltip id={`theme-mode-${item.mode}`} text={i18n.t(`settings.theme.mode.options.${item.mode}`)} disabled={pending}>
+                    {#snippet child({ props })}
+                        <RadioGroup.Item {...props} value={item.mode} class="themeModeButton hoverable activable focusable">
+                            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                            {@html item.icon}
+                        </RadioGroup.Item>
+                    {/snippet}
+                </Tooltip>
+            {/each}
+        </RadioGroup.Root>
+    </div>
+    {@render fields(themeFields)}
+    {#each themeSchemes as scheme (scheme)}
+        <div class="themeHeading">
+            <h3>{i18n.t(`settings.theme.schemes.${scheme}`)}</h3>
+            <TextButton class="themeReset" disabled={pending} onclick={() => void resetTheme(scheme)}>
+                {i18n.t(`settings.theme.actions.reset`)}
+            </TextButton>
+        </div>
+        {#each themeColorKeys as key (key)}
+            {@const color = themeValues[scheme][key]}
+            {@const picker = pickers[`${scheme}-${key}`]}
+            <div class="item">
+                <label for={`theme-${scheme}-${key}`} class="text">
+                    <div class="label">{i18n.t(`settings.theme.colors.${key}`)}</div>
+                </label>
+                <div class="themeColorControl">
+                    <Popover.Root bind:open={picker.open} onOpenChange={open => {
+                        if (open) {
+                            picker.detached = false;
+                            pickerColor = hexToHsla(color)!;
+                        }
+                    }}>
+                        <Tooltip id={`theme-${scheme}-${key}`} text={i18n.t("colorPicker.pick")} disabled={pending}
+                            ignoreNonKeyboardFocus disableCloseOnTriggerClick={false}>
+                            {#snippet child({ props })}
+                                <Popover.Trigger {...props} bind:ref={picker.anchor} class="themeSwatch focusable"
+                                    style={`background-color: ${color};`} disabled={pending} />
+                            {/snippet}
+                        </Tooltip>
+                        <Popover.Portal>
+                            <PopoverContent class="themeColorPicker" style={`z-index: ${modal.getTopLayer()};`} align="end" sideOffset={8}
+                                onCloseAutoFocus={event => {
+                                    event.preventDefault();
+                                    modal.restoreFocus(picker.anchor, { preventScroll: picker.detached });
+                                }}
+                                collisionPadding={{ top: (titlebarBounds?.height ?? 0) + 12, right: 12, bottom: 12, left: 12 }}>
+                                <ColorPicker bind:value={pickerColor} alpha={false} disabled={pending} hexLabel={i18n.t("colorPicker.hex")}
+                                    anchor={picker.anchor} onCloseRequest={() => {
+                                        picker.detached = true;
+                                        picker.open = false;
+                                    }}
+                                    onValueChange={value => editThemeColor(scheme, key, value)}
+                                    onValueCommit={() => void applyFields([`theme-${scheme}-${key}`])} />
+                            </PopoverContent>
+                        </Popover.Portal>
+                    </Popover.Root>
+                    <div class="themeHex">{color}</div>
+                </div>
+            </div>
+        {/each}
     {/each}
-{/each}
+</section>
 
-<h2 class="section-title">{i18n.t("settings.advanced.title")}</h2>
+<div class="advancedGroup">
+    <section class="advanced">
+        <h2 class="section-title">{i18n.t("settings.advanced.title")}</h2>
 
-<h3>{i18n.t("settings.advanced.volumeStabilization.title")}</h3>
-{@render fields(advancedFields)}
+        <h3>{i18n.t("settings.advanced.volumeStabilization.title")}</h3>
+        {@render fields(advancedFields)}
+    </section>
+    <div class="scrollEnd" aria-hidden="true"></div>
+</div>
 
 {#if failure}
     <div class="saveError error-message">{i18n.t("settings.saveError", { error: describeFailure(failure) })}</div>
@@ -202,6 +217,40 @@
 
 
 <style>
+    section {
+        display: flex;
+        flex-direction: column;
+        gap: inherit;
+        content-visibility: auto;
+        /* Allow the controls at the edges to draw their keyboard focus rings. */
+        overflow-clip-margin: 4px;
+    }
+    /* Reserve space for scrolling until Chromium has measured each section. */
+    .general { contain-intrinsic-block-size: auto 520px; }
+    .transcription { contain-intrinsic-block-size: auto 272px; }
+    .editing { contain-intrinsic-block-size: auto 544px; }
+    .playback { contain-intrinsic-block-size: auto 816px; }
+    .theme { contain-intrinsic-block-size: auto 656px; }
+    .advanced {
+        contain-intrinsic-block-size: auto 544px;
+        overflow-anchor: none;
+    }
+    /* Account for longer English descriptions when scrolling directly to the end. */
+    .playback:lang(en) { contain-intrinsic-block-size: auto 848px; }
+    .advanced:lang(en) { contain-intrinsic-block-size: auto 592px; }
+    @media (max-width: 760px) {
+        .playback:lang(en) { contain-intrinsic-block-size: auto 912px; }
+        .advanced:lang(en) { contain-intrinsic-block-size: auto 640px; }
+    }
+    .advancedGroup {
+        gap: inherit;
+    }
+    /* Anchor the last pixel when revealing the section changes its estimated height. */
+    .scrollEnd {
+        height: 1px;
+        margin-top: -1px;
+        pointer-events: none;
+    }
     .item :global(button), .item :global(button *) {
         font-size: 15px;
     }
@@ -403,9 +452,9 @@
     import { type DownloadKind } from "../../../shared/downloads";
     import { taskCapacity } from "../../../shared/task";
     import { mediaPathModes as mediaPathModeValues } from "../../../shared/project/file";
-    import { informationDisplays as informationDisplayValues, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
+    import { informationDisplays as informationDisplayValues, referenceTranscriptPositions, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
+    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validReferenceTranscriptPosition, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { settingsResetPatch } from "../../../shared/settings/reset";
     import { levelStages } from "../../audio/levels";
@@ -437,6 +486,7 @@
     let informationDisplay = $state(current.editing.informationDisplay);
     let hideTrivialInformation = $state(current.editing.hideTrivialInformation);
     let referenceOverlap = $state<number | undefined>(current.editing.referenceOverlap);
+    let referenceTranscriptPosition = $state(current.editing.referenceTranscriptPosition);
     let volumeSliderMapping = $state(current.playback.volumeSliderMapping);
     let volumeSliderMinDb = $state<number | undefined>(current.playback.volumeSliderMinDb);
     let mediaSwitchPlayback = $state(current.playback.mediaSwitchPlayback);
@@ -462,7 +512,7 @@
             `${scheme}-${key}`, { anchor: null, open: false, detached: false }
         ])))
     );
-    let titlebarHeight = $state(0);
+    let titlebarBounds = $state<DOMRectReadOnly>();
     const themeModes = themeModeValues.map(mode => ({ mode, icon: { light: lightIcon, system: contrastIcon, dark: moonIcon }[mode] }));
     let concurrency = $state<number | undefined>(current.transcription.concurrency);
     let stabilization = $state<Record<keyof VolumeStabilizationSettings, number | undefined>>({ ...current.volumeStabilization });
@@ -483,6 +533,7 @@
     const languages = $derived(i18n.languageItems());
     const mediaPathModes = $derived(mediaPathModeValues.map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
     const informationDisplays = $derived(informationDisplayValues.map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
+    const referencePositions = $derived(referenceTranscriptPositions.map(value => ({ value, label: i18n.t(`settings.editing.referenceTranscriptPosition.options.${value}`) })));
     const volumeSliderMappings = $derived(volumeSliderMappingValues.map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));
     const switchPlaybackOptions = $derived(switchPlaybackModes.map(value => ({ value, label: i18n.t(`settings.playback.switchPlayback.options.${value}`) })));
     const levelReadouts = $derived(levelStages.map(value => ({ value, label: i18n.t(`settings.playback.levelMeterReadout.options.${value}`) })));
@@ -542,7 +593,10 @@
             () => hideTrivialInformation, value => hideTrivialInformation = value, value => ({ editing: { hideTrivialInformation: value } })),
         numberField({ id: "reference-overlap", label: "settings.editing.referenceOverlap.label", description: "settings.editing.referenceOverlap.description",
             min: 0, max: 100, step: "1", unit: "%", invalid: () => i18n.t("settings.editing.referenceOverlap.invalid") },
-            () => referenceOverlap, value => referenceOverlap = value, validReferenceOverlap, value => ({ editing: { referenceOverlap: value } }))
+            () => referenceOverlap, value => referenceOverlap = value, validReferenceOverlap, value => ({ editing: { referenceOverlap: value } })),
+        selectField({ id: "reference-transcript-position", label: "settings.editing.referenceTranscriptPosition.label" },
+            () => referenceTranscriptPosition, value => referenceTranscriptPosition = value, validReferenceTranscriptPosition,
+            value => ({ editing: { referenceTranscriptPosition: value } }), () => referencePositions)
     ];
     const playbackFields: Field[] = [
         numberField({ id: "start-rewind", label: "settings.playback.startRewind.label", description: "settings.playback.startRewind.description",

@@ -237,9 +237,9 @@
     import * as dialogs from "../../states/dialogs";
     import { vocabularyLineBreak } from "../../../shared/vocabulary/Vocabulary";
     import { type VocabularyGroup } from "../../../shared/vocabulary/match";
-    import { documentText, applyTranscriptVocabulary } from "../../editor/transcript";
+    import { documentText, applyTranscriptVocabulary, registerTranscriptMenuTarget } from "../../editor/transcript";
 
-    let { runs, run }: { runs: Run[]; run: Run } = $props();
+    let { runs, run, reference = false }: { runs: Run[]; run: Run; reference?: boolean } = $props();
     type ReferenceItem = { text: string; range: Range; target: Range; runs: number[] };
     let request = $state.raw<TranscriptMenuRequest | null>(null);
     let open = $state(false);
@@ -249,13 +249,13 @@
     let vocabularyRevision = -1;
     let content = $state<HTMLDivElement | null>(null);
     const keyboard = new IsUsingKeyboard();
-    const actions = $derived(request ? transcriptMenuClipboardActions(request.target) : []);
+    const actions = $derived<readonly EditAction[]>(reference ? ["copy", "selectAll"] : request ? transcriptMenuClipboardActions(request.target) : []);
     let selectedSource = $state("");
     const canAddVocabulary = $derived(!!selectedSource && !vocabularyLineBreak.test(selectedSource));
-    const canAlign = $derived(request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
-    const references = $derived(request ? referenceItems(request) : []);
+    const canAlign = $derived(!reference && request?.target.kind === "selection" && canAlignTranscriptSelection(request.view, request.selection));
+    const references = $derived(!reference && request ? referenceItems(request) : []);
     let vocabularyMatches = $state.raw<VocabularyGroup[]>([]);
-    const restoreCommand = $derived(request?.target.kind === "deletion" && request.target.information
+    const restoreCommand = $derived(!reference && request?.target.kind === "deletion" && request.target.information
         ? { kind: "restoreTranscriptDeletion", target: request.view.dom, key: request.target.information.key } satisfies Command : null);
     const anchor = $derived(request ? { getBoundingClientRect: () => request!.anchor } : undefined);
     const layer = Symbol();
@@ -266,8 +266,9 @@
             open = false;
             return false;
         }
+        if (reference && (value.target.kind === "gap" || value.target.kind === "deletion")) return false;
         if (value.target.kind === "gap" && !referenceItems(value).length) return false;
-        if (value.target.kind === "deletion" || value.target.kind === "gap") {
+        if (reference || value.target.kind === "deletion" || value.target.kind === "gap") {
             vocabularyMatches = [];
             selectedSource = "";
         }
@@ -429,6 +430,10 @@
     $effect.pre(() => {
         if (open) untrack(() => modal.openLayer(layer));
         else untrack(() => modal.closeLayer(layer));
+    });
+    $effect(() => {
+        if (!content || !request) return;
+        return registerTranscriptMenuTarget(content, request.view);
     });
     $effect(() => {
         const revision = vocabulary.getSnapshot().revision;

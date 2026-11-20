@@ -54,7 +54,7 @@
 {#snippet option(kind: "toggleTranscriptFindCase" | "toggleTranscriptFindWord" | "toggleTranscriptFindPreserveCase", name: "caseSensitive" | "wholeWord" | "preserveCase", icon: string, label: ParseKeys)}
     <Tooltip text={i18n.t(label)} shortcut={shortcut({ kind })} onclick={() => runCommand({ kind })}>
         {#snippet child({ props })}
-            <button {...props} type="button" class="icon-button hoverable activable focusable" class:enabled={transcriptFind.state[name]} aria-pressed={transcriptFind.state[name]} aria-label={i18n.t(label)}>
+            <button {...props} type="button" class="icon-button toggle hoverable activable focusable" class:enabled={transcriptFind.state[name]} aria-pressed={transcriptFind.state[name]} aria-label={i18n.t(label)}>
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 {@html icon}
             </button>
@@ -104,8 +104,7 @@
     .query-field input { padding-right: calc(var(--find-button-size) * 2 + 10px); }
     .replacement-field input { padding-right: calc(var(--find-button-size) + 8px); }
     .options { position: absolute; right: 2px; top: 2px; display: flex; gap: 2px; }
-    .options :global(.icon-button) { padding: 4px; border: 1px solid transparent; }
-    .options :global(.enabled) { border-color: var(--c-accent); background-color: var(--c-selection); }
+    .options :global(.icon-button) { padding: 4px; }
     .actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
     .count { min-width: 64px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .count.empty { color: var(--c-danger); }
