@@ -8,7 +8,7 @@ import { validSettings } from "../main/settings/validate";
 import { defaultSettings } from "../shared/settings/defaults";
 
 type JSONRecord = { [key: string]: unknown };
-const releases = ["v0.5.0", "v0.6.0", "v0.7.0", "v0.8.0", "v0.8.1", "v1.0.0"];
+const releases = ["v0.5.0", "v0.6.0", "v0.7.0", "v0.8.0", "v0.8.1", "v1.0.0", "v1.1.0"];
 const directories: string[] = [];
 const invalidUTF8 = Buffer.from(JSON.stringify({
     ...defaultSettings,
@@ -46,10 +46,14 @@ function retainedFields(sample: JSONRecord): JSONRecord {
     return retained;
 }
 
-function withMissingDefaults(sample: JSONRecord, defaults: JSONRecord): JSONRecord {
-    return Object.fromEntries(Object.entries({ ...defaults, ...sample }).map(([key, value]) => [
-        key, record(value) && record(defaults[key]) ? withMissingDefaults(value, defaults[key]) : value
-    ]));
+// Theme palettes hold overrides, so an empty palette stays empty instead of receiving default colors.
+const overrideMaps = new Set(["theme.light", "theme.dark"]);
+
+function withMissingDefaults(sample: JSONRecord, defaults: JSONRecord, path = ""): JSONRecord {
+    return Object.fromEntries(Object.entries({ ...defaults, ...sample }).map(([key, value]) => {
+        const field = path ? `${path}.${key}` : key;
+        return [key, record(value) && record(defaults[key]) && !overrideMaps.has(field) ? withMissingDefaults(value, defaults[key], field) : value];
+    }));
 }
 
 afterEach(() => {
