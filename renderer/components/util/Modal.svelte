@@ -8,11 +8,13 @@
             <div class="titlebar-backdrop"></div>
             <div class="content-backdrop"></div>
         </Dialog.Overlay>
+        <!-- The fixed backdrop intercepts outside input and the app viewport already clips overflow. -->
         <Dialog.Content
             bind:ref={content}
             class={["modal-content", className]}
             style={`--modal-width: ${width}; --modal-height: ${height}; z-index: ${layerIndex + 1};`}
             escapeKeydownBehavior={escBehavior}
+            preventScroll={false}
             interactOutsideBehavior="ignore"
             {onkeydown}
             onOpenAutoFocus={event => {
