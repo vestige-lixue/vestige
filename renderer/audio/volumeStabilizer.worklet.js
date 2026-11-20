@@ -7,6 +7,7 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
     peakCount = 0;
     power = 0;
     quietFrames = 0;
+    seekGainFramesLeft = 0;
     gain = 1;
     limiterGain = 1;
 
@@ -31,7 +32,10 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         this.port.onmessage = ({ data }) => {
             if (data?.type === "enabled" && typeof data.enabled === "boolean") this.enabled = data.enabled;
             else if (data?.type === "settings") this.parameters = parameters(data.settings);
-            else if (data?.type === "reset") this.reset();
+            else if (data?.type === "reset") {
+                this.reset();
+                this.seekGainFramesLeft = Math.round(sampleRate * 0.02);
+            }
         };
     }
 
@@ -99,10 +103,17 @@ class VolumeStabilizerProcessor extends AudioWorkletProcessor {
         // Keep the quiet threshold in unweighted dBFS, independent of the new
         // loudness estimate. It controls amplification, not noise removal.
         if (rawPower >= gatePower) {
-            this.power = this.power === 0 || this.quietFrames > sampleRate * 0.25
-                ? power : this.power + (power - this.power) * levelBlend;
+            // A seek can land in silence or partway through an onset. Use the
+            // loudest of the first 20 ms above the gate to acquire attenuation.
+            if (this.seekGainFramesLeft > 0) this.power = Math.max(this.power, power);
+            else if (this.power === 0 || this.quietFrames > sampleRate * 0.25) this.power = power;
+            else this.power += (power - this.power) * levelBlend;
             this.quietFrames = 0;
             targetGain = Math.max(0.0630957, Math.min(maxGain, targetLevel / Math.sqrt(this.power)));
+            if (this.seekGainFramesLeft > 0) {
+                this.gain = Math.min(this.gain, targetGain);
+                this.seekGainFramesLeft = Math.max(0, this.seekGainFramesLeft - frames);
+            }
         }
         else {
             this.quietFrames += frames;

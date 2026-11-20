@@ -12,6 +12,7 @@ type Processor = {
     power: number;
     quietFrames: number;
     gain: number;
+    port: { onmessage(event: { data: { type: "reset" } }): void };
     process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean;
     reset(): void;
 };
@@ -51,6 +52,10 @@ function render(processor: Processor, input: Float32Array[]): Float32Array[] {
 
 function tone(frequency: number, amplitude = Math.SQRT2 * 0.1, seconds = 2): Float32Array {
     return Float32Array.from({ length: rate * seconds }, (_, i) => amplitude * Math.sin(2 * Math.PI * frequency * i / rate));
+}
+
+function levelDb(samples: Float32Array): number {
+    return 10 * Math.log10(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
 }
 
 function measuredPower(channels: Float32Array[]): number {
@@ -105,6 +110,48 @@ describe("volume stabilization measurement", () => {
         expect(render(processor, silent)).toEqual(render(create(), silent));
         render(processor, [samples]);
         expect(render(processor, silent)).toEqual(render(create(), silent));
+    });
+
+    it("starts repeated loud previews at their stabilized level", () => {
+        const processor = create();
+        const loud = tone(1000, 0.8);
+        const [continuous] = render(processor, [loud, loud]);
+        const window = rate * 0.01;
+        const reference = levelDb(continuous.subarray(-window));
+        const preview = loud.subarray(0, rate * 0.08);
+        for (let i = 0; i < 4; i++) {
+            processor.port.onmessage({ data: { type: "reset" } });
+            const [output] = render(processor, [preview, preview]);
+            expect(Math.abs(levelDb(output.subarray(0, window)) - reference)).toBeLessThan(1);
+        }
+    });
+
+    it("acquires a loud onset after seeking from boosted audio into background noise", () => {
+        const processor = create();
+        const quiet = tone(1000, 0.01);
+        render(processor, [quiet, quiet]);
+        expect(processor.gain).toBeGreaterThan(5);
+        processor.port.onmessage({ data: { type: "reset" } });
+        const loud = tone(1000, 0.8);
+        const lead = blockSize * 30 + 73;
+        const ramp = rate * 0.005;
+        const samples = new Float32Array(lead + loud.length).fill(0.0005);
+        samples.set(loud.map((value, i) => value * Math.min(1, i / ramp)), lead);
+        const [output] = render(processor, [samples, samples]);
+        const window = rate * 0.01;
+        expect(Math.abs(levelDb(output.subarray(lead + ramp, lead + ramp + window)) - levelDb(output.subarray(-window)))).toBeLessThan(1);
+    });
+
+    it("raises gain gradually when a seek lands on quiet audio", () => {
+        const processor = create();
+        const loud = tone(1000, 0.8);
+        render(processor, [loud, loud]);
+        processor.port.onmessage({ data: { type: "reset" } });
+        const quiet = tone(1000, 0.01);
+        const [output] = render(processor, [quiet, quiet]);
+        const window = rate * 0.01;
+        expect(levelDb(output.subarray(0, window)) - levelDb(quiet.subarray(0, window))).toBeLessThan(1);
+        expect(levelDb(output.subarray(-window)) - levelDb(quiet.subarray(-window))).toBeGreaterThan(15);
     });
 
     it("does not apply weighting filters to the audible bypass path", () => {
