@@ -10,37 +10,71 @@ const qwenLanguages: Record<string, string> = {
     polish: "pl", czech: "cs", filipino: "fil", persian: "fa", greek: "el", hungarian: "hu", macedonian: "mk", romanian: "ro"
 };
 
+type QwenHeader = { from: number; to: number; language: string };
+
+function qwenHeaders(text: string): QwenHeader[] {
+    const headers: QwenHeader[] = [];
+    let previousEnd = 0;
+    let declaration: RegExpExecArray | undefined;
+    for (const match of text.matchAll(/\$?languages?\s+|<asr_text>/gi)) {
+        if (!match[0].startsWith("<")) {
+            declaration = match;
+            continue;
+        }
+        if (!declaration) continue;
+        // Only the declaration immediately preceding this marker belongs to the protocol.
+        const language = text.slice(declaration.index + declaration[0].length, match.index).trim();
+        if (/^[a-z]+(?:[ -]+[a-z]+)*$/i.test(language)) {
+            const from = /[\p{L}\p{N}]/u.test(text.slice(previousEnd, declaration.index)) ? declaration.index : previousEnd;
+            previousEnd = match.index + match[0].length;
+            headers.push({ from, to: previousEnd, language: language.toLowerCase() });
+        }
+        declaration = undefined;
+    }
+    return headers;
+}
+
 export function normalizeQwenOutput(output: NativeObject): NativeObject {
     if (typeof output.text !== "string") return output;
-    // Some 1.7B exports emit $LANGUAGE instead of the lowercase prefix stripped
-    // by sherpa. Only remove a complete leading protocol header, never words
-    // such as "language" that may themselves be the spoken transcript.
-    const prefix = /^\s*\$?languages?\s+([A-Za-z][A-Za-z -]{0,40})<asr_text>/i.exec(output.text);
-    if (!prefix) return output;
-    const header = prefix[0].trimStart();
-    const tokens = array(output.tokens);
-    let joined = "";
-    let removed = tokens.length;
-    let remaining: unknown[] = [];
-    for (let index = 0; index < tokens.length; index++) {
-        if (typeof tokens[index] !== "string") break;
-        joined += tokens[index];
-        const text = joined.trimStart();
-        if (text.startsWith(header)) {
-            const suffix = text.slice(header.length);
-            removed = index + (suffix ? 0 : 1);
-            remaining = suffix ? [suffix, ...tokens.slice(index + 1)] : tokens.slice(removed);
-            break;
-        }
-        if (!header.startsWith(text)) break;
+    const headers = qwenHeaders(output.text);
+    if (!headers.length) return output;
+    let text = "", offset = 0;
+    for (const header of headers) {
+        text += output.text.slice(offset, header.from);
+        offset = header.to;
     }
-    const trim = (value: unknown): unknown[] => remaining.length ? array(value).slice(removed) : [];
-    return {
-        ...output,
-        text: output.text.slice(prefix[0].length).trimStart(),
-        lang: qwenLanguages[prefix[1].trim().toLowerCase()] ?? output.lang,
-        tokens: remaining, timestamps: trim(output.timestamps), durations: trim(output.durations), ys_log_probs: trim(output.ys_log_probs)
-    };
+    text += output.text.slice(offset);
+    if (headers[0].from === 0) text = text.trimStart();
+
+    const tokens = array(output.tokens);
+    const parts = tokens.every((part): part is string => typeof part === "string") ? tokens : [];
+    // Native tokens can include whitespace omitted from text. Match in their own coordinate space.
+    const spans = qwenHeaders(parts.join(""));
+    const remaining: string[] = [], kept = new Set<number>();
+    if (spans.length === headers.length && spans.every((span, i) => span.language === headers[i].language)) {
+        let start = 0, h = 0;
+        for (const [i, part] of parts.entries()) {
+            const end = start + part.length;
+            let body = "", cursor = start;
+            while (h < spans.length && spans[h].from < end) {
+                const span = spans[h];
+                if (cursor < span.from) body += part.slice(cursor - start, span.from - start);
+                cursor = Math.min(end, span.to);
+                if (span.to > end) break;
+                h++;
+            }
+            body += part.slice(cursor - start);
+            const outsideHeader = h === spans.length || start < spans[h].from;
+            if (body || !part && outsideHeader) {
+                kept.add(i);
+                remaining.push(body);
+            }
+            start = end;
+        }
+    }
+    const keep = (value: unknown): unknown[] => array(value).filter((_, i) => kept.has(i));
+    return { ...output, text, lang: qwenLanguages[headers[0].language] ?? output.lang,
+        tokens: remaining, timestamps: keep(output.timestamps), durations: keep(output.durations), ys_log_probs: keep(output.ys_log_probs) };
 }
 
 export function parseBatchResults(raw: string, diagnostic: string, expected: number): unknown[] {

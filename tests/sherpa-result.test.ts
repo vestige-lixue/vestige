@@ -165,6 +165,33 @@ describe("Qwen protocol tokens", () => {
         }
     );
 
+    it("drops the punctuated header from a KateDarling window", () => {
+        const tokens = [".", "language", " English", "<asr_text>", "Just", " imagine"];
+        const output = { text: tokens.join(""), tokens, timestamps: tokens.map(() => 221.081),
+            durations: tokens.map(() => 12.4), ys_log_probs: [-6, -5, -4, -3, -2, -1] };
+        expect(normalizeQwenOutput(output)).toMatchObject({ text: "Just imagine", lang: "en", tokens: ["Just", " imagine"],
+            timestamps: [221.081, 221.081], durations: [12.4, 12.4], ys_log_probs: [-2, -1] });
+    });
+
+    it("keeps spoken Unicode text and both sides of partially covered tokens", () => {
+        const tokens = ["第３句。language LAN", "GUAGE English<asr_text>Just"];
+        expect(normalizeQwenOutput({ text: tokens.join(""), tokens, timestamps: [0, 1], durations: [1, 2], ys_log_probs: [-2, -1] }))
+            .toMatchObject({ text: "第３句。language Just", lang: "en", tokens: ["第３句。language ", "Just"], timestamps: [0, 1], durations: [1, 2], ys_log_probs: [-2, -1] });
+    });
+
+    it("removes every header and uses the first language", () => {
+        const tokens = ["language English<asr_text>", "One ", "language", " French", "<asr_text>deux", ""];
+        const output = { text: tokens.join(""), tokens, timestamps: [0, 1, 2, 3, 4, 5], durations: [5, 6, 7, 8, 9, 0], ys_log_probs: [-5, -4, -3, -2, -1, 0] };
+        expect(normalizeQwenOutput(output)).toMatchObject({ text: "One deux", lang: "en", tokens: ["One ", "deux", ""],
+            timestamps: [1, 4, 5], durations: [6, 9, 0], ys_log_probs: [-4, -1, 0] });
+    });
+
+    it("preserves spoken language English without a protocol marker", () => {
+        const tokens = ["The", " language", " English", " is spoken."];
+        const output = { text: tokens.join(""), tokens, timestamps: [0, 1, 2, 3], durations: [1, 1, 1, 1], ys_log_probs: [-1, -2, -3, -4] };
+        expect(normalizeQwenOutput(output)).toBe(output);
+    });
+
     it("leaves output without a complete protocol header unchanged", () => {
         const output = { text: "language is useful", lang: "en", tokens: ["language", " is", " useful"], timestamps: [0, 1, 2], durations: [1, 1, 1] };
         expect(normalizeQwenOutput(output)).toBe(output);
