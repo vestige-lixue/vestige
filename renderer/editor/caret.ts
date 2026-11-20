@@ -1,21 +1,12 @@
-import { Plugin, TextSelection } from "@tiptap/pm/state";
+import { AllSelection, Plugin, TextSelection } from "@tiptap/pm/state";
 import { isHistoryTransaction } from "@tiptap/pm/history";
 import { compositionPending } from "./composition";
-import { ProjectionStep } from "./projectionStep";
 
 export function caretPlugin(): Plugin {
     return new Plugin({
-        appendTransaction(transactions, oldState, newState) {
-            if (!transactions.some(isHistoryTransaction)) return null;
-            // A moved range follows the text back to its source on undo and to its destination on redo.
-            if (transactions.some(transaction => transaction.steps.some(step => step instanceof ProjectionStep && step.restoreSelection))) return null;
-            // Ordinary history edits keep the user's current selection.
-            // Clamp to both text bounds so select-all excludes the paragraph boundaries.
-            const end = Math.min(oldState.doc.content.size, newState.doc.content.size) - 1;
-            const anchor = Math.max(1, Math.min(end, oldState.selection.anchor));
-            const head = Math.max(1, Math.min(end, oldState.selection.head));
-            const selection = TextSelection.create(newState.doc, anchor, head);
-            return selection.eq(newState.selection) ? null : newState.tr.setSelection(selection);
+        appendTransaction(transactions, _oldState, newState) {
+            if (!(newState.selection instanceof AllSelection) || !transactions.some(isHistoryTransaction)) return null;
+            return newState.tr.setSelection(TextSelection.create(newState.doc, 1, newState.doc.content.size - 1));
         },
         props: {
             attributes(state) {

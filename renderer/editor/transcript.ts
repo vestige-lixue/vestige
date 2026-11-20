@@ -292,8 +292,7 @@ export function transcriptPlugins(index: TextIndex, canEdit: () => boolean = () 
             // ProseMirror owns the composition DOM until the final input has been consumed.
             if (compositionActive(newState)) return null;
             const transaction = newState.tr.setMeta(bridgeKey, true);
-            if (projection !== saved) transaction.step(new ProjectionStep(saved.modifications, projection.modifications, saved, projection,
-                transactions.some(transaction => transaction.getMeta("uiEvent") === "drop")));
+            if (projection !== saved) transaction.step(new ProjectionStep(saved.modifications, projection.modifications, saved, projection));
             synchronizeMarks(index, transaction, projection, dirty);
             return transaction.steps.length || dirty.length ? transaction : null;
         },

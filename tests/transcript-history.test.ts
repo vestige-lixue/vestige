@@ -93,6 +93,7 @@ describe("transcript history selection", () => {
 
     it("undoes different case-preserved replacement lengths together with their exact source marks", () => {
         const value = editor(["CAT", " cat", " Cat"]);
+        value.select(12, 1);
         const before = value.state().doc;
         const text = documentText(before);
         const ranges = findOccurrences(text, "cat").map(range => ({ ...range, text: preserveReplacementCase(text.slice(range.from, range.to), "ß") }));
@@ -102,6 +103,7 @@ describe("transcript history selection", () => {
         const after = value.state().doc, modifications = transcriptModifications(value.state());
         value.history("undo");
         expect(value.state().doc.eq(before)).toBe(true);
+        expect(value.state().selection).toMatchObject({ anchor: 12, head: 1 });
         expect(transcriptModifications(value.state())).toEqual([]);
         value.history("redo");
         expect(value.state().doc.eq(after)).toBe(true);
@@ -131,7 +133,8 @@ describe("transcript history selection", () => {
 
     it.each([["新词", "甲新词丙丁"], ["", "甲丙丁"]])("applies vocabulary replacement %j across added text and Unicode as an isolated undo entry", (replacement, expected) => {
         const value = editor("甲乙😀丙丁");
-        value.apply(value.state().tr.insertText("新增", 2));
+        value.select(2);
+        value.apply(value.state().tr.insertText("新增"));
         value.select(2, 7);
         const before = transcriptProjection(value.state());
         const request = vocabularyRequest(value);
@@ -148,6 +151,7 @@ describe("transcript history selection", () => {
         expect(documentText(value.state().doc)).toBe(expected);
         value.history("undo");
         expect(documentText(value.state().doc)).toBe(before.text);
+        expect(value.state().selection.eq(request.selection)).toBe(true);
         expect(transcriptModifications(value.state())).toEqual(before.modifications);
         value.history("redo");
         expect(documentText(value.state().doc)).toBe(expected);
@@ -206,22 +210,25 @@ describe("transcript history selection", () => {
         expect(documentText(value.state().doc)).toBe("怎样X");
         expect(undoDepth(value.state())).toBe(2);
         expect(transcriptModifications(value.state())).toEqual(after.modifications);
+        value.select(4);
         value.history("undo");
         expect(documentText(value.state().doc)).toBe("什X么");
+        expect(value.state().selection).toMatchObject({ anchor: 1, head: 1 });
         expect(transcriptModifications(value.state())).toEqual(before.modifications);
         value.history("redo");
         expect(documentText(value.state().doc)).toBe("怎样X");
         expect(transcriptModifications(value.state())).toEqual(after.modifications);
     });
 
-    it.each([[5, 5], [4, 7], [7, 4]])("keeps the current anchor %i and head %i through undo and redo", (anchor, head) => {
+    it.each([[9, 9], [7, 12], [12, 7]])("undoes typing at its original caret and redoes to the pre-undo selection %i/%i", (anchor, head) => {
         const value = editor("abcdefghij");
-        value.apply(value.state().tr.insertText("XY", 2));
+        value.select(2);
+        value.apply(value.state().tr.insertText("XY"));
         const modifications = transcriptModifications(value.state());
         value.select(anchor, head);
         expect(value.history("undo")).toBe(true);
         expect(documentText(value.state().doc)).toBe("abcdefghij");
-        expect(value.state().selection).toMatchObject({ anchor, head });
+        expect(value.state().selection).toMatchObject({ anchor: 2, head: 2 });
         expect(transcriptModifications(value.state())).toEqual([]);
         expect(undoDepth(value.state())).toBe(0);
         expect(redoDepth(value.state())).toBe(1);
@@ -233,77 +240,76 @@ describe("transcript history selection", () => {
         expect(redoDepth(value.state())).toBe(0);
     });
 
-    it("uses the selection moved after undo when redoing a replacement", () => {
-        const value = editor("abcdefghij");
-        value.select(2, 5);
-        value.apply(value.state().tr.insertText("XYZ"));
-        value.select(9, 7);
+    it("restores a reverse selection across emoji and a hard break when undoing a replacement", () => {
+        const value = editor("a😀b\ncd");
+        value.select(7, 2);
+        value.apply(value.state().tr.insertText("X"));
+        expect(documentText(value.state().doc)).toBe("aXd");
         value.history("undo");
-        expect(value.state().selection).toMatchObject({ anchor: 9, head: 7 });
-        value.select(6);
+        expect(documentText(value.state().doc)).toBe("a😀b\ncd");
+        expect(value.state().selection).toMatchObject({ anchor: 7, head: 2 });
+        value.select(1);
         value.history("redo");
-        expect(documentText(value.state().doc)).toBe("aXYZefghij");
-        expect(value.state().selection).toMatchObject({ anchor: 6, head: 6 });
+        expect(documentText(value.state().doc)).toBe("aXd");
+        expect(value.state().selection).toMatchObject({ anchor: 3, head: 3 });
     });
 
-    it.each([[4, 9, 4, 7], [9, 4, 7, 4], [9, 9, 7, 7]])("clamps only out-of-range endpoints %i/%i when undo shortens the text", (anchor, head, nextAnchor, nextHead) => {
+    it("returns the caret to the right of the restored character when undoing Backspace", () => {
+        const value = editor("明天下午去");
+        value.select(5);
+        const { head } = value.state().selection;
+        value.apply(value.state().tr.delete(head - 1, head));
+        expect(documentText(value.state().doc)).toBe("明天下去");
+        value.history("undo");
+        expect(documentText(value.state().doc)).toBe("明天下午去");
+        expect(value.state().selection).toMatchObject({ anchor: 5, head: 5 });
+        value.history("redo");
+        expect(value.state().selection).toMatchObject({ anchor: 4, head: 4 });
+    });
+
+    it.each(["X", ""])("restores a text-only selection after replacing the whole document with %j", replacement => {
         const value = editor("abcdef");
-        value.apply(value.state().tr.insertText("XYZ", 7));
-        value.select(anchor, head);
+        value.apply(value.state().tr.setSelection(new AllSelection(value.state().doc)));
+        expect(value.state().selection).toBeInstanceOf(AllSelection);
+        value.apply(replacement ? value.state().tr.insertText(replacement) : value.state().tr.deleteSelection());
+        expect(documentText(value.state().doc)).toBe(replacement);
         value.history("undo");
         expect(documentText(value.state().doc)).toBe("abcdef");
-        expect(value.state().selection).toMatchObject({ anchor: nextAnchor, head: nextHead });
+        expect(value.state().selection.eq(TextSelection.create(value.state().doc, 1, 7))).toBe(true);
         value.history("redo");
-        expect(documentText(value.state().doc)).toBe("abcdefXYZ");
-        expect(value.state().selection).toMatchObject({ anchor: nextAnchor, head: nextHead });
+        expect(documentText(value.state().doc)).toBe(replacement);
+        expect(value.state().selection.eq(TextSelection.create(value.state().doc, 1 + replacement.length))).toBe(true);
     });
 
-    it("clamps the current reverse selection when redo shortens the text", () => {
-        const value = editor("abcdefghij");
-        value.apply(value.state().tr.delete(4, 11));
-        value.select(2);
-        value.history("undo");
-        expect(value.state().selection).toMatchObject({ anchor: 2, head: 2 });
-        value.select(9, 2);
-        value.history("redo");
-        expect(documentText(value.state().doc)).toBe("abc");
-        expect(value.state().selection).toMatchObject({ anchor: 4, head: 2 });
-    });
-
-    it("keeps the same selected text range when undo grows a fully selected document", () => {
-        const value = editor("abcdef");
-        value.apply(value.state().tr.delete(4, 7));
+    it("clamps restored whole-document selections to the empty and populated text bounds", () => {
+        const value = editor("");
+        value.apply(value.state().tr.setSelection(new AllSelection(value.state().doc)));
+        value.apply(value.state().tr.insertText("hello"));
         value.apply(value.state().tr.setSelection(new AllSelection(value.state().doc)));
         value.history("undo");
-        expect(documentText(value.state().doc)).toBe("abcdef");
-        expect(value.state().selection).toMatchObject({ anchor: 1, head: 4 });
-        value.history("redo");
-        expect(documentText(value.state().doc)).toBe("abc");
-        expect(value.state().selection).toMatchObject({ anchor: 1, head: 4 });
-    });
-
-    it("keeps a valid caret when undo empties the document and redo restores it", () => {
-        const value = editor("");
-        value.apply(value.state().tr.insertText("hello"));
-        value.select(6);
-        value.history("undo");
         expect(documentText(value.state().doc)).toBe("");
-        expect(value.state().selection).toMatchObject({ anchor: 1, head: 1 });
+        expect(value.state().selection.eq(TextSelection.create(value.state().doc, 1))).toBe(true);
         value.history("redo");
         expect(documentText(value.state().doc)).toBe("hello");
-        expect(value.state().selection).toMatchObject({ anchor: 1, head: 1 });
+        expect(value.state().selection.eq(TextSelection.create(value.state().doc, 1, 6))).toBe(true);
     });
 
-    it("preserves a reverse selection across line breaks and emoji through multiple history entries", () => {
-        const value = editor("a😀b\ncdefgh");
-        value.apply(value.state().tr.insertText("X", 2));
-        value.apply(closeHistory(value.state().tr).insertText("Y", 2));
-        value.select(9, 5);
-        for (const action of ["undo", "undo", "redo", "redo"] as const) {
+    it("restores each entry's selection through two consecutive undos and redos", () => {
+        const value = editor("abcdef");
+        value.select(2);
+        value.apply(value.state().tr.insertText("X"));
+        value.select(5, 3);
+        value.apply(closeHistory(value.state().tr).insertText("Y"));
+        for (const [action, text, anchor, head] of [
+            ["undo", "aXbcdef", 5, 3],
+            ["undo", "abcdef", 2, 2],
+            ["redo", "aXbcdef", 5, 3],
+            ["redo", "aXYdef", 4, 4]
+        ] as const) {
             expect(value.history(action)).toBe(true);
-            expect(value.state().selection).toMatchObject({ anchor: 9, head: 5 });
+            expect(documentText(value.state().doc)).toBe(text);
+            expect(value.state().selection).toMatchObject({ anchor, head });
         }
-        expect(documentText(value.state().doc)).toBe("aYX😀b\ncdefgh");
         expect(undoDepth(value.state())).toBe(2);
         expect(redoDepth(value.state())).toBe(0);
     });
@@ -337,11 +343,12 @@ describe("transcript history selection", () => {
         expect(value.history("undo")).toBe(true);
         expect(transcriptModifications(value.state())).toEqual(before.modifications);
         expect(documentText(value.state().doc)).toBe(before.text);
+        expect(value.state().selection).toMatchObject({ anchor: 6, head: 2 });
         expect(value.history("redo")).toBe(true);
         expect(transcriptModifications(value.state())).toEqual(after.modifications);
         expect(documentText(value.state().doc)).toBe(after.text);
         expect(value.state().selection.anchor).toBeGreaterThanOrEqual(value.state().selection.head);
-        if (action !== "restore" && action !== "insert") expect(value.state().selection.eq(selection)).toBe(true);
+        expect(value.state().selection.eq(selection)).toBe(true);
     });
 
     it("undoes partial alignment without changing unselected added text or selection direction", () => {
