@@ -1,7 +1,7 @@
 <svelte:window bind:innerHeight={windowHeight} />
 
-<section class:video={isVideo}>
-    <div class="preview" style:height={`${previewHeight}px`} bind:contentBoxSize={null, sizes => previewWidth = sizes?.[0]?.inlineSize ?? 0}>
+<section class:video={isVideo} class:below bind:borderBoxSize={null, sizes => playerHeight = sizes?.[0]?.blockSize ?? 0}>
+    <div class="preview" style:height={`${previewHeight}px`} bind:borderBoxSize={null, sizes => previewSize = sizes?.[0]}>
         {#if source && isVideo}
             {#key source}
                 <!-- svelte-ignore a11y_media_has_caption -->
@@ -21,13 +21,14 @@
             </Tooltip>
         {/if}
     </div>
-    <div class="playback-controls" bind:borderBoxSize={null, sizes => controlsHeight = sizes?.[0]?.blockSize ?? 0}>
+    <div class="playback-controls">
         <Controls {levels} />
     </div>
 </section>
 {#if isVideo}
     <Resizer
         direction="horizontal"
+        reverse={below}
         origin={previewHeight}
         min={Math.min(minimumVideoHeight, maxVideoHeight)}
         max={maxVideoHeight}
@@ -43,10 +44,15 @@
         flex-shrink: 0;
         min-width: 0;
         padding: 0 20px;
+    }
+    section:not(.video, .below) {
         border-bottom: 1px solid var(--c-border);
     }
-    section.video {
-        border-bottom: 0;
+    section.below {
+        padding-top: var(--drag-region-margin);
+    }
+    section.below:not(.video) {
+        border-top: 1px solid var(--c-border);
     }
     .preview {
         display: grid;
@@ -104,7 +110,7 @@
     import * as mediaImportAPI from "../../states/mediaImport";
     import * as mediaImport from "../../states/mediaImport.svelte";
 
-    const { availableHeight }: { availableHeight: number } = $props();
+    const { availableHeight, below = false }: { availableHeight: number; below?: boolean } = $props();
     const mediaId = $derived(mediaSelection.get());
     const media = $derived(mediaId !== null && mediaImport.isReady(mediaId) ? project.getMedia(mediaId) : null);
     const source = $derived(player.getURL());
@@ -114,15 +120,16 @@
     const minimumTranscriptHeight = 160;
     const resizerThickness = 3;
     let windowHeight = $state(0);
-    let previewWidth = $state(0);
-    let controlsHeight = $state(0);
+    let previewSize = $state.raw<ResizeObserverSize>();
+    let playerHeight = $state(0);
+    const nonPreviewHeight = $derived(Math.max(0, playerHeight - (previewSize?.blockSize ?? 0)));
     let videoSize = $state<{ source: string; ratio: number } | null>(null);
     let nameElement = $state<HTMLSpanElement>();
     let nameTruncated = $state(false);
     const defaultVideoHeight = $derived(Math.min(200, Math.max(minimumVideoHeight, windowHeight * 0.24)));
     const maxVideoHeight = $derived(Math.min(
-        Math.max(0, availableHeight - controlsHeight - resizerThickness - minimumTranscriptHeight),
-        videoSize && videoSize.source === source ? previewWidth * videoSize.ratio : Infinity
+        Math.max(0, availableHeight - nonPreviewHeight - resizerThickness - minimumTranscriptHeight),
+        videoSize && videoSize.source === source ? (previewSize?.inlineSize ?? 0) * videoSize.ratio : Infinity
     ));
     // Clamp only the displayed size so a larger window can restore the user's preference.
     const previewHeight = $derived(isVideo

@@ -54,6 +54,7 @@
     type Props = {
         direction: "horizontal" | "vertical";
         thickness?: number;
+        reverse?: boolean;
         changeCB: (value: number) => void;
         resetCB?: () => void;
         origin: number | string;
@@ -61,7 +62,7 @@
         max?: number | string;
     };
 
-    const { direction, thickness = 5, changeCB, resetCB, origin, min, max }: Props = $props();
+    const { direction, thickness = 5, reverse = false, changeCB, resetCB, origin, min, max }: Props = $props();
 
     let handle: HTMLDivElement;
     let measurement: HTMLDivElement;
@@ -79,6 +80,12 @@
         return direction === "horizontal" ? event.clientY : event.clientX;
     }
 
+    function resize(size: number, delta: number): void {
+        // CSS resolves relative units and min/max expressions against the current layout.
+        measurement.style[dimension] = `${Math.max(0, size + (reverse ? -delta : delta))}px`;
+        changeCB(measurement.getBoundingClientRect()[dimension]);
+    }
+
     function onkeydown(event: KeyboardEvent): void {
         if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
         const decreaseKey = direction === "vertical" ? "ArrowLeft" : "ArrowUp";
@@ -88,8 +95,7 @@
         event.stopPropagation();
         measurement.style[dimension] = toLength(origin)!;
         const size = measurement.getBoundingClientRect()[dimension];
-        measurement.style[dimension] = `${Math.max(0, size + (event.key === decreaseKey ? -1 : 1))}px`;
-        changeCB(measurement.getBoundingClientRect()[dimension]);
+        resize(size, event.key === decreaseKey ? -1 : 1);
     }
 
     function onpointerdown(event: PointerEvent): void {
@@ -110,9 +116,7 @@
             stopDragging();
             return;
         }
-        // CSS resolves relative units and min/max expressions against the current layout.
-        measurement.style[dimension] = `${Math.max(0, dragOrigin + getPos(event) - dragStart)}px`;
-        changeCB(measurement.getBoundingClientRect()[dimension]);
+        resize(dragOrigin, getPos(event) - dragStart);
     }
 
     function onpointerup(event: PointerEvent): void {

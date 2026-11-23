@@ -3,6 +3,7 @@ import { type Settings, type VolumeStabilizationSettings } from "./Settings";
 import { type Config, type Presets } from "../transcription/Config";
 
 export const validLanguage = typia.createIs<Settings["language"]>();
+export const validPlayerPosition = typia.createIs<Settings["layout"]["playerPosition"]>();
 export const validMediaPathMode = typia.createIs<Settings["mediaPathMode"]>();
 export const validSidebarTransparency = typia.createIs<Settings["theme"]["sidebarTransparency"]>();
 

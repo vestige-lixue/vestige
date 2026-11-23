@@ -452,9 +452,9 @@
     import { type DownloadKind } from "../../../shared/downloads";
     import { taskCapacity } from "../../../shared/task";
     import { mediaPathModes as mediaPathModeValues } from "../../../shared/project/file";
-    import { informationDisplays as informationDisplayValues, referenceTranscriptPositions, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
+    import { playerPositions, informationDisplays as informationDisplayValues, referenceTranscriptPositions, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validReferenceTranscriptPosition, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
+    import { validLanguage, validPlayerPosition, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validReferenceTranscriptPosition, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { settingsResetPatch } from "../../../shared/settings/reset";
     import { levelStages } from "../../audio/levels";
@@ -479,6 +479,7 @@
     } = $props();
     const [current, micaSupported] = await Promise.all([load(), window.api.supportsMica()]);
     let language = $state<Locale>(current.language);
+    let playerPosition = $state(current.layout.playerPosition);
     let compressProjectFiles = $state(current.compressProjectFiles);
     let mediaPathMode = $state(current.mediaPathMode);
     let followPlayback = $state(current.editing.followPlayback);
@@ -531,6 +532,7 @@
     let updates = Promise.resolve(true);
     const failure = $derived(settings.getError());
     const languages = $derived(i18n.languageItems());
+    const playerPositionOptions = $derived(playerPositions.map(value => ({ value, label: i18n.t(`settings.general.playerPosition.options.${value}`) })));
     const mediaPathModes = $derived(mediaPathModeValues.map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
     const informationDisplays = $derived(informationDisplayValues.map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
     const referencePositions = $derived(referenceTranscriptPositions.map(value => ({ value, label: i18n.t(`settings.editing.referenceTranscriptPosition.options.${value}`) })));
@@ -569,6 +571,8 @@
     const generalFields: Field[] = [
         selectField({ id: "interface-language", label: "settings.general.language.label", language: true },
             () => language, value => language = value, validLanguage, value => ({ language: value }), () => languages),
+        selectField({ id: "player-position", label: "settings.general.playerPosition.label" },
+            () => playerPosition, value => playerPosition = value, validPlayerPosition, value => ({ layout: { playerPosition: value } }), () => playerPositionOptions),
         switchField({ id: "compress-project-files", label: "settings.general.compressProjectFiles.label", description: "settings.general.compressProjectFiles.description" },
             () => compressProjectFiles, value => compressProjectFiles = value, value => ({ compressProjectFiles: value })),
         selectField({ id: "media-path-mode", label: "settings.general.mediaPathMode.label", description: "settings.general.mediaPathMode.description",

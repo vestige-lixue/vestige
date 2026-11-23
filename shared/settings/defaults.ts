@@ -32,6 +32,6 @@ export const defaultSettings = {
         targetLevelDb: -15
     },
     window: { width: 800, height: 600, maximized: false },
-    layout: { sidebarWidth: null, videoHeight: null, showReferenceTranscript: false, referenceTranscriptRatio: 0.5 },
+    layout: { playerPosition: "top", sidebarWidth: null, videoHeight: null, showReferenceTranscript: false, referenceTranscriptRatio: 0.5 },
     playback: { mode: "single", volumeSliderMapping: "amplitude", volumeSliderMinDb: -60, mediaSwitchPlayback: "keep", wordSwitchPlayback: "keep", rewindStepMs: 2000, startRewindMs: 0, rememberPlaybackPosition: true, pauseOnOutputDeviceChange: true, audioOffsetMs: 0, showLevelMeter: true, levelMeterReadout: "source", volumeStabilization: false, volume: 1, speed: 1, savedSpeed: null }
 } as const satisfies Settings;

@@ -41,9 +41,8 @@ export function normalizeSettings(value: unknown): unknown {
             if (!(key in value.editing)) Object.assign(value.editing, { [key]: defaultSettings.editing[key] });
         }
     }
-    // Version 1.0.0 and earlier stored neither reference column visibility nor its width.
     if (value && typeof value === "object" && "layout" in value && value.layout && typeof value.layout === "object") {
-        for (const key of ["showReferenceTranscript", "referenceTranscriptRatio"] as const) {
+        for (const key of ["playerPosition", "showReferenceTranscript", "referenceTranscriptRatio"] as const) {
             if (!(key in value.layout)) Object.assign(value.layout, { [key]: defaultSettings.layout[key] });
         }
     }

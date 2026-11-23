@@ -7,7 +7,7 @@ import { type Config, type Presets } from "../transcription/Config";
 import { type MediaPathMode } from "../project/file";
 
 import { type taskCapacity } from "../task";
-import { type audioLevelStages, type playbackModes, type informationDisplays, type referenceTranscriptPositions, type volumeSliderMappings, type switchPlaybackModes } from "./options";
+import { type audioLevelStages, type playbackModes, type playerPositions, type informationDisplays, type referenceTranscriptPositions, type volumeSliderMappings, type switchPlaybackModes } from "./options";
 import { type settingsSections } from "./policy";
 
 type StabilizationLimits = typeof volumeStabilizationLimits;
@@ -61,6 +61,7 @@ export type Settings = {
         readonly maximized: boolean;
     };
     readonly layout: {
+        readonly playerPosition: typeof playerPositions[number];
         // null retains the responsive default until the sidebar is resized.
         readonly sidebarWidth: (number & tags.Minimum<typeof minSidebarWidth> & tags.Maximum<typeof maxSidebarWidth>) | null;
         // null uses the responsive default; viewport limits only affect the displayed height.

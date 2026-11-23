@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { readSettings } from "../main/settings/file";
 import { validSettings } from "../main/settings/validate";
 import { defaultSettings } from "../shared/settings/defaults";
+import { mergeSettings } from "../shared/settings/merge";
+import { settingsResetPatch } from "../shared/settings/reset";
 
 type JSONRecord = { [key: string]: unknown };
 const releases = ["v0.5.0", "v0.6.0", "v0.7.0", "v0.8.0", "v0.8.1", "v1.0.0", "v1.1.0"];
@@ -73,7 +75,7 @@ describe("settings file reading and upgrade", () => {
         expect(readFileSync(path)).toEqual(bytes);
     });
 
-    it("fills only the missing reference preferences when upgrading a settings file", () => {
+    it("fills only the missing layout preferences when upgrading a settings file", () => {
         const path = temporaryPath();
         const previous = JSON.parse(readFileSync(new URL("./support/settings/v1.0.0.json", import.meta.url), "utf8"));
         previous.editing.referenceTranscriptPosition = "left";
@@ -81,7 +83,17 @@ describe("settings file reading and upgrade", () => {
         writeFileSync(path, JSON.stringify(previous));
         const loaded = readSettings(path);
         expect(loaded.loadError).toBeNull();
-        expect(loaded.settings).toEqual({ ...previous, layout: { ...previous.layout, showReferenceTranscript: false } });
+        expect(loaded.settings).toEqual({ ...previous, layout: { ...previous.layout, playerPosition: "top", showReferenceTranscript: false } });
+    });
+
+    it("restores a saved bottom player and resets its position independently of pane sizes", () => {
+        const path = temporaryPath();
+        const layout = { ...defaultSettings.layout, playerPosition: "bottom", sidebarWidth: 240, videoHeight: 180 };
+        writeFileSync(path, JSON.stringify({ ...defaultSettings, layout }));
+        const loaded = readSettings(path);
+        expect(loaded.loadError).toBeNull();
+        expect(loaded.settings.layout).toEqual(layout);
+        expect(mergeSettings(loaded.settings, settingsResetPatch()).layout).toEqual({ ...layout, playerPosition: "top" });
     });
 
     it("round-trips the current defaults", () => {
@@ -115,6 +127,7 @@ describe("settings file reading and upgrade", () => {
         { label: "a newer settings version", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, version: 2, futureSetting: true })), error: { kind: "unsupported-version", file: "settings", version: "2" } },
         { label: "an unknown field from a newer version", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, futureSetting: true })), error: { kind: "unknown-field", path: "settings.futureSetting" } },
         { label: "invalid UTF-8 bytes", bytes: invalidUTF8, error: { kind: "invalid-encoding" } },
+        { label: "an invalid player position", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, layout: { ...defaultSettings.layout, playerPosition: "left" } })), error: { kind: "invalid-structure", path: "settings.layout.playerPosition" } },
         { label: "an invalid reference position", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, editing: { ...defaultSettings.editing, referenceTranscriptPosition: "top" } })), error: { kind: "invalid-structure", path: "settings.editing.referenceTranscriptPosition" } },
         { label: "an out-of-range reference ratio", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, layout: { ...defaultSettings.layout, referenceTranscriptRatio: 1 } })), error: { kind: "invalid-structure", path: "settings.layout.referenceTranscriptRatio" } },
         { label: "a field with the wrong type", bytes: Buffer.from(JSON.stringify({ ...defaultSettings, playback: { ...defaultSettings.playback, speed: "fast" } })), error: { kind: "invalid-structure", path: "settings.playback.speed" } }

@@ -449,6 +449,13 @@
                     "en": "English"
                 }
             },
+            "playerPosition": {
+                "label": "Player position",
+                "options": {
+                    "top": "Above the editor",
+                    "bottom": "Below the editor"
+                }
+            },
             "mediaPathMode": {
                 "label": "Media path storage mode",
                 "description": "Relative paths start from the project file’s folder. Takes effect from the next save.",

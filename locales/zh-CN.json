@@ -448,6 +448,13 @@
                     "en": "English"
                 }
             },
+            "playerPosition": {
+                "label": "播放器位置",
+                "options": {
+                    "top": "编辑器上方",
+                    "bottom": "编辑器下方"
+                }
+            },
             "mediaPathMode": {
                 "label": "媒体路径保存方式",
                 "description": "相对路径以项目文件所在的文件夹为起点。从下次保存起生效。",

@@ -10,6 +10,7 @@ export function settingsResetPatch(): SettingsPatch {
     } = playback;
     return structuredClone({
         compressProjectFiles, mediaPathMode,
+        layout: { playerPosition: defaultSettings.layout.playerPosition },
         transcription: { concurrency: transcription.concurrency },
         editing: { ...editing },
         playback: {

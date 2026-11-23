@@ -1,4 +1,4 @@
-<section class="transcript">
+<section class="transcript" class:player-below={playerBelow}>
     {#if run && vestige}
         {#if settings.getEditing().informationDisplay === "bar"}
             <div class="information-bar">
@@ -80,8 +80,14 @@
     .information-bar {
         flex-shrink: 0;
         padding: 10px 28px;
-        border-bottom: 1px solid var(--c-border);
         background: var(--c-surface);
+    }
+    .transcript:not(.player-below) .information-bar {
+        border-bottom: 1px solid var(--c-border);
+    }
+    .player-below .information-bar {
+        order: 1;
+        border-top: 1px solid var(--c-border);
     }
     .columns {
         display: flex;
@@ -159,6 +165,7 @@
     import { shortcut } from "../../keybindings";
     import { commandDisabled, runCommand, type Command } from "../../states/commands";
 
+    const { playerBelow = false }: { playerBelow?: boolean } = $props();
     let primaryEditor = $state.raw<Editor>();
     let referenceEditor = $state.raw<Editor>();
     const run = $derived(transcript.getRun());

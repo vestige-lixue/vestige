@@ -13,9 +13,9 @@
         {:else}
             <Menu />
         {/if}
-        <main bind:contentBoxSize={null, sizes => availableHeight = sizes?.[0]?.blockSize ?? 0}>
-            <Player {availableHeight} />
-            <Transcript />
+        <main class:player-below={playerBelow} bind:contentBoxSize={null, sizes => availableHeight = sizes?.[0]?.blockSize ?? 0}>
+            <Player {availableHeight} below={playerBelow} />
+            <Transcript {playerBelow} />
         </main>
     </div>
 </Tooltip.Provider>
@@ -33,6 +33,9 @@
         flex: 1;
         min-height: 0;
         overflow: clip;
+    }
+    main.player-below {
+        flex-direction: column-reverse;
     }
 </style>
 
@@ -53,12 +56,14 @@
     import ApplicationDialogs from "./ApplicationDialogs.svelte";
     import Transcript from "../transcript/Transcript.svelte";
     import * as project from "../../states/project.svelte";
+    import * as settings from "../../states/settings.svelte";
     import * as settingsAPI from "../../states/settings";
     import * as transcriptionAPI from "../../states/transcription";
     import * as projectAPI from "../../states/project";
     import { prepareSettingsForQuit } from "../../states/settingsPersistence";
 
     let availableHeight = $state(0);
+    const playerBelow = $derived(settings.getCurrent().layout.playerPosition === "bottom");
 
     $effect(() => {
         document.documentElement.lang = i18n.getLocale();
