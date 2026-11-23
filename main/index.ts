@@ -92,7 +92,7 @@ function startApplication(): void {
             ...(process.platform === "darwin"
                 ? { titleBarOverlay: true, trafficLightPosition: { x: 16, y: 20 } }
                 : { titleBarOverlay: {
-                    color: colors["--c-background"],
+                    color: process.platform === "win32" ? "#00000000" : colors["--c-background"],
                     symbolColor: colors["--c-text"],
                     height: 48
                 } }),

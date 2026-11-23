@@ -40,7 +40,12 @@ export function registerWindowTheme(window: BrowserWindow): void {
             previousMica = mica;
         }
         window.setBackgroundColor(mica ? "#00000000" : background);
-        if (process.platform !== "darwin") window.setTitleBarOverlay({ color: background, symbolColor: text });
+        if (process.platform !== "darwin") {
+            window.setTitleBarOverlay({
+                color: process.platform === "win32" ? "#00000000" : background,
+                symbolColor: text
+            });
+        }
     };
     const unsubscribe = settings.subscribe(update);
     nativeTheme.on("updated", update);
