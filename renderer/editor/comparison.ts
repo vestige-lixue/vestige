@@ -1,11 +1,11 @@
-import { textPosition, textOffset, textPieces, type TextIndex, type TextProjection } from "../../shared/transcript/text";
+import { displayedPieces } from "../../shared/transcript/pieces";
+import { textPosition, textOffset, textPieces, projectionSlice, type TextIndex, type TextProjection, type TextSpan, type TextEdit } from "../../shared/transcript/text";
 
 export type ComparisonPart = { kind: "original" | "deleted" | "inserted" | "ellipsis"; text: string };
-type Block = { from: number; to: number };
 
-export function selectionComparison(index: TextIndex, projection: TextProjection, selection: Block & { sourceFrom: number; sourceTo: number }): ComparisonPart[] {
+export function selectionComparison(index: TextIndex, projection: TextProjection, selection: TextSpan & { sourceFrom: number; sourceTo: number }): ComparisonPart[] {
     if (!projection.modifications.length) return [];
-    const changes: (Block & { parts: ComparisonPart[] })[] = [];
+    const changes: (TextSpan & { parts: ComparisonPart[] })[] = [];
     for (const modification of projection.modifications) {
         if (modification.type !== "delete") continue;
         const from = Math.max(selection.sourceFrom, textOffset(index, modification.range.start));
@@ -41,6 +41,30 @@ export function selectionComparison(index: TextIndex, projection: TextProjection
         cursor = Math.max(cursor, change.to);
     }
     context(selection.sourceTo);
+    return foldComparison(parts);
+}
+
+export function editComparison(projection: TextProjection, selection: TextSpan, edits: readonly TextEdit[]): ComparisonPart[] {
+    const parts: ComparisonPart[] = [];
+    let cursor = selection.from;
+    function context(end: number): void {
+        if (cursor >= end) return;
+        for (const piece of displayedPieces(projection.tree, cursor, end)) {
+            const from = Math.max(cursor, piece.from), to = Math.min(end, piece.to);
+            if (from < to) parts.push({ kind: "original", text: projectionSlice(projection, { from, to }) });
+        }
+    }
+    for (const edit of edits) {
+        context(edit.from);
+        if (edit.from < edit.to) parts.push({ kind: "deleted", text: projectionSlice(projection, edit) });
+        if (edit.text) parts.push({ kind: "inserted", text: edit.text });
+        cursor = edit.to;
+    }
+    context(selection.to);
+    return foldComparison(parts);
+}
+
+function foldComparison(parts: ComparisonPart[]): ComparisonPart[] {
     const result: ComparisonPart[] = [];
     for (let position = 0; position < parts.length;) {
         if (parts[position].kind !== "original") {

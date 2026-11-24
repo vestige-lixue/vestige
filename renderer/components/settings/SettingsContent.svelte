@@ -452,9 +452,9 @@
     import { type DownloadKind } from "../../../shared/downloads";
     import { taskCapacity } from "../../../shared/task";
     import { mediaPathModes as mediaPathModeValues } from "../../../shared/project/file";
-    import { playerPositions, informationDisplays as informationDisplayValues, referenceTranscriptPositions, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
+    import { playerPositions, informationDisplays as informationDisplayValues, referenceTranscriptPositions, referenceMatchings, volumeSliderMappings as volumeSliderMappingValues, switchPlaybackModes } from "../../../shared/settings/options";
     import { type Settings, type SettingsPatch, type VolumeStabilizationSettings } from "../../../shared/settings/Settings";
-    import { validLanguage, validPlayerPosition, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validReferenceTranscriptPosition, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
+    import { validLanguage, validPlayerPosition, validMediaPathMode, validConcurrency, validEditorFontSize, validInformationDisplay, validReferenceOverlap, validReferenceTranscriptPosition, validReferenceMatching, validSidebarTransparency, validVolumeStabilizationValue, validVolumeSliderMapping, validVolumeSliderMinDb, validMediaSwitchPlayback, validWordSwitchPlayback, validLevelMeterReadout, validAudioOffsetMs, validRewindStepMs, validStartRewindMs } from "../../../shared/settings/validate";
     import { defaultSettings } from "../../../shared/settings/defaults";
     import { settingsResetPatch } from "../../../shared/settings/reset";
     import { levelStages } from "../../audio/levels";
@@ -488,6 +488,7 @@
     let hideTrivialInformation = $state(current.editing.hideTrivialInformation);
     let referenceOverlap = $state<number | undefined>(current.editing.referenceOverlap);
     let referenceTranscriptPosition = $state(current.editing.referenceTranscriptPosition);
+    let referenceMatching = $state(current.editing.referenceMatching);
     let volumeSliderMapping = $state(current.playback.volumeSliderMapping);
     let volumeSliderMinDb = $state<number | undefined>(current.playback.volumeSliderMinDb);
     let mediaSwitchPlayback = $state(current.playback.mediaSwitchPlayback);
@@ -536,6 +537,7 @@
     const mediaPathModes = $derived(mediaPathModeValues.map(value => ({ value, label: i18n.t(`settings.general.mediaPathMode.options.${value}`) })));
     const informationDisplays = $derived(informationDisplayValues.map(value => ({ value, label: i18n.t(`settings.editing.informationDisplay.options.${value}`) })));
     const referencePositions = $derived(referenceTranscriptPositions.map(value => ({ value, label: i18n.t(`settings.editing.referenceTranscriptPosition.options.${value}`) })));
+    const matchingOptions = $derived(referenceMatchings.map(value => ({ value, label: i18n.t(`settings.editing.referenceMatching.options.${value}`) })));
     const volumeSliderMappings = $derived(volumeSliderMappingValues.map(value => ({ value, label: i18n.t(`settings.playback.volumeSliderMapping.options.${value}`) })));
     const switchPlaybackOptions = $derived(switchPlaybackModes.map(value => ({ value, label: i18n.t(`settings.playback.switchPlayback.options.${value}`) })));
     const levelReadouts = $derived(levelStages.map(value => ({ value, label: i18n.t(`settings.playback.levelMeterReadout.options.${value}`) })));
@@ -595,12 +597,15 @@
         switchField({ id: "hide-trivial-information", label: "settings.editing.hideTrivialInformation.label", description: "settings.editing.hideTrivialInformation.description",
             visible: () => informationDisplay === "tooltip" },
             () => hideTrivialInformation, value => hideTrivialInformation = value, value => ({ editing: { hideTrivialInformation: value } })),
-        numberField({ id: "reference-overlap", label: "settings.editing.referenceOverlap.label", description: "settings.editing.referenceOverlap.description",
-            min: 0, max: 100, step: "1", unit: "%", invalid: () => i18n.t("settings.editing.referenceOverlap.invalid") },
-            () => referenceOverlap, value => referenceOverlap = value, validReferenceOverlap, value => ({ editing: { referenceOverlap: value } })),
         selectField({ id: "reference-transcript-position", label: "settings.editing.referenceTranscriptPosition.label" },
             () => referenceTranscriptPosition, value => referenceTranscriptPosition = value, validReferenceTranscriptPosition,
-            value => ({ editing: { referenceTranscriptPosition: value } }), () => referencePositions)
+            value => ({ editing: { referenceTranscriptPosition: value } }), () => referencePositions),
+        selectField({ id: "reference-matching", label: "settings.editing.referenceMatching.label", description: "settings.editing.referenceMatching.description" },
+            () => referenceMatching, value => referenceMatching = value, validReferenceMatching,
+            value => ({ editing: { referenceMatching: value } }), () => matchingOptions),
+        numberField({ id: "reference-overlap", label: "settings.editing.referenceOverlap.label", description: "settings.editing.referenceOverlap.description",
+            min: 0, max: 100, step: "1", unit: "%", invalid: () => i18n.t("settings.editing.referenceOverlap.invalid") },
+            () => referenceOverlap, value => referenceOverlap = value, validReferenceOverlap, value => ({ editing: { referenceOverlap: value } }))
     ];
     const playbackFields: Field[] = [
         numberField({ id: "start-rewind", label: "settings.playback.startRewind.label", description: "settings.playback.startRewind.description",

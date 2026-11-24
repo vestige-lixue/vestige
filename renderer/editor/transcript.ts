@@ -19,11 +19,13 @@ import { type Modification } from "../../shared/Vestige";
 import { type Run } from "../../shared/transcription/Run";
 import { type EditAction } from "../../shared/app";
 import { closeTranscriptMenu, editTranscriptMenu, canRestoreDeletion, restoreDeletion, type TranscriptMenuRequest } from "./menuTarget";
-import { type Range } from "../../shared/util/range";
+import { type Settings } from "../../shared/settings/Settings";
+import { referencePane, type ReferencePane } from "../../shared/transcript/reference";
+import { referenceReplacement, type ReferenceReplacementRequest } from "./referenceReplacement";
 import { informationPlugin, toggleSelectionDeletions, toggleDeletion, transcriptDeletion, transcriptPlaybackMarkers, type InspectionOptions } from "./information";
 import {
     createTextIndex, projectText, editText, editTextRanges, commitText, textPieces, sourceTextPieces, projectionOffset, provenanceChange,
-    alignText, canAlignText, textReplacement, replaceText, type TextReplacement, type TextIndex, type TextProjection
+    alignText, canAlignText, type TextEdit, type TextIndex, type TextProjection
 } from "../../shared/transcript/text";
 
 type DirtyRange = { from: number; to: number };
@@ -466,8 +468,9 @@ export function transcriptExtensions(index: TextIndex, canEdit: () => boolean = 
 }
 
 export function createTranscriptEditor(element: HTMLElement, run: Run, modifications: readonly Modification[], onChange: ((modifications: Modification[]) => void) | undefined, canEdit: () => boolean = () => true, inspection?: InspectionOptions, reference = false): Editor {
-    const index = createTextIndex(run.transcript);
-    const initial = projectText(index, modifications);
+    const cached = reference ? referencePane(run) : null;
+    const index = cached?.index ?? createTextIndex(run.transcript);
+    const initial = cached?.projection ?? projectText(index, modifications);
     let previous = initial.modifications;
     const interaction = Extension.create({
         name: "transcriptInteraction", priority: 0,
@@ -580,40 +583,39 @@ export function alignTranscriptSelection(view: EditorView): boolean {
     return true;
 }
 
-export function transcriptReferenceTarget(request: TranscriptMenuRequest): { range: Range; position: number; replacement: TextReplacement | null } | null {
+export function transcriptReferenceTarget(request: TranscriptMenuRequest): { source: ReferencePane; replacement: ReferenceReplacementRequest } | null {
     const { view, target, selection } = request;
     if (view.isDestroyed || view.state.doc !== request.doc || view.composing || compositionPending(view.state)) return null;
     const { index, projection } = bridgeKey.getState(view.state)!;
     const information = target.information;
     if (!information?.range) return null;
-    const position = projectionOffset(projection, target.position - 1, false);
-    if (target.kind === "gap") return { range: information.range, position, replacement: null };
+    const source = { index, projection };
+    if (target.kind === "gap") return { source, replacement: {
+        kind: "gap", range: information.range, position: projectionOffset(projection, target.position - 1, false)
+    } };
     if (target.kind !== "selection" || selection.empty || target.selectionKind === "added" || information.kind !== "selection") return null;
     const tokens = information.tokens;
     if (!tokens.length) return null;
     const from = projectionOffset(projection, selection.from - 1, false);
     const to = projectionOffset(projection, selection.to - 1, false);
-    const replacement = textReplacement(index, projection, tokens, from, to, position);
-    if (!replacement) return null;
     const range = target.selectionKind === "mixed" ? {
         start: tokens.reduce((start, token) => Math.min(start, index.transcript[token].range.start), Infinity),
         end: tokens.reduce((end, token) => Math.max(end, index.transcript[token].range.end), -Infinity)
     } : information.range;
-    return { range, position, replacement };
+    return { source, replacement: { kind: "selection", range, selection: { from, to }, tokens } };
 }
 
-export function applyTranscriptReference(request: TranscriptMenuRequest, text: string): boolean {
+export function applyTranscriptReference(request: TranscriptMenuRequest, run: Run, edits: readonly TextEdit[], settings: Settings["editing"]): boolean {
     if (!request.view.editable) return false;
     const target = transcriptReferenceTarget(request);
     if (!target) return false;
-    const { view } = request;
-    const { index, projection } = bridgeKey.getState(view.state)!;
-    const next = target.replacement ? replaceText(index, projection, target.replacement, text)
-        : editText(index, projection, target.position, target.position, text, false);
-    if (next === projection) return false;
-    dispatchPreservingScroll(view, closeHistory(projectionTransaction(view.state, projection, next)));
-    view.focus();
-    return true;
+    const candidate = referenceReplacement(target.source, referencePane(run), target.replacement, settings);
+    if (!candidate || candidate.edits.length !== edits.length || !candidate.edits.every(({ from, to, text }, i) =>
+        from === edits[i].from && to === edits[i].to && text === edits[i].text)) return false;
+    const { projection } = target.source;
+    return replaceTranscriptRanges(request.view, edits.map(({ from, to, text }) => ({
+        from: projectionOffset(projection, from, true), to: projectionOffset(projection, to, true), text
+    })));
 }
 
 export function applyTranscriptVocabulary(request: TranscriptMenuRequest, { rule, ranges }: VocabularyGroup): boolean {
@@ -635,14 +637,14 @@ export function applyTranscriptVocabulary(request: TranscriptMenuRequest, { rule
     return replaceTranscriptRanges(view, ranges.map(range => ({ ...range, text: rule.replacement })));
 }
 
-// Both vocabulary and find write displayed ranges explicitly, with one isolated history entry.
-export function replaceTranscriptRanges(view: EditorView, ranges: readonly { from: number; to: number; text: string }[]): boolean {
+// Vocabulary, find and reference candidates write explicit UTF-16 ranges with one isolated history entry.
+export function replaceTranscriptRanges(view: EditorView, ranges: readonly TextEdit[]): boolean {
     if (view.isDestroyed || !view.editable || view.composing || compositionPending(view.state) || !ranges.length) return false;
     const { index, projection } = bridgeKey.getState(view.state)!;
     let right = projection.text.length;
     for (let i = ranges.length - 1; i >= 0; i--) {
         const { from, to } = ranges[i];
-        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to > right || from >= to
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to > right || from > to
             || splitsCodepoint(projection.text, from) || splitsCodepoint(projection.text, to)) return false;
         right = from;
     }

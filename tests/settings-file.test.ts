@@ -72,6 +72,7 @@ describe("settings file reading and upgrade", () => {
         expect(loaded.loadError).toBeNull();
         expect(validSettings(loaded.settings)).toBe(true);
         expect(loaded.settings).toEqual(withMissingDefaults(retained, defaultSettings));
+        expect(loaded.settings.editing.referenceMatching).toBe("text");
         expect(readFileSync(path)).toEqual(bytes);
     });
 
@@ -83,7 +84,10 @@ describe("settings file reading and upgrade", () => {
         writeFileSync(path, JSON.stringify(previous));
         const loaded = readSettings(path);
         expect(loaded.loadError).toBeNull();
-        expect(loaded.settings).toEqual({ ...previous, layout: { ...previous.layout, playerPosition: "top", showReferenceTranscript: false } });
+        expect(loaded.settings).toEqual({
+            ...previous, editing: { ...previous.editing, referenceMatching: "text" },
+            layout: { ...previous.layout, playerPosition: "top", showReferenceTranscript: false }
+        });
     });
 
     it("restores a saved bottom player and resets its position independently of pane sizes", () => {

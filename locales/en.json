@@ -509,9 +509,17 @@
                     "right": "Right"
                 }
             },
+            "referenceMatching": {
+                "label": "Reference matching",
+                "description": "When matching by text, very different text or a very long selection is still matched by time.",
+                "options": {
+                    "text": "By text",
+                    "time": "By time"
+                }
+            },
             "referenceOverlap": {
                 "label": "Reference overlap threshold",
-                "description": "Offer text from other transcriptions under “Replace with” and “Insert” when its time overlap with the target reaches this percentage of the shorter duration.",
+                "description": "When “Replace with” and “Insert” find candidates by time, including when matching by text fails, offer text from other transcriptions whose time overlap with the target reaches this percentage of the shorter duration.",
                 "invalid": "The overlap threshold must be an integer from 0 to 100."
             },
             "title": "Editing",

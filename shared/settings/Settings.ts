@@ -7,7 +7,7 @@ import { type Config, type Presets } from "../transcription/Config";
 import { type MediaPathMode } from "../project/file";
 
 import { type taskCapacity } from "../task";
-import { type audioLevelStages, type playbackModes, type playerPositions, type informationDisplays, type referenceTranscriptPositions, type volumeSliderMappings, type switchPlaybackModes } from "./options";
+import { type audioLevelStages, type playbackModes, type playerPositions, type informationDisplays, type referenceTranscriptPositions, type referenceMatchings, type volumeSliderMappings, type switchPlaybackModes } from "./options";
 import { type settingsSections } from "./policy";
 
 type StabilizationLimits = typeof volumeStabilizationLimits;
@@ -53,6 +53,7 @@ export type Settings = {
         readonly hideTrivialInformation: boolean;
         readonly referenceOverlap: number & tags.Type<"uint32"> & tags.Maximum<100>;
         readonly referenceTranscriptPosition: typeof referenceTranscriptPositions[number];
+        readonly referenceMatching: typeof referenceMatchings[number];
     };
     readonly volumeStabilization: VolumeStabilizationSettings;
     readonly window: {

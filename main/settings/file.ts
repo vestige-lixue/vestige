@@ -37,7 +37,7 @@ export function readSettings(path: string, preferredLanguages: readonly string[]
 export function normalizeSettings(value: unknown): unknown {
     if (value && typeof value === "object" && "editing" in value && value.editing && typeof value.editing === "object") {
         if ("spellcheck" in value.editing) delete value.editing.spellcheck;
-        for (const key of ["followPlayback", "hideTrivialInformation", "referenceOverlap", "referenceTranscriptPosition"] as const) {
+        for (const key of ["followPlayback", "hideTrivialInformation", "referenceOverlap", "referenceTranscriptPosition", "referenceMatching"] as const) {
             if (!(key in value.editing)) Object.assign(value.editing, { [key]: defaultSettings.editing[key] });
         }
     }

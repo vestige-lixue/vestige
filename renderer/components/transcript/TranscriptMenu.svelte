@@ -23,15 +23,20 @@
                         <DropdownMenu.SubContent class="transcript-menu transcript-references" data-keyboard={keyboard.current}
                             align="start" sideOffset={8} collisionPadding={8} style={`z-index: ${layerIndex + 1};`} onkeydown={keydown}
                             onOpenAutoFocus={focusReferences}>
-                            {#each references as reference (reference.text)}
-                                {@const lines = timing(reference.range, reference.target)}
-                                <DropdownMenu.Item class="reference-item activable focusable" disabled={disabled("paste")} onSelect={() => applyReference(reference.text)}>
-                                    <svg class="reference-timing" viewBox="0 0 40 20">
-                                        <line class="candidate-time" x1={lines[0]} x2={lines[1]} y1="4" y2="4" />
-                                        <line class="target-time" x1={lines[2]} x2={lines[3]} y1="16" y2="16" />
-                                    </svg>
-                                    <div class="reference-text" use:fitPreview={{ units: previewUnits(reference.text.replace(/\r\n?|\n/g, " "), "original"), compact: true }}></div>
-                                    <span class="reference-runs">{reference.runs.map(number => `#${number}`).join(" ")}</span>
+                            {#each references as reference (reference.runId)}
+                                {@const display = reference.display}
+                                <DropdownMenu.Item class="reference-item activable focusable" disabled={disabled("paste")} onSelect={() => applyReference(reference)}>
+                                    {#if display.kind === "comparison"}
+                                        <div class="reference-text transcript-preview transcript-comparison" use:fitPreview={{ units: comparisonPreview(display.parts), compact: true }}></div>
+                                    {:else}
+                                        {@const lines = timing(display.range, display.target)}
+                                        <svg class="reference-timing" viewBox="0 0 40 20">
+                                            <line class="candidate-time" x1={lines[0]} x2={lines[1]} y1="4" y2="4" />
+                                            <line class="target-time" x1={lines[2]} x2={lines[3]} y1="16" y2="16" />
+                                        </svg>
+                                        <div class="reference-text" use:fitPreview={{ units: previewUnits(display.text.replace(/\r\n?|\n/g, " "), "original"), compact: true }}></div>
+                                    {/if}
+                                    <span class="reference-run">#{reference.number}</span>
                                 </DropdownMenu.Item>
                             {/each}
                         </DropdownMenu.SubContent>
@@ -172,7 +177,8 @@
         white-space: pre;
         line-height: 20px;
     }
-    .reference-runs {
+    .reference-text.transcript-comparison { white-space-collapse: preserve-spaces; }
+    .reference-run {
         flex-shrink: 0;
         color: var(--c-text-80p);
         font-size: 12px;
@@ -222,10 +228,11 @@
     import { type EditAction } from "../../../shared/app";
     import { transcriptMenuClipboardActions, restoreTranscriptMenuFocus, restoreTranscriptMenuSelection, type TranscriptMenuRequest } from "../../editor/menuTarget";
     import { dismissTranscriptMenu, toggleTranscriptDeletion, canAlignTranscriptSelection, alignTranscriptSelection, transcriptReferenceTarget, applyTranscriptReference } from "../../editor/transcript";
-    import { referenceCandidate } from "../../../shared/transcript/reference";
+    import { referencePane } from "../../../shared/transcript/reference";
+    import { referenceReplacement, type ReferenceReplacement } from "../../editor/referenceReplacement";
     import { type Run } from "../../../shared/transcription/Run";
     import { type Range } from "../../../shared/util/range";
-    import { fitPreview, previewUnits } from "../../editor/preview";
+    import { fitPreview, previewUnits, comparisonPreview } from "../../editor/preview";
     import * as settings from "../../states/settings.svelte";
     import { commandDisabled, commandLabel, runCommand, type Command } from "../../states/commands";
     import { editAvailable, runEdit } from "../../edit";
@@ -240,7 +247,7 @@
     import { documentText, applyTranscriptVocabulary, registerTranscriptMenuTarget } from "../../editor/transcript";
 
     let { runs, run, reference = false }: { runs: Run[]; run: Run; reference?: boolean } = $props();
-    type ReferenceItem = { text: string; range: Range; target: Range; runs: number[] };
+    type ReferenceItem = ReferenceReplacement & { runId: string; number: number };
     let request = $state.raw<TranscriptMenuRequest | null>(null);
     let open = $state(false);
     let focusPending = false;
@@ -317,22 +324,12 @@
     function referenceItems(value: TranscriptMenuRequest): ReferenceItem[] {
         const target = transcriptReferenceTarget(value);
         if (!target) return [];
-        const text = target.replacement?.parts.map(part => part.text).join("");
-        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local grouping is rebuilt for each derived value.
-        const grouped = new Map<string, ReferenceItem>();
-        runs.forEach((source, i) => {
-            if (source.id === run.id) return;
-            const candidate = referenceCandidate(source, target.range, settings.getEditing().referenceOverlap);
-            if (!candidate || candidate.text === text) return;
-            const previous = grouped.get(candidate.text);
-            if (previous) {
-                previous.runs.push(i + 1);
-                previous.range.start = Math.min(previous.range.start, candidate.range.start);
-                previous.range.end = Math.max(previous.range.end, candidate.range.end);
-            }
-            else grouped.set(candidate.text, { text: candidate.text, range: { ...candidate.range }, target: target.range, runs: [i + 1] });
+        const editing = settings.getEditing();
+        return runs.flatMap((other, i) => {
+            if (other.id === run.id) return [];
+            const candidate = referenceReplacement(target.source, referencePane(other), target.replacement, editing);
+            return candidate ? [{ ...candidate, runId: other.id, number: i + 1 }] : [];
         });
-        return [...grouped.values()];
     }
 
     function timing(candidate: Range, target: Range): number[] {
@@ -340,14 +337,14 @@
         return [candidate.start, candidate.end, target.start, target.end].map(time => Math.round(end === start ? 20 : 1 + (time - start) / (end - start) * 38));
     }
 
-    function applyReference(text: string): void {
+    function applyReference(item: ReferenceItem): void {
         if (!request || disabled("paste")) return;
         const current = request;
         changeOpen(false);
         void tick().then(() => {
-            if (open || request !== current || disabled("paste") || !referenceItems(current).some(item => item.text === text)
-                || !restoreTranscriptMenuSelection(current)) return;
-            applyTranscriptReference(current, text);
+            if (open || request !== current || disabled("paste") || !restoreTranscriptMenuSelection(current)) return;
+            const other = runs.find(candidate => candidate.id === item.runId && candidate.id !== run.id);
+            if (other) applyTranscriptReference(current, other, item.edits, settings.getEditing());
         });
     }
 

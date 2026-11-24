@@ -5,7 +5,7 @@ import { closeHistory, undo, redo, undoDepth, redoDepth } from "@tiptap/pm/histo
 import { transcriptContent, transcriptExtensions, transcriptPlugins, transcriptProjection, transcriptModifications, documentText, applyTranscriptVocabulary, replaceTranscriptRanges } from "../renderer/editor/transcript";
 import { findOccurrences, preserveReplacementCase } from "../shared/transcript/find";
 import { projectionTransaction } from "../renderer/editor/projectionStep";
-import { createTextIndex, editText, alignText, restoreTextDeletion, textReplacement, replaceText } from "../shared/transcript/text";
+import { createTextIndex, editText, alignText, restoreTextDeletion, tokenReplacementRanges, replacementBlocks, replacementEdits } from "../shared/transcript/text";
 import { vocabularyRuleIssue } from "../shared/vocabulary/Vocabulary";
 import { transcript } from "./support/fixtures";
 import { rule } from "./support/vocabulary";
@@ -205,8 +205,9 @@ describe("transcript history selection", () => {
         const before = editText(index, initial, 1, 1, "X", false);
         value.apply(closeHistory(projectionTransaction(value.state(), initial, before)));
         value.select(1);
-        const after = replaceText(index, before, textReplacement(index, before, [0], 0, 0, 0)!, "怎样");
-        value.apply(closeHistory(projectionTransaction(value.state(), before, after)));
+        const blocks = replacementBlocks(before, tokenReplacementRanges(index, before, [0]), { from: 0, to: 1 })!;
+        expect(replaceTranscriptRanges(vocabularyRequest(value).view, replacementEdits(blocks, "怎样"))).toBe(true);
+        const after = transcriptProjection(value.state());
         expect(documentText(value.state().doc)).toBe("怎样X");
         expect(undoDepth(value.state())).toBe(2);
         expect(transcriptModifications(value.state())).toEqual(after.modifications);
@@ -218,6 +219,23 @@ describe("transcript history selection", () => {
         value.history("redo");
         expect(documentText(value.state().doc)).toBe("怎样X");
         expect(transcriptModifications(value.state())).toEqual(after.modifications);
+    });
+
+    it("writes multiple insertions beside a supplementary character in one isolated undo entry", () => {
+        const value = editor("😀 cat dog");
+        value.apply(value.state().tr.insertText("!", 3));
+        const before = value.state().doc;
+        expect(replaceTranscriptRanges(vocabularyRequest(value).view, [{ from: 3, to: 3, text: "," }, { from: 11, to: 11, text: "." }])).toBe(true);
+        const after = value.state().doc;
+        expect(documentText(after)).toBe("😀!, cat dog.");
+        value.apply(value.state().tr.insertText("?", 5));
+        expect(undoDepth(value.state())).toBe(3);
+        value.history("undo");
+        expect(value.state().doc.eq(after)).toBe(true);
+        value.history("undo");
+        expect(value.state().doc.eq(before)).toBe(true);
+        value.history("redo");
+        expect(value.state().doc.eq(after)).toBe(true);
     });
 
     it.each([[9, 9], [7, 12], [12, 7]])("undoes typing at its original caret and redoes to the pre-undo selection %i/%i", (anchor, head) => {

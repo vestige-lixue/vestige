@@ -37,6 +37,9 @@ export type TextProjection = {
     modifications: Modification[];
 };
 
+export type TextSpan = { from: number; to: number };
+export type TextEdit = TextSpan & { text: string };
+
 export function createTextIndex(transcript: readonly TranscriptSpan[]): TextIndex {
     const starts: number[] = [];
     const characters: string[] = [];
@@ -194,6 +197,10 @@ export function projectedOffset(projection: TextProjection, source: number): num
 
 export function projectionOffset(projection: TextProjection, offset: number, toUtf16: boolean): number {
     return convertOffset(projection.tree, offset, toUtf16);
+}
+
+export function projectionSlice(projection: TextProjection, { from, to }: TextSpan): string {
+    return projection.text.slice(projectionOffset(projection, from, true), projectionOffset(projection, to, true));
 }
 
 export function projectText(index: TextIndex, modifications: readonly Modification[]): TextProjection {
@@ -363,11 +370,11 @@ export function commitText(index: TextIndex, saved: TextProjection, pending: Tex
 
 // Explicit disjoint writes share one projection update instead of normalizing a growing list per hit.
 // Ranges address displayed codepoints in the same immutable projection, in ascending order.
-export function editTextRanges(index: TextIndex, projection: TextProjection, ranges: readonly { from: number; to: number; text: string }[]): TextProjection {
+export function editTextRanges(index: TextIndex, projection: TextProjection, ranges: readonly TextEdit[]): TextProjection {
     if (!ranges.length) return projection;
     let previous = 0;
     for (const { from, to } of ranges) {
-        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < previous || to <= from || to > projection.length) {
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < previous || to < from || to > projection.length) {
             throw new RangeError("Invalid rendered text ranges.");
         }
         previous = to;
@@ -380,7 +387,8 @@ export function editTextRanges(index: TextIndex, projection: TextProjection, ran
     let first = 0;
     for (const piece of pieces) {
         if (piece.source.kind === "modification" && projection.modifications[piece.source.index].type === "delete") continue;
-        while (first < ranges.length && ranges[first].to <= piece.from) first++;
+        // A point at this piece's start writes before its text, including an existing insertion.
+        while (first < ranges.length && ranges[first].to <= piece.from && ranges[first].from < piece.from) first++;
         const added = piece.source.kind === "modification";
         const characters = added ? Array.from(piece.text) : [];
         const fragments: string[] = [];
@@ -405,6 +413,7 @@ export function editTextRanges(index: TextIndex, projection: TextProjection, ran
     const fragments: string[] = [];
     let offset = 0;
     for (const { from, to, text } of ranges) {
+        if (from === projection.length && text) modifications.push(insertionOf(index, index.characters.length, text));
         fragments.push(projection.text.slice(offset, projectionOffset(projection, from, true)), text);
         offset = projectionOffset(projection, to, true);
     }
@@ -489,20 +498,24 @@ export function editText(index: TextIndex, projection: TextProjection, from: num
     return modifiedProjection(index, projection, changes, next.text);
 }
 
-export type TextReplacement = { parts: { from: number; to: number; text: string }[]; main: number };
+type TextReplacement = { parts: TextEdit[]; main: number };
 
-// All offsets are displayed codepoints. Only unselected added characters separate movable parts.
-export function textReplacement(index: TextIndex, projection: TextProjection, tokens: readonly number[], from: number, to: number, position: number): TextReplacement | null {
-    if (!tokens.length) return null;
+export function tokenReplacementRanges(index: TextIndex, projection: TextProjection, tokens: readonly number[]): TextSpan[] {
+    if (!tokens.length) return [];
     const selected = new Set(tokens);
     const first = tokens.reduce((a, b) => Math.min(a, b)), last = tokens.reduce((a, b) => Math.max(a, b));
-    const ranges = sourceTextPieces(index, projection, index.starts[first], index.starts[last + 1])
+    return sourceTextPieces(index, projection, index.starts[first], index.starts[last + 1])
         .filter(piece => piece.source.kind === "segment" && selected.has(piece.source.index)).map(piece => ({ from: piece.from, to: piece.to }));
-    if (from < to) {
-        for (const piece of textPieces(index, projection, from, to)) {
-            if (piece.source.kind === "segment") continue;
-            const start = Math.max(from, piece.from), end = Math.min(to, piece.to);
-            if (start < end) ranges.push({ from: start, to: end });
+}
+
+// All offsets are displayed codepoints. Only unselected added characters separate movable parts.
+export function replacementBlocks(projection: TextProjection, original: readonly TextSpan[], selection: TextSpan, position = selection.from): TextReplacement | null {
+    const ranges = [...original];
+    if (selection.from < selection.to) {
+        for (const piece of displayedPieces(projection.tree, selection.from, selection.to)) {
+            if (piece.kind !== "insert") continue;
+            const from = Math.max(selection.from, piece.from), to = Math.min(selection.to, piece.to);
+            if (from < to) ranges.push({ from, to });
         }
     }
     ranges.sort((a, b) => a.from - b.from);
@@ -512,14 +525,13 @@ export function textReplacement(index: TextIndex, projection: TextProjection, to
         if (previous && range.from <= previous.to) previous.to = Math.max(previous.to, range.to);
         else parts.push({ ...range, text: "" });
     }
-    for (const part of parts) part.text = projection.text.slice(projectionOffset(projection, part.from, true), projectionOffset(projection, part.to, true));
-    const at = from < to ? from : position;
-    let main = parts.findIndex(part => part.from <= at && at < part.to);
-    if (main < 0) main = parts.findIndex(part => part.to === at);
-    return main < 0 ? null : { parts, main };
+    if (!parts.length) return null;
+    for (const part of parts) part.text = projectionSlice(projection, part);
+    const main = parts.findIndex(part => part.from <= position && position < part.to);
+    return { parts, main: Math.max(0, main) };
 }
 
-export function replaceText(index: TextIndex, projection: TextProjection, target: TextReplacement, text: string): TextProjection {
+export function replacementEdits(target: TextReplacement, text: string): TextEdit[] {
     const { parts, main } = target;
     const kept = new Set<number>();
     let characters = Array.from(text);
@@ -533,12 +545,7 @@ export function replaceText(index: TextIndex, projection: TextProjection, target
         kept.add(last);
         characters = characters.slice(0, characters.length - suffix.length);
     }
-    text = characters.join("");
-    // Right-to-left edits keep the original displayed coordinates and insertion order valid.
-    for (let i = last; i >= 0; i--) {
-        if (!kept.has(i)) projection = editText(index, projection, parts[i].from, parts[i].to, i === main ? text : "", false);
-    }
-    return projection;
+    return parts.flatMap(({ from, to }, i) => kept.has(i) ? [] : [{ from, to, text: i === main ? characters.join("") : "" }]);
 }
 
 export function codepointToUtf16(text: string, offset: number): number {

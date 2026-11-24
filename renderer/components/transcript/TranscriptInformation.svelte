@@ -3,7 +3,7 @@
 {#snippet details(information: InspectionInformation | null)}
     <div class="information" class:compact class:deletion={information?.kind === "deletion"}>
         {#if preview.length}
-            <div class="original" class:comparison={information?.kind === "selection"} use:fitPreview={{ units: preview, compact, suffix, deletion: information?.kind === "deletion" }}></div>
+            <div class="original transcript-preview" class:transcript-comparison={information?.kind === "selection"} use:fitPreview={{ units: preview, compact, suffix, deletion: information?.kind === "deletion" }}></div>
         {/if}
         {#if (!information || information.kind === "token" || information.kind === "gap") && !hideProbabilities}
             <div class="probabilities">
@@ -70,14 +70,6 @@
         text-align: left;
         line-height: 1.9;
     }
-    .original :global(.preview-deleted) {
-        padding: 0 3px;
-        border: 1px solid color-mix(in srgb, var(--c-danger) 20%, transparent);
-        border-radius: 4px;
-        background: color-mix(in srgb, var(--c-danger) 10%, transparent);
-        box-decoration-break: slice;
-        color: var(--c-danger);
-    }
     .deletion:not(.compact) .original {
         padding: 2px 2px 1px;
         overflow: clip visible;
@@ -85,17 +77,9 @@
     .deletion:not(.compact) .original :global(.preview-deleted) {
         padding-inline: 1px;
     }
-    .information:not(.compact) .comparison {
+    .information:not(.compact) .transcript-comparison {
         padding: 0;
         line-height: inherit;
-    }
-    .comparison :global(.preview-deleted) {
-        text-decoration-line: line-through;
-    }
-    .comparison :global(.preview-inserted) {
-        text-decoration-line: underline;
-        text-decoration-style: dashed;
-        text-underline-offset: .15em;
     }
     .original :global(.transcript-event) {
         color: var(--c-accent);

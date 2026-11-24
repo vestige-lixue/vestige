@@ -2,20 +2,21 @@ import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
 import {
     createTextIndex, projectText, textPieces, projectionOffset, projectedOffset, editText, textPosition, textOffset, codepointToUtf16, utf16ToCodepoint, normalizeModifications,
-    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion, textReplacement, replaceText, editTextRanges
+    provenanceChange, commitText, alignText, canAlignText, restoreTextDeletion, tokenReplacementRanges, replacementBlocks, replacementEdits, editTextRanges
 } from "../shared/transcript/text";
 import { modification, referenceText, sourcePosition, sourceOffset, transcript } from "./support/fixtures";
 import { editingArbitrary, editRange, patchesArbitrary, transcriptArbitrary, normalizationArbitrary, textArbitrary } from "./support/generators";
 import { checkProperty } from "./support/properties";
 
 describe("text projection and editing", () => {
-    it("batches disjoint explicit writes exactly like reverse single writes, including existing additions and deletions", () => {
+    it("batches disjoint explicit writes and insertions exactly like reverse single writes", () => {
         fc.assert(fc.property(patchesArbitrary, fc.array(fc.nat(), { minLength: 4, maxLength: 30 }), fc.array(textArbitrary, { minLength: 1, maxLength: 20 }), ({ spans, modifications }, points, replacements) => {
             const index = createTextIndex(spans), before = projectText(index, modifications);
             const endpoints = [...new Set([0, before.length, ...points.map(value => value % (before.length + 1))])].sort((a, b) => a - b);
             const disjoint = endpoints.flatMap((from, i) => i % 2 === 0 && i + 1 < endpoints.length ? [{ from, to: endpoints[i + 1] }] : []);
             const adjacent = Array.from({ length: before.length }, (_, from) => ({ from, to: from + 1 }));
-            for (const ranges of [disjoint, adjacent]) {
+            const withInsertions = endpoints.flatMap((from, i) => [{ from, to: from }, ...i % 2 === 0 && i + 1 < endpoints.length ? [{ from, to: endpoints[i + 1] }] : []]);
+            for (const ranges of [disjoint, adjacent, withInsertions]) {
                 const edits = ranges.map((range, i) => ({ ...range, text: replacements[i % replacements.length] }));
                 let expected = before;
                 for (let i = edits.length - 1; i >= 0; i--) expected = editText(index, expected, edits[i].from, edits[i].to, edits[i].text, false);
@@ -51,9 +52,10 @@ describe("text projection and editing", () => {
     ])("replaces references: $name", ({ texts, edits, tokens, selection, position, candidate, expected }) => {
         const spans = transcript(texts), index = createTextIndex(spans);
         const before = projectText(index, edits.flatMap(change => modification(spans, ...change)));
-        const target = textReplacement(index, before, tokens, ...selection, position)!;
+        const [from, to] = selection;
+        const target = replacementBlocks(before, tokenReplacementRanges(index, before, tokens), { from, to }, from < to ? from : position)!;
         expect(target).not.toBeNull();
-        const result = replaceText(index, before, target, candidate);
+        const result = editTextRanges(index, before, replacementEdits(target, candidate));
         const wanted = projectText(index, expected.flatMap(change => modification(spans, ...change)));
         expect(result.text).toBe(wanted.text);
         expect(result.modifications).toEqual(wanted.modifications);
@@ -61,6 +63,16 @@ describe("text projection and editing", () => {
         const extended = editText(index, result, result.length, result.length, "!");
         const sources = (value: typeof result): (number | null)[] => textPieces(index, value).flatMap(piece => Array.from(piece.text, (_, i) => piece.source.kind === "segment" ? piece.sourceFrom + i : null));
         expect(sources(extended).slice(0, result.length)).toEqual(sources(result));
+    });
+
+    it("replaces an expanded displayed range without touching its unselected addition", () => {
+        const index = createTextIndex(transcript(["Tipton"]));
+        const before = editText(index, projectText(index, []), 3, 3, "X", false);
+        const original = [{ from: 0, to: 3 }, { from: 4, to: 7 }];
+        const blocks = replacementBlocks(before, original, { from: 0, to: 3 })!;
+        const after = editTextRanges(index, before, replacementEdits(blocks, "Pitzer"));
+        expect(after.text).toBe("PitzerX");
+        expect(projectText(index, after.modifications).text).toBe(after.text);
     });
 
     it("projects original-coordinate changes like an independent string reference", () => {

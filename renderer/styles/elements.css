@@ -204,6 +204,25 @@ h6 { font-size: 14px; }
     overflow-wrap: anywhere;
 }
 
+.transcript-preview .preview-deleted {
+    padding: 0 3px;
+    border: 1px solid color-mix(in srgb, var(--c-danger) 20%, transparent);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--c-danger) 10%, transparent);
+    box-decoration-break: slice;
+    color: var(--c-danger);
+}
+
+.transcript-comparison .preview-deleted {
+    text-decoration-line: line-through;
+}
+
+.transcript-comparison .preview-inserted {
+    text-decoration-line: underline;
+    text-decoration-style: dashed;
+    text-underline-offset: .15em;
+}
+
 a {
     color: var(--c-link);
     text-decoration: none;

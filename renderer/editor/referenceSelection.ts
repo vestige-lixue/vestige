@@ -1,7 +1,9 @@
 import { type Editor, type EditorEvents } from "@tiptap/core";
+import { projectionOffset } from "../../shared/transcript/text";
+import { subscribe } from "../states/settings";
 import { compositionPending } from "./composition";
 import { transcriptSelectionTime } from "./informationModel";
-import { referenceTimeIndex } from "./referenceTime";
+import { referenceHighlight } from "./referenceHighlight";
 import { observeTranscriptSelection } from "./selection";
 import { transcriptProjection, transcriptTextIndex } from "./transcript";
 
@@ -15,10 +17,10 @@ export function synchronizeTranscriptSelection(primary: Editor, reference: Edito
     }
     function pane(editor: Editor): {
         view: Editor["view"]; index: ReturnType<typeof transcriptTextIndex>;
-        time: ReturnType<typeof referenceTimeIndex>; selection: ReturnType<typeof observeTranscriptSelection>;
+        selection: ReturnType<typeof observeTranscriptSelection>;
     } {
         const view = editor.view, index = transcriptTextIndex(view.state);
-        return { view, index, time: referenceTimeIndex(index, duration), selection: observeTranscriptSelection(view, schedule) };
+        return { view, index, selection: observeTranscriptSelection(view, schedule) };
     }
     const left = pane(primary), right = pane(reference);
     function update(): void {
@@ -32,10 +34,16 @@ export function synchronizeTranscriptSelection(primary: Editor, reference: Edito
             return;
         }
         const target = source === left ? right : left;
-        const range = transcriptSelectionTime(source.index, transcriptProjection(source.view.state), duration, selected.from - 1, selected.to - 1);
-        const offsets = range && target.time.rangeAtTime(transcriptProjection(target.view.state), range);
+        const from = selected.from - 1, to = selected.to - 1;
+        const projection = transcriptProjection(source.view.state), targetProjection = transcriptProjection(target.view.state);
+        const range = transcriptSelectionTime(source.index, projection, duration, from, to);
+        const offsets = referenceHighlight({ index: source.index, projection }, { index: target.index, projection: targetProjection }, {
+            from: projectionOffset(projection, from, false), to: projectionOffset(projection, to, false)
+        }, range, duration);
         source.selection.compare(null);
-        target.selection.compare(offsets && { from: offsets.from + 1, to: offsets.to + 1 });
+        target.selection.compare(offsets && offsets.from < offsets.to ? {
+            from: projectionOffset(targetProjection, offsets.from, true) + 1, to: projectionOffset(targetProjection, offsets.to, true) + 1
+        } : null);
     }
     function transaction({ transaction, appendedTransactions }: EditorEvents["transaction"]): void {
         const active = composing();
@@ -49,8 +57,9 @@ export function synchronizeTranscriptSelection(primary: Editor, reference: Edito
     owner.addEventListener("blur", schedule, { signal: events.signal });
     primary.on("transaction", transaction);
     reference.on("transaction", transaction);
-    schedule();
+    const stopSettings = subscribe(schedule);
     return () => {
+        stopSettings();
         events.abort();
         primary.off("transaction", transaction);
         reference.off("transaction", transaction);

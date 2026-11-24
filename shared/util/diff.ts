@@ -2,14 +2,17 @@ export type CommonRun = { a: number; b: number; length: number };
 
 // A longest common subsequence of a and b, as maximal runs of equal elements in order.
 // Myers' linear-space bisection (as in diff-match-patch, without its heuristics) keeps every split on a shortest edit path.
-export function commonRuns(a: ArrayLike<number>, b: ArrayLike<number>): CommonRun[] {
+export function commonRuns(a: ArrayLike<number>, b: ArrayLike<number>): CommonRun[];
+export function commonRuns(a: ArrayLike<number>, b: ArrayLike<number>, maxDistance: number): CommonRun[] | null;
+export function commonRuns(a: ArrayLike<number>, b: ArrayLike<number>, maxDistance = Infinity): CommonRun[] | null {
+    if (Math.abs(a.length - b.length) > maxDistance) return null;
     const runs: CommonRun[] = [];
     function push(aFrom: number, bFrom: number, length: number): void {
         const previous = runs.at(-1);
         if (previous && previous.a + previous.length === aFrom && previous.b + previous.length === bFrom) previous.length += length;
         else runs.push({ a: aFrom, b: bFrom, length });
     }
-    function collect(aFrom: number, aTo: number, bFrom: number, bTo: number): void {
+    function collect(aFrom: number, aTo: number, bFrom: number, bTo: number, limit = Infinity): boolean {
         let prefix = 0;
         while (aFrom + prefix < aTo && bFrom + prefix < bTo && a[aFrom + prefix] === b[bFrom + prefix]) prefix++;
         if (prefix) push(aFrom, bFrom, prefix);
@@ -20,21 +23,23 @@ export function commonRuns(a: ArrayLike<number>, b: ArrayLike<number>): CommonRu
         aTo -= suffix;
         bTo -= suffix;
         if (aFrom < aTo && bFrom < bTo) {
-            const split = bisect(a, b, aFrom, aTo, bFrom, bTo);
+            // The top-level split proves the distance for the entire edit path.
+            const split = bisect(a, b, aFrom, aTo, bFrom, bTo, limit);
+            if (split === false) return false;
             if (split) {
                 collect(aFrom, split[0], bFrom, split[1]);
                 collect(split[0], aTo, split[1], bTo);
             }
         }
         if (suffix) push(aTo, bTo, suffix);
+        return true;
     }
-    collect(0, a.length, 0, b.length);
-    return runs;
+    return collect(0, a.length, 0, b.length, maxDistance) ? runs : null;
 }
 
-// A point on a shortest edit path strictly inside the box, or null when the two ranges share no element.
+// A point on a shortest edit path, null for disjoint text, or false if the distance exceeds the limit.
 // The ranges must differ in their first and in their last elements.
-function bisect(a: ArrayLike<number>, b: ArrayLike<number>, aFrom: number, aTo: number, bFrom: number, bTo: number): [number, number] | null {
+function bisect(a: ArrayLike<number>, b: ArrayLike<number>, aFrom: number, aTo: number, bFrom: number, bTo: number, limit: number): [number, number] | null | false {
     const n = aTo - aFrom, m = bTo - bFrom;
     const maxD = Math.ceil((n + m) / 2);
     const offset = maxD, size = 2 * maxD;
@@ -45,8 +50,9 @@ function bisect(a: ArrayLike<number>, b: ArrayLike<number>, aFrom: number, aTo: 
     const delta = n - m;
     // With an odd delta the paths meet during a forward step, otherwise during a reverse step.
     const odd = delta % 2 !== 0;
+    const lastD = Math.min(maxD - 1, Math.floor((limit + Number(odd)) / 2));
     let forwardStart = 0, forwardEnd = 0, reverseStart = 0, reverseEnd = 0;
-    for (let d = 0; d < maxD; d++) {
+    for (let d = 0; d <= lastD; d++) {
         for (let k = -d + forwardStart; k <= d - forwardEnd; k += 2) {
             const at = offset + k;
             let x = k === -d || (k !== d && forward[at - 1] < forward[at + 1]) ? forward[at + 1] : forward[at - 1] + 1;
@@ -81,5 +87,5 @@ function bisect(a: ArrayLike<number>, b: ArrayLike<number>, aFrom: number, aTo: 
             }
         }
     }
-    return null;
+    return n + m > limit ? false : null;
 }

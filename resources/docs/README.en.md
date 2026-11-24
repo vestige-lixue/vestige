@@ -68,7 +68,7 @@ While holding Ctrl (⌘), click text to play from there, or press Enter to play 
 Right-click a ▼ marker, a gap marker, a selection, a word or your own added text to see the actions available there:
 
 - **Restore deleted text** and **Expand/Collapse deleted text** on deletion markers and shown deleted text.
-- **Replace with** lists text that other transcriptions of the same media recognized at the same time. Choosing an entry replaces the selection with it. On a gap marker, the same list appears as **Insert**. The Reference overlap threshold setting decides how closely the times must overlap.
+- **Replace with** offers candidates from other transcriptions of the same media. On a gap marker, the list appears as **Insert**. By default, **Reference matching** finds the corresponding text and previews the differences it will apply. Matching by time looks for words spoken at the same time and uses **Reference overlap threshold** to decide how closely the times must overlap.
 - **Vocabulary replacements** applies matching vocabulary rules, and **Add to vocabulary…** creates a rule from a single-line selection.
 - **Align with original** appears when text you typed contains characters that were deleted from the original. It marks those characters as original again, so they regain their timing. The displayed text does not change.
 - Cut, Copy and Paste.
@@ -118,7 +118,7 @@ Settings also control the playback state after switching media or jumping to a w
 
 Open the Transcriptions button on a media row to see all of its results, each with its start time and configuration. Select a result to display it in the editor.
 
-To read another original result alongside your edits, click the two-column button at the right end of the menu bar (the title bar on macOS), or choose **Show reference transcript** from the **Transcription** menu. This needs at least two results for the media. Pick the reference result from the list above its column. Both columns scroll to the same point in the recording, and selecting text in either column highlights the words spoken at the same time in the other. Drag the divider to resize the columns or double-click it to restore equal widths. Choose the reference side in **Settings → Editing → Reference transcript position**. Vestige remembers the visibility, width ratio and side between sessions.
+To read another original result alongside your edits, click the two-column button at the right end of the menu bar (the title bar on macOS), or choose **Show reference transcript** from the **Transcription** menu. This needs at least two results for the media. Pick the reference result from the list above its column. Both columns scroll to the same point in the recording. When you select text in either column, **Reference matching** determines whether the other column highlights corresponding text or words spoken at the same time. Drag the divider to resize the columns or double-click it to restore equal widths. Choose the reference side in **Settings → Editing → Reference transcript position**. Vestige remembers the visibility, width ratio and side between sessions.
 
 Edits belong to the displayed result. Switching to another result discards all edits, so Vestige asks for confirmation first. Deleting the displayed result also deletes its edits.
 

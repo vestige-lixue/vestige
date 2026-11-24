@@ -18,6 +18,7 @@ export const validEditorFontSize = typia.createIs<Settings["editing"]["fontSize"
 export const validInformationDisplay = typia.createIs<Settings["editing"]["informationDisplay"]>();
 export const validReferenceOverlap = typia.createIs<Settings["editing"]["referenceOverlap"]>();
 export const validReferenceTranscriptPosition = typia.createIs<Settings["editing"]["referenceTranscriptPosition"]>();
+export const validReferenceMatching = typia.createIs<Settings["editing"]["referenceMatching"]>();
 
 export const validVolumeSliderMapping = typia.createIs<Settings["playback"]["volumeSliderMapping"]>();
 const isVolumeSliderMinDb = typia.createIs<Settings["playback"]["volumeSliderMinDb"]>();
