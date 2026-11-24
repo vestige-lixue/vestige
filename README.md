@@ -28,6 +28,7 @@ Vestige brings listening, transcription, and proofreading into one workspace. Th
 3. **Playback and proofreading**: Listen to the original recording and jump to timestamps while reviewing the transcript, correcting mistakes, and filling in omissions.
 4. **Saving projects**: Organize recordings and transcripts in `.vestige` project files in JSON format, with autosave and references to the original media files.
 5. **Exporting transcripts**: Export the original or corrected transcripts as plain text or SRT subtitles.
+6. **Free and open source**: Free software under AGPL-3.0-or-later. Anyone may use, study, modify, and share it at no cost, and versions shared with others stay under the same license.
 
 ## Development
 
