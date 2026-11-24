@@ -115,9 +115,11 @@
     .menu-bar.compact {
         padding-left: 8px;
     }
+    /* Unlike the empty left edge of the window buttons, the toggle's own hover box cannot share space with the title. */
     .reference-toggle {
         flex-shrink: 0;
         margin-left: auto;
+        padding-left: 12px;
     }
     .measurement {
         position: absolute;
